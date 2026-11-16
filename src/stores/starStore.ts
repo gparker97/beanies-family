@@ -6,7 +6,7 @@
  *
  * OFF MEANS ABSENT. Every getter answers nothing (`null` or an empty list) while the feature is
  * off or the stars are not loaded, so a surface needs one `v-if` and no rule of its own. The
- * week close and `afterTick` return at once, logging nothing, while it is off.
+ * week close and the achieved banner's claim do nothing, logging nothing, while it is off.
  *
  * Action contract (the chore store's, through the shared `createGuardedWrites`): a grown-up
  * action checks its `actorId` FIRST, before any other guard; a refusal is an info toast plus an
@@ -19,16 +19,18 @@
  * `settingsStore`. `choreStore` never learns about stars.
  */
 import { defineStore } from 'pinia';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { createGuardedWrites } from '@/composables/useGuardedWrites';
 import { celebrateReward } from '@/composables/useCelebration';
+import { showToast } from '@/composables/useToast';
 import { CHORE_TITLE_MAX } from '@/constants/choreBlocks';
 import { isDocLoaded } from '@/services/automerge/docService';
 import { registerLoadMaintenance, storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import * as choreRepo from '@/services/automerge/repositories/choreRepository';
 import * as repo from '@/services/automerge/repositories/starRepository';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { useTranslationStore } from '@/stores/translationStore';
 import { takeAutoWrite } from '@/utils/autoWriteBudget';
 import { firstName } from '@/utils/assignees';
 import {
@@ -70,12 +72,11 @@ import {
   REWARD_MARK_REF,
   choreDayOfWeek,
   choreWeekStart,
-  isChoreRefusal,
   marksOn,
   shiftChoreDay,
 } from '@/utils/chores';
 import { reportError } from '@/utils/errorReporter';
-import { useChoreStore, type ToggleChoreOutcome } from '@/stores/choreStore';
+import { useChoreStore } from '@/stores/choreStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { Chore, ChoreAward, ChoreStarGift, ChoreWeek, FamilyMember } from '@/types/models';
@@ -126,19 +127,8 @@ export interface WallStars {
   valueOf: (chore: Pick<Chore, 'stars'>) => number;
 }
 
-/** What a tick path hands `afterTick` once `choreStore.toggleChore` resolved. */
-export interface AfterTickInput {
-  memberId: string;
-  outcome: ToggleChoreOutcome | null;
-  surface: 'app' | 'wall';
-  /**
-   * Does the surface that ticked draw the achieved banner for THIS child (the wall's lane: yes;
-   * a child's day: yes; the Chores view's home cards: no)? Only a surface that shows it may
-   * claim the once-a-week celebration; with `false` nothing is written or played, so the child's
-   * next tick on their lane or day plays it.
-   */
-  showsBanner: boolean;
-}
+/** Where a mounted banner host draws the achieved banner: a child's day, or the wall's lane. */
+export type RewardBannerSurface = 'app' | 'wall';
 
 export const useStarStore = defineStore('stars', () => {
   const choreStore = useChoreStore();
@@ -418,13 +408,16 @@ export const useStarStore = defineStore('stars', () => {
    * the patched keys change, and the worker merges per key. `applyRewardsPatch` stamps
    * `startedOn` on every turn-on from off. Turning it OFF (from on) first records every kid's
    * open week as it stands (`recordAtTurnOff`), so the week a pause starts in keeps its stars.
+   * If that record cannot be written the turn-off does NOT happen: it resolves `null` (the
+   * failure has been toasted and reported), the setting is untouched and the switch stays on,
+   * because the next turn-on re-stamps `startedOn` and an unrecorded week would be lost.
    */
   async function setRewards(patch: ChoreRewardsPatch, actorId: string): Promise<true | null> {
     const action = 'setRewards';
     if (!adultActor(actorId, action)) return null;
     if (!validRewardsPatch(patch)) return refuse('invalid', action);
     // Turning it off records the books as they stand, BEFORE the setting is written.
-    if (patch.on === false && rewards.value.on) await recordAtTurnOff();
+    if (patch.on === false && rewards.value.on && !(await recordAtTurnOff())) return null;
     const today = todayYmd.value;
     const ok = await write(action, async () => {
       await settingsStore.setChoreRewards((current) => applyRewardsPatch(current, patch, today));
@@ -463,10 +456,22 @@ export const useStarStore = defineStore('stars', () => {
     };
   }
 
+  /** The same stored kid list (order and malformed entries aside)? Absent and empty are alike. */
+  function sameKids(a: unknown, b: unknown): boolean {
+    const list = (v: unknown) =>
+      Array.isArray(v) ? [...new Set(v.filter((id) => typeof id === 'string'))].sort() : [];
+    const x = list(a);
+    const y = list(b);
+    return x.length === y.length && x.every((id, i) => id === y[i]);
+  }
+
   /**
    * Create an award (no `id`) or edit one (`id`). A new award counts from this week; an edit
    * keeps the week it counts from. Edited with a based patch, so a peer's edit to another field
-   * is kept; `memberIds` travels whole (absent deletes it: every kid).
+   * is kept; `memberIds` travels whole (absent deletes it: every kid). An edit that sends back
+   * the kids the award already has leaves them exactly as stored (not in the patch), even when
+   * none of them earns stars now: an edit never changes who a reward is for unless the
+   * grown-up changed it (the drawer sends the stored list while its Who control is untouched).
    */
   async function saveAward(
     draft: AwardDraft & { id?: string },
@@ -476,7 +481,9 @@ export const useStarStore = defineStore('stars', () => {
     const actor = adultActor(actorId, action);
     if (!actor) return null;
     if (!rewards.value.on) return refuse('off', action);
-    const clean = cleanAward(draft);
+    const stored = draft.id ? awards.value.find((a) => a.id === draft.id) : undefined;
+    const keepKids = !!stored && sameKids(draft.memberIds, stored.memberIds);
+    const clean = cleanAward(keepKids ? { ...draft, memberIds: undefined } : draft);
     if (!clean) return refuse('invalid', action);
     // `count`: how many kids it is for when chosen (0 = every kid). Never names.
     const logSaved = (verb: 'create' | 'update', a: ChoreAward) =>
@@ -488,9 +495,11 @@ export const useStarStore = defineStore('stars', () => {
       });
     if (draft.id) {
       const id = draft.id;
-      if (!awards.value.some((a) => a.id === id)) return refuse('not-found', action);
+      if (!stored) return refuse('not-found', action);
+      const { memberIds, ...rest } = clean;
+      const patch = keepKids ? rest : { ...rest, memberIds };
       const updated = await write(action, async () => {
-        const result = await repo.updateAward(id, clean);
+        const result = await repo.updateAward(id, patch);
         await refresh();
         // Gone: deleted on another device after this store last read it. A refusal, not a failure.
         return result ?? ('gone' as const);
@@ -601,55 +610,123 @@ export const useStarStore = defineStore('stars', () => {
 
   // ========== THE ACHIEVED MOMENT ==========
 
-  /** `member:weekStart` whose reward mark this device is writing now (two ticks at once). */
+  /**
+   * THE RULE (#148, as built). The weekly reward's achieved banner is triggered by the surfaces
+   * that DRAW it, never by a tick. A banner host is a mounted surface that draws the banner for a
+   * child: the wall's lane for that child (`WallChoreLanes`) and the child's day head
+   * (`ChoreboardPage`), each registered through `useRewardBannerHost`. Whenever a host is
+   * mounted for a kid whose current week has reached the weekly reward's bar and has no `reward`
+   * mark (on mount, and whenever that becomes true: a tick on any device or surface, a bonus, a
+   * sync, the stores becoming authoritative), the ONE claim sequence runs (`claimReward`):
+   *  1. wait for any tick of that kid still being written on this device to settle
+   *     (`choreStore.whenTicksSettled`), so a block celebration it starts has started;
+   *  2. wait for that kid's block celebration to end (`celebrateReward`);
+   *  3. ask again: still the same week, still at or above the bar, still not marked, and a host
+   *     for that kid still mounted. If not, nothing is written and nothing plays; the next time
+   *     it holds (a re-tick, the host mounted again) the sequence runs again;
+   *  4. write the once-only mark (`ifAbsent`) and show the banner only if THIS write created it.
+   *     A failed write still shows it on this device, once (`shownUnmarked`), and the mark is
+   *     retried silently the next time the claim runs. A mark another device wrote first shows
+   *     nothing.
+   * So: a device with no host mounted claims nothing; a marked week never replays; a grown-up's
+   * tick on the Chores view's home cards plays it the next time the child's day or lane is on
+   * screen. Two hosts on one device make one claim (one key in flight). Two devices each with a
+   * host: the `ifAbsent` mark means one plays (both playing when both were offline is the
+   * accepted residual). Never for a grown-up, a pet, while the feature is off, with no weekly
+   * reward, or on the stores' snapshot copy (`storesAuthoritative`, the automatic writers' rule).
+   */
+
+  /** Every mounted banner host: an id per registration, so two hosts of one kid count apart. */
+  const hosts = shallowRef<ReadonlyMap<number, { memberId: string; surface: RewardBannerSurface }>>(
+    new Map()
+  );
+  let hostSeq = 0;
+
+  /**
+   * Register a mounted banner host for a kid (`useRewardBannerHost` is the only caller). Returns
+   * its release, which is safe to call twice.
+   */
+  function hostRewardBanner(memberId: string, surface: RewardBannerSurface): () => void {
+    const id = ++hostSeq;
+    hosts.value = new Map(hosts.value).set(id, { memberId, surface });
+    return () => {
+      if (!hosts.value.has(id)) return;
+      const next = new Map(hosts.value);
+      next.delete(id);
+      hosts.value = next;
+    };
+  }
+
+  function hostOf(memberId: string): RewardBannerSurface | null {
+    for (const h of hosts.value.values()) if (h.memberId === memberId) return h.surface;
+    return null;
+  }
+
+  /** `member:weekStart` whose claim is running on this device now (one claim per kid-week). */
   const rewarding = new Set<string>();
   /**
    * `member:weekStart` whose banner THIS device showed although its mark write failed: the
-   * on-device latch, so it plays once here; the next tick retries the mark without a banner.
+   * on-device latch, so it plays once here; the next claim retries the mark without a banner.
    */
   const shownUnmarked = new Set<string>();
 
   const isMarked = (memberId: string, weekStart: string) =>
     marksOn(choreStore.markIndex, memberId, weekStart).celebrated.has(REWARD_MARK_REF);
 
-  /**
-   * Called by EVERY tick path once `choreStore.toggleChore` resolved (`useChoreTicks.toggle` and
-   * the chore writer in `useWallJobs`), not awaited. Decides by itself whether the outcome is a
-   * landed tick, so the call sites hold no condition beyond `showsBanner`.
-   *
-   * The rule: after a kid's landed tick on a surface that draws the banner for that kid
-   * (`showsBanner`), if their week has reached the weekly reward's bar NOW and the week has no
-   * `reward` mark yet, the celebration is claimed and shown, in this order:
-   *  1. wait for that kid's block celebration to end (`celebrateReward`);
-   *  2. ask again whether the week is still at or above the bar (an untick meanwhile ends it
-   *     quietly and writes nothing, so the re-tick plays it);
-   *  3. write the once-only mark (`ifAbsent`) and show the banner only if THIS write created it.
-   *     A failed write still shows the banner on this device (the `shownUnmarked` latch keeps it
-   *     once here; the failure is reported by the chore store) and the next tick retries the
-   *     mark silently. A mark another device wrote first shows nothing.
-   * "Achieved now, not yet marked", never "this tick crossed the bar": two ticks that land
-   * together across the bar both see a total already past it. A tick from a surface with no
-   * banner (a grown-up on the Chores view's cards) claims nothing, and a bonus past the bar
-   * plays nothing (no tick); in both cases the kid's next tick on their lane or day plays it.
-   * Never throws; silent while the feature is off.
-   */
-  async function afterTick(input: AfterTickInput): Promise<void> {
-    if (!rewards.value.on) return;
-    const { memberId, outcome, surface, showsBanner } = input;
-    const latch = { key: '' };
-    try {
-      if (!outcome || isChoreRefusal(outcome) || outcome.action !== 'tick') return;
-      if (!showsBanner) return;
-      if (!active.value || !rewards.value.weeklyOn || !earnerSet.value.has(memberId)) return;
+  interface RewardClaim {
+    memberId: string;
+    weekStart: string;
+    surface: RewardBannerSurface;
+  }
+
+  /** The hosted kids whose current week is achieved and not marked: what is owed a claim. */
+  function owedClaims(): RewardClaim[] {
+    if (!rewards.value.on || !rewards.value.weeklyOn || !active.value) return [];
+    if (!storesAuthoritative.value) return [];
+    const out: RewardClaim[] = [];
+    const seen = new Set<string>();
+    for (const { memberId, surface } of hosts.value.values()) {
+      if (seen.has(memberId) || !earnerSet.value.has(memberId)) continue;
+      seen.add(memberId);
       const week = weekFor(memberId);
-      if (!week || !weeklyAchieved(week)) return;
-      const weekStart = week.weekStart;
-      const key = `${memberId}:${weekStart}`;
-      // Another tick on this device is claiming it, or the week is already celebrated (the
-      // normal state for every tick after the bar): nothing to do, nothing to log.
-      if (rewarding.has(key) || isMarked(memberId, weekStart)) return;
-      rewarding.add(key);
-      latch.key = key;
+      if (!week || !weeklyAchieved(week) || isMarked(memberId, week.weekStart)) continue;
+      out.push({ memberId, weekStart: week.weekStart, surface });
+    }
+    return out;
+  }
+
+  /**
+   * The one trigger: re-read on every change to what `owedClaims` reads (the hosts, the marks,
+   * the chores, the gifts, the settings, the clock), so every way a week becomes achieved is
+   * covered and there is no second trigger path. Cheap while nothing is owed: a marked week
+   * stops at `isMarked`, a kid-week already claiming stops at `rewarding`.
+   */
+  watch(
+    () => {
+      try {
+        return owedClaims();
+      } catch (e) {
+        reportError({
+          surface: SURFACE,
+          message: 'the weekly reward check failed; nothing was claimed and no banner played',
+          error: e,
+          severity: 'warning',
+          context: { action: 'achieved-check-failed' },
+        });
+        return [];
+      }
+    },
+    (owed) => {
+      for (const claim of owed) void claimReward(claim);
+    }
+  );
+
+  /** The claim sequence (THE RULE above, steps 1 to 4). Never throws. */
+  async function claimReward({ memberId, weekStart, surface }: RewardClaim): Promise<void> {
+    const key = `${memberId}:${weekStart}`;
+    if (rewarding.has(key)) return;
+    rewarding.add(key);
+    try {
       const writeMark = () =>
         choreStore.writeCelebratedMark(memberId, weekStart, REWARD_MARK_REF, memberId);
       if (shownUnmarked.has(key)) {
@@ -657,6 +734,7 @@ export const useStarStore = defineStore('stars', () => {
         if ((await writeMark()) !== 'failed') shownUnmarked.delete(key);
         return;
       }
+      await choreStore.whenTicksSettled(memberId);
       let mark: Awaited<ReturnType<typeof writeMark>> | null = null;
       const child = familyStore.members.find((m) => m.id === memberId);
       const result = await celebrateReward({
@@ -664,7 +742,8 @@ export const useStarStore = defineStore('stars', () => {
         beanName: firstName(child?.name),
         title: rewards.value.title ?? '',
         emoji: rewards.value.emoji ?? '',
-        stillAchieved: () => {
+        stillClaimable: () => {
+          if (hostOf(memberId) === null || isMarked(memberId, weekStart)) return false;
           const now = weekFor(memberId);
           return !!now && now.weekStart === weekStart && weeklyAchieved(now);
         },
@@ -680,25 +759,29 @@ export const useStarStore = defineStore('stars', () => {
         log('info', 'achieved-banner', { detail: 'skipped-exists' });
         return;
       }
-      if (result !== 'dropped') {
-        log('info', 'reward-achieved', {
-          kind: 'weekly',
-          detail: surface,
-          stage: mark === 'failed' ? 'unmarked' : 'marked',
+      if (result === 'dropped') {
+        // Why it did not play: the host left during the wait, or the week fell below the bar.
+        log('info', 'achieved-banner', {
+          detail: hostOf(memberId) === null ? 'host-left' : 'dropped',
         });
+        return;
       }
+      log('info', 'reward-achieved', {
+        kind: 'weekly',
+        detail: hostOf(memberId) ?? surface,
+        stage: mark === 'failed' ? 'unmarked' : 'marked',
+      });
       log('info', 'achieved-banner', { detail: result });
     } catch (e) {
       reportError({
         surface: SURFACE,
-        message:
-          'the weekly reward check after a tick failed; the tick landed and no banner played',
+        message: 'the weekly reward claim failed; the ticks landed and no banner played',
         error: e,
         severity: 'warning',
         context: { action: 'achieved-check-failed' },
       });
     } finally {
-      if (latch.key) rewarding.delete(latch.key);
+      rewarding.delete(key);
     }
   }
 
@@ -751,6 +834,41 @@ export const useStarStore = defineStore('stars', () => {
     return closing;
   }
 
+  /** `week-closed` / `week-recorded-at-off`'s `detail` (counts only). */
+  const planDetail = (plan: WeekClosePlan) => `created:${plan.created}+resettled:${plan.resettled}`;
+
+  /**
+   * THE one projection read, plan and write of frozen weeks, for the close and the turn-off:
+   * read the projection, plan with `planWeekClose` (`includeOpen` for the turn-off), and, when
+   * the plan writes something and `admit(plan)` agrees, write it in ONE `setChoreWeeks` batch
+   * and re-read. `admit` runs before any write, also for an empty plan, so a caller can log the
+   * plan's problems and take its budget there. Throws on a failed read or write: each caller
+   * reports in its own way.
+   */
+  async function writeWeekPlan(
+    includeOpen: boolean,
+    admit: (plan: WeekClosePlan) => boolean
+  ): Promise<{ plan: WeekClosePlan; written: boolean }> {
+    const [chores, marks, storedGifts, stored] = await Promise.all([
+      choreRepo.getAllChores(),
+      choreRepo.getAllChoreMarks(),
+      repo.getAllGifts(),
+      repo.getAllChoreWeeks(),
+    ]);
+    const plan = planWeekClose({
+      ...planContext(),
+      chores,
+      marks,
+      gifts: storedGifts,
+      weeks: stored,
+      ...(includeOpen ? { includeOpen: true } : {}),
+    });
+    if (!admit(plan) || !plan.write.length) return { plan, written: false };
+    await repo.setChoreWeeks(plan.write);
+    weeks.value = await repo.getAllChoreWeeks();
+    return { plan, written: true };
+  }
+
   async function runClose(): Promise<void> {
     if (!CHORE_WEEK_CLOSE_ENABLED) return;
     // Off is the normal state for most families (and unloaded settings read as off): silent.
@@ -759,36 +877,27 @@ export const useStarStore = defineStore('stars', () => {
       log('warn', 'week-close-skipped', { detail: 'not-loaded' });
       return;
     }
-    const ctx = planContext();
+    const today = choreStore.todayYmd;
     try {
       const cheap = planWeekClose({
-        ...ctx,
+        ...planContext(),
         chores: choreStore.chores,
         marks: choreStore.choreMarks,
         gifts: gifts.value,
         weeks: weeks.value,
       });
       if (!cheap.write.length) {
-        logProblems(cheap, ctx.todayYmd);
+        logProblems(cheap, today);
         return;
       }
-      const [chores, marks, storedGifts, stored] = await Promise.all([
-        choreRepo.getAllChores(),
-        choreRepo.getAllChoreMarks(),
-        repo.getAllGifts(),
-        repo.getAllChoreWeeks(),
-      ]);
-      const plan = planWeekClose({ ...ctx, chores, marks, gifts: storedGifts, weeks: stored });
-      logProblems(plan, ctx.todayYmd);
-      if (!plan.write.length) return;
-      // An automatic write, bounded; a refusal reports itself and a later run retries.
-      if (!takeAutoWrite(CLOSE_WRITER)) return;
-      await repo.setChoreWeeks(plan.write);
-      weeks.value = await repo.getAllChoreWeeks();
-      log('info', 'week-closed', {
-        count: plan.write.length,
-        detail: `created:${plan.created}+resettled:${plan.resettled}`,
+      // Only the PROJECTION's plan is written. An automatic write, bounded; a refusal reports
+      // itself and a later run retries.
+      const { plan, written } = await writeWeekPlan(false, (p) => {
+        logProblems(p, today);
+        return p.write.length > 0 && takeAutoWrite(CLOSE_WRITER);
       });
+      if (written)
+        log('info', 'week-closed', { count: plan.write.length, detail: planDetail(plan) });
     } catch (e) {
       reportError({
         surface: SURFACE,
@@ -803,52 +912,41 @@ export const useStarStore = defineStore('stars', () => {
 
   /**
    * The turn-off (`setRewards`, on to off): record the books as they stand, before the setting
-   * is written. One plan over the PROJECTION through `planWeekClose` with `includeOpen` (each
-   * kid's open week as of now, plus any closed week the close would still write), one
-   * `setChoreWeeks` batch. A grown-up's action, so no automatic-write budget. If it fails the
-   * turn-off still goes ahead: the failure is reported (a warning, never silent) and nothing
-   * else is lost, because the close still freezes the closed weeks after a later turn-on.
+   * is written. `writeWeekPlan` with `includeOpen` (each kid's open week as of now, plus any
+   * closed week the close would still write), one batch, no automatic-write budget (a grown-up's
+   * action). Resolves `true` when recorded or when there was nothing to record (nothing earned
+   * is success), and `false` when the record could not be written (the doc not loaded, a read
+   * or the write threw): then the turn-off must not happen, because the next turn-on re-stamps
+   * `startedOn` and the week would never be recorded. A `false` has already shown the grown-up
+   * an error toast (rewards were not turned off, try again) and been reported as critical: a
+   * grown-up's action failed.
    */
-  async function recordAtTurnOff(): Promise<void> {
-    if (!CHORE_WEEK_CLOSE_ENABLED) return;
-    if (!isDocLoaded()) {
-      log('warn', 'week-recorded-at-off', { detail: 'not-loaded', count: 0 });
-      return;
-    }
-    try {
-      // A close already running writes the same deterministic records; let it finish first.
-      if (closing) await closing;
-      const [chores, marks, storedGifts, stored] = await Promise.all([
-        choreRepo.getAllChores(),
-        choreRepo.getAllChoreMarks(),
-        repo.getAllGifts(),
-        repo.getAllChoreWeeks(),
-      ]);
-      const plan = planWeekClose({
-        ...planContext(),
-        chores,
-        marks,
-        gifts: storedGifts,
-        weeks: stored,
-        includeOpen: true,
-      });
-      if (plan.write.length) {
-        await repo.setChoreWeeks(plan.write);
-        weeks.value = await repo.getAllChoreWeeks();
-      }
-      log('info', 'week-recorded-at-off', {
-        count: plan.write.length,
-        detail: `created:${plan.created}+resettled:${plan.resettled}`,
-      });
-    } catch (e) {
+  async function recordAtTurnOff(): Promise<boolean> {
+    if (!CHORE_WEEK_CLOSE_ENABLED) return true;
+    const failed = (detail: 'not-loaded' | 'write-failed', e?: unknown): false => {
       reportError({
         surface: SURFACE,
         message:
-          "turning stars off could not record this week's stars first; the feature was still turned off",
+          "turning stars off could not record this week's stars first; the turn-off was refused",
         error: e,
-        severity: 'warning',
-        context: { action: 'off-record-failed' },
+        severity: 'critical',
+        context: { action: 'off-record-failed', detail },
       });
+      // Silent: reported above, at its own severity.
+      showToast('error', useTranslationStore().t('choreStars.error.offNotRecorded'), undefined, {
+        silent: true,
+      });
+      return false;
+    };
+    if (!isDocLoaded()) return failed('not-loaded');
+    try {
+      // A close already running writes the same deterministic records; let it finish first.
+      if (closing) await closing;
+      const { plan } = await writeWeekPlan(true, () => true);
+      log('info', 'week-recorded-at-off', { count: plan.write.length, detail: planDetail(plan) });
+      return true;
+    } catch (e) {
+      return failed('write-failed', e);
     }
   }
 
@@ -872,6 +970,7 @@ export const useStarStore = defineStore('stars', () => {
     loggedOn.clear();
     rewarding.clear();
     shownUnmarked.clear();
+    // `hosts` is left alone: it mirrors what is mounted, not the family's data.
   }
 
   return {
@@ -903,7 +1002,7 @@ export const useStarStore = defineStore('stars', () => {
     deleteAward,
     giveStars,
     removeGift,
-    afterTick,
+    hostRewardBanner,
     closeWeeks,
     resetState,
   };

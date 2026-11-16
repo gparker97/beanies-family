@@ -17,6 +17,7 @@ import {
   planWeekClose,
   rewardsOf,
   starsOf,
+  weekBonusEntries,
   weekBreakdown,
   type ChoreWeekDraft,
   type WeekCloseInput,
@@ -855,5 +856,74 @@ describe("weekBreakdown (a week bar's summary): it always adds up to the bar", (
     expect(markCutoffYmd(MON)! > old).toBe(true);
     expect(b.days.every((d) => d.chores === null)).toBe(true);
     expect(b.total).toBe(7);
+  });
+
+  it('a closed week whose chores changed since it was frozen: a day that no longer agrees shows its stars alone', () => {
+    // Frozen: Mon 1, Tue 2 (two chores ticked), Wed..Sun 0. Since then `c2` was deleted, so
+    // the live Tuesday is worth 1 star where the record says 2, and Wednesday now has nothing.
+    const frozen = closedWeek(rec({ days: [1, 2, 0, 0, 0, 0, 0], stars: 3, bonus: 0 }));
+    const marks = [mark(W0, 'c1'), mark('2026-11-10', 'c1'), mark('2026-11-10', 'c2')];
+    const live = choreWeekRecord([chore('c1')], indexMarks(marks), 'kid', W0, 1, new Set(['kid']));
+    const b = weekBreakdown(frozen, [], live, MON);
+    expect(b.days.slice(0, 3).map((d) => [d.stars, d.chores])).toEqual([
+      [1, { done: 1, due: 1 }], // agrees: 1 star from the done chores now, 1 frozen
+      [2, null], // 1 star now, 2 frozen: never "1 of 1 chore" beside "2 stars"
+      [0, { done: 0, due: 1 }], // agrees (0 and 0)
+    ]);
+    // A chore moved off a day that the record still has stars for: "Nothing due" never shows
+    // beside stars.
+    const gone = choreWeekRecord([], indexMarks([]), 'kid', W0, 1, new Set(['kid']));
+    const empty = weekBreakdown(
+      closedWeek(rec({ days: [3, 0, 0, 0, 0, 0, 0], stars: 3 })),
+      [],
+      gone,
+      MON
+    );
+    expect(empty.days[0]).toEqual({ ymd: W0, stars: 3, chores: null });
+    // The add-up property is untouched.
+    expect(b.total).toBe(frozen.total);
+    expect(empty.total).toBe(3);
+  });
+});
+
+describe('weekBonusEntries: the one rule every bonus list reads', () => {
+  const giftOn = (id: string, date: string, stars: number): ChoreStarGift => ({
+    ...gift(date, stars),
+    id,
+  });
+  it("lists the week's gifts oldest first when they add up to its bonus", () => {
+    const gifts = [giftOn('b', '2026-11-12', -1), giftOn('a', '2026-11-10', 3)];
+    expect(weekBonusEntries({ weekStart: W0, bonus: 2 }, gifts)?.map((g) => g.id)).toEqual([
+      'a',
+      'b',
+    ]);
+  });
+  it('a closed week whose frozen bonus never took a late gift in: null, so nothing lists +2 beside a 0', () => {
+    expect(
+      weekBonusEntries({ weekStart: W0, bonus: 0 }, [giftOn('late', '2026-11-14', 2)])
+    ).toBeNull();
+  });
+  it("no gift in the week and no bonus: an empty list; another week's gift is ignored", () => {
+    expect(weekBonusEntries({ weekStart: W0, bonus: 0 }, [giftOn('x', MON, 2)])).toEqual([]);
+  });
+  it('the breakdown reads the same rule', () => {
+    const gifts = [giftOn('late', '2026-11-14', 2)];
+    const week = closedWeek({
+      ...stored({
+        id: choreWeekId('kid', W0),
+        memberId: 'kid',
+        weekStart: W0,
+        done: 0,
+        due: 7,
+        stars: 0,
+        bonus: 0,
+        full: 7,
+        bar: 7,
+        days: [0, 0, 0, 0, 0, 0, 0],
+        marks: 0,
+      }),
+    });
+    expect(weekBreakdown(week, gifts, null, MON).entries).toBeNull();
+    expect(weekBonusEntries(week, gifts)).toBeNull();
   });
 });

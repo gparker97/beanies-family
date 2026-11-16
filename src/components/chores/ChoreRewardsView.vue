@@ -42,6 +42,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import StarCount from '@/components/chores/StarCount.vue';
 import StarPathStrip from '@/components/chores/StarPathStrip.vue';
 import StarsTurnOnPanel from '@/components/chores/StarsTurnOnPanel.vue';
+import { awardForKids, rewardEmojiOptions } from '@/components/chores/starText';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
 import { useChoreStore } from '@/stores/choreStore';
@@ -53,16 +54,15 @@ import {
   CHORE_STARS_MAX,
   CHORE_STARS_MIN,
   DEFAULT_REWARD_EMOJI,
-  REWARD_EMOJI_OPTIONS,
   STAR_BAR_MAX,
   STAR_BAR_MIN,
   STAR_BAR_STEP,
   rewardEmojiAfterRename,
   suggestRewardEmoji,
 } from '@/constants/choreStars';
-import { firstName, formatNameList } from '@/utils/assignees';
+import { firstName } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { awardKids, starsOf } from '@/utils/choreStars';
+import { starsOf } from '@/utils/choreStars';
 import type { ChoreAward, FamilyMember } from '@/types/models';
 
 /** How long the bar waits after the last change before it saves. */
@@ -143,9 +143,7 @@ function commitTitle(): void {
 }
 
 const emojiOpen = ref(false);
-const emojiOptions = computed(() =>
-  REWARD_EMOJI_OPTIONS.map((o) => ({ emoji: o.emoji, label: t(o.labelKey) }))
-);
+const emojiOptions = computed(() => rewardEmojiOptions(t));
 /** The emoji shown, as the name is typed. */
 const rewardEmoji = computed(() => emojiForName(titleDraft.value.trim()));
 
@@ -194,15 +192,26 @@ const freshKey = computed(() =>
 /** The children who earn stars, in family order. */
 const kids = computed<FamilyMember[]>(() => starStore.earnerMembers);
 
-/** "32 of 40 stars" for a child this week: the bar and a full week, from the star store. */
-function barLine(memberId: string): string {
-  const week = starStore.weekFor(memberId);
-  if (!week || week.full <= 0) return t('choreStars.bar.nothingDue');
-  return fillTemplate(
-    t(week.full === 1 ? 'choreStars.bar.child.one' : 'choreStars.bar.child.other'),
-    { bar: week.bar, full: week.full }
-  );
-}
+/**
+ * "32 of 40 stars" per child this week (the bar and a full week, from the star store), by member
+ * id: built once when the weeks change, never per render (typing the reward's name re-renders).
+ */
+const barLines = computed(() => {
+  const by = new Map<string, string>();
+  for (const kid of kids.value) {
+    const week = starStore.weekFor(kid.id);
+    by.set(
+      kid.id,
+      !week || week.full <= 0
+        ? t('choreStars.bar.nothingDue')
+        : fillTemplate(
+            t(week.full === 1 ? 'choreStars.bar.child.one' : 'choreStars.bar.child.other'),
+            { bar: week.bar, full: week.full }
+          )
+    );
+  }
+  return by;
+});
 
 // ── Extra Special Rewards ───────────────────────────────────────────────────
 
@@ -221,19 +230,10 @@ function awardLine(award: ChoreAward): string {
   if (award.kind === 'saved') {
     parts.push(t(award.repeats ? 'choreStars.awards.repeats' : 'choreStars.awards.oneTime'));
   }
-  const who = forKidsLine(award);
-  if (who) parts.push(who);
+  // "For Max & Pip" when a special reward is not for every kid.
+  const who = awardForKids(award, kids.value, t);
+  if (who) parts.push(who.label);
   return parts.join(' · ');
-}
-
-/** "For Max & Pip" when a special reward is not for every kid, else ''. */
-function forKidsLine(award: ChoreAward): string {
-  const ids = awardKids(award, starStore.earners);
-  if (ids === null) return '';
-  const names = ids.map((id) => firstName(kids.value.find((k) => k.id === id)?.name));
-  return names.length
-    ? fillTemplate(t('choreStars.awards.forKids'), { names: formatNameList(names) })
-    : t('choreStars.awards.forNobody');
 }
 
 /** The special reward drawer is the page's (ONE): ask for it, empty or on that reward. */
@@ -374,7 +374,7 @@ const hintClass = 'text-secondary-400 dark:text-ink-faint text-xs';
                 class="font-outfit text-secondary-500 dark:text-ink font-bold whitespace-nowrap"
                 data-testid="chore-rewards-bar-kid"
                 :data-member-id="kid.id"
-                >{{ barLine(kid.id) }}</b
+                >{{ barLines.get(kid.id) }}</b
               >
             </li>
           </ul>

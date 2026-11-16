@@ -39,9 +39,11 @@
  * award), with the reward's emoji as a badge once achieved; and a quiet `StarCount` at the end of
  * the name row, spoken as this week's stars or the stars saved up (the arc's `kind`). The header is a size container, so the count drops out before the name
  * truncates on a narrow lane. With `lane.stars` absent the header is exactly as it was (no ring
- * wrapper in the DOM). While `rewardBannerFor(member)` is set, the existing `CelebrationBanner`
- * (compact) plays once at the top of the lane body: "Max earned Ice Cream this week", nothing to
- * press. The green all-done ring is untouched.
+ * wrapper in the DOM). Every lane drawn is a banner host for its bean (`useRewardBannerHost`),
+ * so the weekly reward's achieved banner is claimed while the lane is on screen, whoever ticked
+ * the week past the bar; while `rewardBannerFor(member)` is set, the existing
+ * `CelebrationBanner` (compact) plays once at the top of the lane body: "Max earned Ice Cream
+ * this week", nothing to press. The green all-done ring is untouched.
  *
  * Editing is one thing only: while unlocked, each lane has an add row that adds a chore for
  * that bean in the block happening now (`WALL_EDIT.addChore`, bound by the page to the grown-up
@@ -73,6 +75,7 @@ import ProgressRing from '@/components/ui/ProgressRing.vue';
 import StarCount from '@/components/chores/StarCount.vue';
 import { rewardBannerText } from '@/components/chores/starText';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
+import { useRewardBannerHost } from '@/composables/useRewardBannerHost';
 import { useWallLock } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
@@ -152,6 +155,9 @@ const lanes = computed(() => {
   }
   return built;
 });
+
+/** Every lane drawn hosts its bean's achieved banner (the store ignores a grown-up or a pet). */
+useRewardBannerHost(() => lanes.value.map((l) => l.member.id), 'wall');
 
 const progress = computed(() => choreProgress(lanes.value.map((a) => a.lane)));
 const progressText = computed(() => wallChoreProgressText(progress.value, t));

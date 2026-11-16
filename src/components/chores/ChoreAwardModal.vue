@@ -10,9 +10,13 @@
  *    the emoji (the new name no longer matches the old name's suggestion) picks the new one,
  *    even over a hand pick; otherwise the emoji stays. Opening a special reward never changes
  *    its emoji.
- *  - Who Is It For (only with two kids or more): All Kids (the default, stored as no
- *    `memberIds`, so a kid who joins later is included) or Pick Kids (`FamilyChipPicker`, at
- *    least one). The pricing table, the nudge and the estimate read only the kids it is for.
+ *  - Who Is It For (with two kids or more, or when the special reward being edited is for
+ *    nobody now because its kids have left): All Kids (the default, stored as no `memberIds`,
+ *    so a kid who joins later is included) or Pick Kids (`FamilyChipPicker`, at least one). An
+ *    edit never changes who it is for unless this control was used: until then Save sends the
+ *    stored list back and the store keeps it as it is (so a rename of a reward whose kids all
+ *    left never makes it everyone's). The pricing table, the nudge and the estimate read only
+ *    the kids it is for.
  *  - Kind: This Week (this week's stars only, starts again every week) or Saved Up (keeps counting
  *    across weeks). Saved Up only: One Time (the default; once reached it stays achieved) or
  *    Repeats (the count starts again the week after).
@@ -52,6 +56,7 @@ import { confirm } from '@/composables/useConfirm';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFormValidation } from '@/composables/useFormValidation';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
+import { rewardEmojiOptions } from '@/components/chores/starText';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useStarStore } from '@/stores/starStore';
@@ -60,13 +65,13 @@ import {
   AWARD_PRICE_MAX_STARS,
   AWARD_PRICE_MAX_WEEKS,
   DEFAULT_SPECIAL_REWARD_EMOJI,
-  REWARD_EMOJI_OPTIONS,
   rewardEmojiAfterRename,
 } from '@/constants/choreStars';
 import {
-  awardIsFor,
+  awardKids,
   awardPriceStars,
   fairPrice,
+  oneDecimal,
   parsePrice,
   weeksEstimate,
   type AwardDraft,
@@ -107,6 +112,8 @@ const emojiOpen = ref(false);
 /** Who it is for: every kid, or the kids in `chosen` (kept in family order on save). */
 const who = ref<Who>('all');
 const chosen = ref<string[]>([]);
+/** The grown-up used the Who control in this opening (until then an edit keeps who it is for). */
+const whoTouched = ref(false);
 const kind = ref<ChoreAward['kind']>('saved');
 const repeats = ref(false);
 const unit = ref<Unit>('weeks');
@@ -119,6 +126,7 @@ function seedNew(): void {
   emojiOpen.value = false;
   who.value = 'all';
   chosen.value = [];
+  whoTouched.value = false;
   kind.value = 'saved';
   repeats.value = false;
   unit.value = 'weeks';
@@ -129,12 +137,12 @@ function seedEdit(award: ChoreAward): void {
   title.value = award.title;
   settled.value = { name: award.title, emoji: award.emoji || DEFAULT_SPECIAL_REWARD_EMOJI };
   emojiOpen.value = false;
-  // Its kids, read through the one rule (an id that is no longer a kid is dropped here).
-  const ids = (award.memberIds ?? []).length
-    ? starStore.earners.filter((id) => awardIsFor(award, id))
-    : [];
-  who.value = (award.memberIds ?? []).length ? 'some' : 'all';
-  chosen.value = ids;
+  // Its kids, read through the one rule (`awardKids`: `null` = every kid; an id that is no
+  // longer a kid is dropped, so a list whose kids have all left reads as none).
+  const ids = awardKids(award, starStore.earners);
+  who.value = ids === null ? 'all' : 'some';
+  chosen.value = ids ?? [];
+  whoTouched.value = false;
   kind.value = award.kind;
   repeats.value = award.kind === 'saved' && award.repeats === true;
   unit.value = award.unit;
@@ -148,9 +156,7 @@ const { isEditing, isSubmitting } = useFormModal(
   { onEdit: seedEdit, onNew: seedNew }
 );
 
-const emojiOptions = computed(() =>
-  REWARD_EMOJI_OPTIONS.map((o) => ({ emoji: o.emoji, label: t(o.labelKey) }))
-);
+const emojiOptions = computed(() => rewardEmojiOptions(t));
 /** A pick by hand settles the emoji against the name as it stands. */
 function pickEmoji(value: string): void {
   settled.value = { name: title.value, emoji: value };
@@ -161,26 +167,32 @@ function pickEmoji(value: string): void {
 
 /** Every kid who earns stars: the picker's chips. */
 const allKids = computed<FamilyMember[]>(() => starStore.earnerMembers);
-/** The picker is offered only when there is a choice to make. */
-const canChoose = computed(() => allKids.value.length > 1);
+/** The special reward being edited is for chosen kids, none of whom earns stars now. */
+const forNobodyNow = computed(
+  () => !!props.award && awardKids(props.award, starStore.earners)?.length === 0
+);
+/**
+ * The picker is offered when there is a choice to make, and always for a special reward that
+ * is for nobody now (even with one kid), so the grown-up can see it and change it.
+ */
+const canChoose = computed(() => allKids.value.length > 1 || forNobodyNow.value);
 
 const whoOptions = computed(() => [
   { value: 'all', label: t('choreStars.awardForm.who.all'), variant: 'orange' as const },
   { value: 'some', label: t('choreStars.awardForm.who.some'), variant: 'orange' as const },
 ]);
 function setWho(value: string): void {
-  if (value === 'all' || value === 'some') who.value = value;
+  if (value !== 'all' && value !== 'some') return;
+  who.value = value;
+  whoTouched.value = true;
 }
 function pickKids(value: string | string[]): void {
   chosen.value = Array.isArray(value) ? value : [];
+  whoTouched.value = true;
 }
 
-/** The kids it is for as the draft stands, through the one rule (`awardIsFor`). */
-const forDraft = computed(() =>
-  who.value === 'some' && chosen.value.length
-    ? { memberIds: chosen.value }
-    : { memberIds: undefined }
-);
+/** The kids it is for as the draft stands: every kid, or the chosen ones (none chosen: none). */
+const isForKid = (id: string) => who.value === 'all' || chosen.value.includes(id);
 
 /**
  * The kids it is for, with what a full week is worth for each of them today: the pricing table,
@@ -188,7 +200,7 @@ const forDraft = computed(() =>
  */
 const kids = computed<{ member: FamilyMember; full: number }[]>(() =>
   allKids.value
-    .filter((member) => awardIsFor(forDraft.value, member.id))
+    .filter((member) => isForKid(member.id))
     .map((member) => ({
       member,
       full: starStore.weekFor(member.id)?.full ?? 0,
@@ -202,8 +214,6 @@ const parsed = computed(() => parsePrice(typed.value[unit.value], unit.value));
 const price = computed<number | null>(() =>
   typeof parsed.value === 'number' ? parsed.value : null
 );
-
-const oneDecimal = (n: number) => Math.round(n * 10) / 10;
 
 /** "80" or "80 to 160": a set of numbers as the other box shows it. */
 function spanText(values: number[]): string {
@@ -380,8 +390,11 @@ const v = useFormValidation(
   () => ({
     title: () => title.value.trim().length > 0,
     price: () => price.value !== null,
-    // "Pick Kids" needs at least one kid (a rule only while the chips are shown).
-    ...(canChoose.value && who.value === 'some' ? { who: () => chosen.value.length > 0 } : {}),
+    // "Pick Kids" needs at least one kid (a rule only while the chips are shown, and on an edit
+    // only once the control was used: untouched, the edit keeps who it is for).
+    ...(canChoose.value && who.value === 'some' && (!isEditing.value || whoTouched.value)
+      ? { who: () => chosen.value.length > 0 }
+      : {}),
   }),
   { open: () => props.open }
 );
@@ -403,12 +416,15 @@ async function onSave(): Promise<void> {
     unit: unit.value,
     price: price.value,
     repeats: kind.value === 'saved' ? repeats.value : undefined,
-    // Every kid picked is stored as every kid (the store does that), so a kid who joins later
-    // is included.
+    // An edit whose Who control was not used sends the stored kids back, and the store keeps
+    // them as they are. Otherwise every kid picked is stored as every kid (the store does
+    // that), so a kid who joins later is included.
     memberIds:
-      who.value === 'some' && canChoose.value
-        ? allKids.value.filter((m) => chosen.value.includes(m.id)).map((m) => m.id)
-        : undefined,
+      props.award && !whoTouched.value
+        ? props.award.memberIds
+        : who.value === 'some' && canChoose.value
+          ? allKids.value.filter((m) => chosen.value.includes(m.id)).map((m) => m.id)
+          : undefined,
   };
   if (props.award) draft.id = props.award.id;
   isSubmitting.value = true;
@@ -527,9 +543,11 @@ const hintClass = 'text-secondary-400 dark:text-ink-faint text-xs leading-snug';
           <p :class="hintClass" data-testid="chore-award-who-hint">
             {{
               t(
-                who === 'some'
-                  ? 'choreStars.awardForm.whoHint.some'
-                  : 'choreStars.awardForm.whoHint.all'
+                forNobodyNow && !whoTouched
+                  ? 'choreStars.awardForm.whoHint.nobody'
+                  : who === 'some'
+                    ? 'choreStars.awardForm.whoHint.some'
+                    : 'choreStars.awardForm.whoHint.all'
               )
             }}
           </p>

@@ -1,12 +1,17 @@
 /**
- * Stars and rewards (#148): the two small wordings several star surfaces share, so the strip,
- * the banner and the wall lane say them the same way. Pure: `t` is passed in.
+ * Stars and rewards (#148): the small wordings several star surfaces share, so the strip, the
+ * banner, the wall lane, the Star Report and the Rewards view say them the same way. Pure: `t`
+ * is passed in.
  */
 import { CHORE_DAY_LABEL_KEYS } from '@/constants/choreBlocks';
+import { REWARD_EMOJI_OPTIONS } from '@/constants/choreStars';
 import type { ActiveRewardBanner } from '@/composables/useCelebration';
+import { firstName, formatNameList } from '@/utils/assignees';
+import { awardKids } from '@/utils/choreStars';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { choreDayOfWeek } from '@/utils/chores';
+import type { ChoreAward, FamilyMember } from '@/types/models';
 
 /** The star glyph's path (a 24 x 24 box), shared by `StarCount` and the Rewards button. */
 export const STAR_GLYPH_PATH =
@@ -45,4 +50,40 @@ export function rewardBannerText(
       { count, name }
     ),
   };
+}
+
+/**
+ * Who a special reward is for, when that is not every kid: its kids who earn stars now (in
+ * family order) and the line naming them ("For Max & Pip"), or "Not for any child now" when
+ * none of them does. `null` when it is for every kid. `kids` are the earners
+ * (`starStore.earnerMembers`).
+ */
+export function awardForKids(
+  award: Pick<ChoreAward, 'memberIds'>,
+  kids: readonly FamilyMember[],
+  t: (key: UIStringKey) => string
+): { members: FamilyMember[]; label: string } | null {
+  const ids = awardKids(
+    award,
+    kids.map((k) => k.id)
+  );
+  if (ids === null) return null;
+  const members = ids
+    .map((id) => kids.find((k) => k.id === id))
+    .filter((m): m is FamilyMember => !!m);
+  return {
+    members,
+    label: members.length
+      ? fillTemplate(t('choreStars.awards.forKids'), {
+          names: formatNameList(members.map((m) => firstName(m.name))),
+        })
+      : t('choreStars.awards.forNobody'),
+  };
+}
+
+/** The reward icon choices as `EmojiPicker` takes them, labels translated. */
+export function rewardEmojiOptions(
+  t: (key: UIStringKey) => string
+): { emoji: string; label: string }[] {
+  return REWARD_EMOJI_OPTIONS.map((o) => ({ emoji: o.emoji, label: t(o.labelKey) }));
 }

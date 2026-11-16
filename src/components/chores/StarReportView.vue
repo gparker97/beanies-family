@@ -7,10 +7,12 @@
  * (`v-model:week`), the same week as the Chores view's board (page state only). The main table
  * IS the Chores Done board (`ChoreWeekPanel`, the kids' rows for that week from the chore
  * marks), with its stepper in the header and its `extras` carrying the star facts per kid:
- *  - stars from chores, and the bonus as a signed net ("+2", "-1", "0"). A kid with a bonus or
- *    take-away entry that week gets a tappable number (the fact's `action`), which opens that
- *    kid's bonus summary (`StarBonusPopover`, the same convention as a day's number); a kid with
- *    none gets a plain, non-interactive "0";
+ *  - stars from chores, and the bonus as a signed net ("+2", "-1", "0"). The entries are the
+ *    ones the week's breakdown lists (`weekBonusEntries`, the one rule): the gifts dated in that
+ *    week, only when they add up to the week's own net. When that rule yields entries the number
+ *    is tappable (the fact's `action`) and opens that kid's bonus summary (`StarBonusPopover`,
+ *    the same convention as a day's number); otherwise (no entry, or entries on this device that
+ *    the frozen week never counted) it is the plain net, as the breakdown's net line shows it;
  *  - the weekly reward: Achieved with the day, or "N of M";
  *  - "No record for this week" (`choreStars.noRecord`) where `starStore.weekFor` answers `null`
  *    (a closed week no device recorded), never a zero. The board still shows that kid's chores.
@@ -60,7 +62,7 @@ import ChoreWeekPanel, {
 } from '@/components/chores/ChoreWeekPanel.vue';
 import StarBonusPopover, { type BonusEntryLine } from '@/components/chores/StarBonusPopover.vue';
 import StarWeekPopover, { type WeekBreakdownLines } from '@/components/chores/StarWeekPopover.vue';
-import { choreDayShort, rewardName } from '@/components/chores/starText';
+import { awardForKids, choreDayShort, rewardName } from '@/components/chores/starText';
 import { confirm } from '@/composables/useConfirm';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
@@ -71,14 +73,14 @@ import { useStarStore, type AwardStanding } from '@/stores/starStore';
 import { DEFAULT_REWARD_EMOJI } from '@/constants/choreStars';
 import {
   awardIsFor,
-  awardKids,
   awardProgressLabel,
+  weekBonusEntries,
   weekBreakdown,
   weeklyAchieved,
   type WeekStars,
 } from '@/utils/choreStars';
 import { choreDayOfWeek, shiftChoreDay } from '@/utils/chores';
-import { firstName, formatNameList } from '@/utils/assignees';
+import { firstName } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatUiDate } from '@/utils/uiLocale';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -206,29 +208,38 @@ function bonusLine(gift: ChoreStarGift): BonusEntryLine {
           who
         ),
     amount: signed(gift.stars),
-    sub: [
-      dayShort(gift.date),
-      gift.note ? fillTemplate(t('choreStars.bonus.note.quote'), { note: gift.note }) : '',
-    ]
-      .filter(Boolean)
-      .join('. '),
+    // The day and the note in one template, so each language punctuates it its own way.
+    sub: gift.note
+      ? fillTemplate(t('choreStars.report.bonusEntry.sub'), {
+          day: dayShort(gift.date),
+          note: fillTemplate(t('choreStars.bonus.note.quote'), { note: gift.note }),
+        })
+      : dayShort(gift.date),
   };
 }
 
-/** Each kid's bonus and take-away entries that week, newest first, as the summary lists them. */
+/** Each kid's gifts, any week (`weekBonusEntries` picks a week's). */
+const giftsByKid = computed(() => {
+  const by = new Map<string, ChoreStarGift[]>();
+  for (const g of starStore.gifts) {
+    const list = by.get(g.memberId);
+    if (list) list.push(g);
+    else by.set(g.memberId, [g]);
+  }
+  return by;
+});
+
+/**
+ * Each kid's bonus and take-away entries for the week showing, newest first, as the summary
+ * lists them: exactly the breakdown's (`weekBonusEntries` over that kid's week). A kid with no
+ * record, no entry, or entries that do not add up to the week's net has none here.
+ */
 const entriesByKid = computed(() => {
   const by = new Map<string, BonusEntryLine[]>();
-  const ids = new Set(kids.value.map((k) => k.id));
-  const gifts = starStore.gifts
-    .filter((g) => ids.has(g.memberId) && inShownWeek(g.date))
-    .sort(
-      (a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
-    );
-  for (const gift of gifts) {
-    const line = bonusLine(gift);
-    const list = by.get(gift.memberId);
-    if (list) list.push(line);
-    else by.set(gift.memberId, [line]);
+  for (const r of rows.value) {
+    if (!r.week) continue;
+    const entries = weekBonusEntries(r.week, giftsByKid.value.get(r.member.id) ?? []);
+    if (entries?.length) by.set(r.member.id, [...entries].reverse().map(bonusLine));
   }
   return by;
 });
@@ -305,12 +316,7 @@ const weekLines = computed<WeekBreakdownLines | null>(() => {
   const week = open && row ? (row.byWeek.get(open.weekStart) ?? null) : null;
   if (!open || !week) return null;
   const record = choreStore.weekFor(open.memberId, open.weekStart, choreDayOfWeek(open.weekStart));
-  const b = weekBreakdown(
-    week,
-    starStore.gifts.filter((g) => g.memberId === open.memberId),
-    record,
-    todayYmd.value
-  );
+  const b = weekBreakdown(week, giftsByKid.value.get(open.memberId) ?? [], record, todayYmd.value);
   const starsText = (n: number) =>
     plural(n, 'choreStars.report.trend.total.one', 'choreStars.report.trend.total.other');
   return {
@@ -377,7 +383,10 @@ const showWeekly = computed(
   () => rewards.value.weeklyOn || rows.value.some((r) => (r.week?.bar ?? 0) > 0)
 );
 
-/** The Bonus column: the signed net, tappable when the kid has an entry that week. */
+/**
+ * The Bonus column: the signed net, tappable only when the one rule yields entries for that
+ * week (`entriesByKid`), so it never opens a list the net does not add up to.
+ */
 function bonusFact(r: KidRow, w: WeekStars): WeekPanelFact {
   const text = signed(w.bonus);
   const fact: WeekPanelFact = {
@@ -524,7 +533,7 @@ function openRewards(): void {
 const specialProgress = computed(() =>
   starStore.sortedAwards.map((award) => ({
     award,
-    forKids: forKidsOf(award),
+    forKids: awardForKids(award, kids.value, t),
     lines: rows.value
       .filter((r) => r.week && awardIsFor(award, r.member.id))
       .map((r) => {
@@ -548,23 +557,6 @@ const specialProgress = computed(() =>
       }),
   }))
 );
-
-/** Who a special reward is for when not every kid: their members and the spoken line. */
-function forKidsOf(award: ChoreAward): { members: FamilyMember[]; label: string } | null {
-  const ids = awardKids(award, starStore.earners);
-  if (ids === null) return null;
-  const members = ids
-    .map((id) => kids.value.find((k) => k.id === id))
-    .filter((m): m is FamilyMember => !!m);
-  return {
-    members,
-    label: members.length
-      ? fillTemplate(t('choreStars.awards.forKids'), {
-          names: formatNameList(members.map((m) => firstName(m.name))),
-        })
-      : t('choreStars.awards.forNobody'),
-  };
-}
 
 const cardClass =
   'dark:bg-surface-raised dark:border-line rounded-3xl bg-white p-4 shadow-[var(--card-shadow)] dark:border';

@@ -34,6 +34,20 @@ vi.mock('@/stores/choreStore', () => ({
 }));
 /** The store's finishing-tick decision, as the test sets it. */
 const willCelebrate = vi.hoisted(() => vi.fn((_m: string, _c: string) => false));
+/** #148: the reward banner's hosts registered by the lanes (`useRewardBannerHost`, real). */
+const hosts = vi.hoisted(() => [] as string[]);
+vi.mock('@/stores/starStore', () => ({
+  useStarStore: () => ({
+    hostRewardBanner: (memberId: string, surface: string) => {
+      const key = `${memberId}:${surface}`;
+      hosts.push(key);
+      return () => {
+        const i = hosts.indexOf(key);
+        if (i >= 0) hosts.splice(i, 1);
+      };
+    },
+  }),
+}));
 
 const members: FamilyMember[] = [
   { id: 'pip', name: 'Pip', color: '#F15D22' } as FamilyMember,
@@ -478,6 +492,16 @@ describe('WallChoreLanes: stars', () => {
     expect(w.find('[data-testid="wall-chore-lane-stars"]').classes()).toContain('wall-star-count');
   });
 
+  it("every lane drawn hosts its bean's reward banner while mounted, and only those", async () => {
+    hosts.length = 0;
+    const lanes: Record<string, WallChoreLane | null> = { pip: pipMorning(), juno: null };
+    const w = mountLanes(lanes);
+    // Juno has no lane, so nothing of hers is drawn and she claims nothing here.
+    expect(hosts).toEqual(['pip:wall']);
+    w.unmount();
+    expect(hosts).toEqual([]);
+  });
+
   it("the achieved moment: the banner at the top of that child's lane, nothing to press", async () => {
     vi.useFakeTimers();
     try {
@@ -492,7 +516,7 @@ describe('WallChoreLanes: stars', () => {
         beanName: 'Pip',
         title: 'Ice cream',
         emoji: '🍦',
-        stillAchieved: () => true,
+        stillClaimable: () => true,
         claim: async () => true,
       });
       await nextTick();

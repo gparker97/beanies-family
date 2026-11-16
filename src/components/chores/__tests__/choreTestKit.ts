@@ -188,7 +188,7 @@ const choreStoreFake = {
 
 export const choreStoreModule = { useChoreStore: () => choreStoreFake };
 
-// ── starStore (#148): the tick paths hand every outcome to `afterTick` ───────
+// ── starStore (#148): the day head registers as the reward banner's host ─────
 
 /**
  * The star store's surface the chore views read, OFF by default (so every pre-stars test sees the
@@ -209,8 +209,17 @@ export const stars = reactive({
   /** The weeks the stepper offers, newest first (empty while off). */
   lookback: [] as string[],
 });
+/** Every banner host registered and not yet released, as `memberId:surface`. */
+export const bannerHosts: string[] = [];
 export const starActions = {
-  afterTick: vi.fn(async () => {}),
+  hostRewardBanner: vi.fn((memberId: string, surface: string) => {
+    const key = `${memberId}:${surface}`;
+    bannerHosts.push(key);
+    return () => {
+      const i = bannerHosts.indexOf(key);
+      if (i >= 0) bannerHosts.splice(i, 1);
+    };
+  }),
   setRewards: vi.fn(async (): Promise<true | null> => true),
   giveStars: vi.fn(async (): Promise<unknown> => ({})),
 };
@@ -297,7 +306,8 @@ export function resetKit(): void {
   routerFns.replace.mockClear();
   routerFns.push.mockClear();
   for (const fn of Object.values(choreActions)) fn.mockReset();
-  starActions.afterTick.mockClear();
+  starActions.hostRewardBanner.mockClear();
+  bannerHosts.length = 0;
   starActions.setRewards.mockReset();
   starActions.setRewards.mockResolvedValue(true);
   stars.on = false;

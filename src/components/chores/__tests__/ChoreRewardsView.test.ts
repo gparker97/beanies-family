@@ -47,6 +47,8 @@ const rs = vi.hoisted(() => ({
 const starSpies = vi.hoisted(() => ({
   setRewards: vi.fn(async (): Promise<true | null> => true),
 }));
+/** How many times a child's week was built (`weekFor`), per kid. */
+const weekReads = vi.hoisted(() => vi.fn());
 vi.mock('@/stores/starStore', async () => {
   const kit = await import('./choreTestKit');
   return {
@@ -70,7 +72,7 @@ vi.mock('@/stores/starStore', async () => {
         return kit.sortedAwardsOf(rs.state!.awards as { createdAt?: string }[]);
       },
       weekFor: (id: string) =>
-        id === 'kid'
+        (weekReads(id), id) === 'kid'
           ? { total: 9, full: 20, bar: 16, weekStart: '2026-11-09' }
           : id === 'sib'
             ? { total: 3, full: 10, bar: 8, weekStart: '2026-11-09' }
@@ -366,6 +368,15 @@ describe('ChoreRewardsView: each control calls its one store action', () => {
 });
 
 describe('ChoreRewardsView: what it shows', () => {
+  it("typing the weekly reward's name never rebuilds the kids' weeks (the bar lines are one computed map)", async () => {
+    const w = await mountView();
+    weekReads.mockClear();
+    const input = w.get('[data-testid="chore-rewards-title"]');
+    await input.trigger('focus');
+    for (const name of ['I', 'Ic', 'Ice', 'Ice c', 'Ice cr']) await input.setValue(name);
+    expect(weekReads.mock.calls.filter(([id]) => id === 'sib')).toEqual([]);
+  });
+
   it('each child\'s "N of M stars" under the bar, kids only', async () => {
     const w = await mountView();
     const lines = w

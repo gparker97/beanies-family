@@ -213,6 +213,10 @@ export const PAGING_SURFACES = {
   'photo-upload': { impact: 'data-at-risk', why: 'a photo upload could not be finalized' },
   'recipe-extract': { impact: 'data-at-risk', why: 'a captured recipe could not be saved' },
   'beanie-wall': { impact: 'data-at-risk', why: 'a beanie wall job could not be saved' },
+  'chore-stars': {
+    impact: 'journey-blocked',
+    why: 'turning stars off could not record the week first, so the turn-off was refused',
+  },
   'recurring-processor': {
     impact: 'data-at-risk',
     why: 'recurring items could not be generated: transactions go missing',

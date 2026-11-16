@@ -429,12 +429,43 @@ export const useChoreStore = defineStore('chores', () => {
    * Resolves the landed tick or untick, a `ChoreTickRefused` when a guard refused (toasted and
    * logged, or a quiet double tap), or `null` for a failed write (`useWallJobs` reports that one).
    *
-   * EVERY tick path calls `void starStore.afterTick({ memberId, outcome, surface, showsBanner })`
-   * once this resolves (#148: `useChoreTicks.toggle` and the chore writer in `useWallJobs`).
-   * A new tick path must add that one line too, or it loses the weekly reward's achieved
-   * banner (the arc and badge are derived and still show). This store never learns about stars.
+   * Every call is tracked per bean until it resolves (`whenTicksSettled`), the whole tick
+   * including its commit, so a reader can wait until any celebration a tick starts has started
+   * (#148: the star store's achieved banner waits behind it). This store never learns about
+   * stars; a new tick path needs nothing for them.
    */
-  async function toggleChore(
+  function toggleChore(
+    choreId: string,
+    memberId: string,
+    opts: ToggleChoreOpts
+  ): Promise<ToggleChoreOutcome | null> {
+    const run = runToggleChore(choreId, memberId, opts);
+    const mine = ticking.get(memberId) ?? new Set<Promise<unknown>>();
+    mine.add(run);
+    ticking.set(memberId, mine);
+    const done = () => {
+      mine.delete(run);
+      if (!mine.size && ticking.get(memberId) === mine) ticking.delete(memberId);
+    };
+    run.then(done, done);
+    return run;
+  }
+
+  /** Each bean's `toggleChore` calls still running on this device. */
+  const ticking = new Map<string, Set<Promise<unknown>>>();
+
+  /**
+   * Resolves once every `toggleChore` of this bean running on this device has resolved (also
+   * those started while waiting), so any block celebration they start has started. Never
+   * rejects.
+   */
+  async function whenTicksSettled(memberId: string): Promise<void> {
+    for (let set = ticking.get(memberId); set?.size; set = ticking.get(memberId)) {
+      await Promise.allSettled([...set]);
+    }
+  }
+
+  async function runToggleChore(
     choreId: string,
     memberId: string,
     opts: ToggleChoreOpts
@@ -586,7 +617,7 @@ export const useChoreStore = defineStore('chores', () => {
   /**
    * THE one write of a `celebrated` mark (`ifAbsent`): a finished block's (the commit and
    * `finishLate`), and the weekly reward's (`ref` = `REWARD_MARK_REF`, `ymd` = the week start;
-   * written by `starStore.afterTick`, #148), so marks keep one writer. `created` (THIS write made
+   * written by the star store's banner claim, #148), so marks keep one writer. `created` (THIS write made
    * it: celebrate), `exists` (another device or tick did), or `failed` (reported as a warning,
    * never toasted; the ticks landed, and the banner or the arc still shows).
    */
@@ -1206,6 +1237,7 @@ export const useChoreStore = defineStore('chores', () => {
     // Actions
     loadChores,
     toggleChore,
+    whenTicksSettled,
     writeCelebratedMark,
     tickWillCelebrate,
     createChore,

@@ -84,7 +84,7 @@ describe('both devices tick across the bar', () => {
     const { a, b } = fork(seeded());
     const onA = apply(a, set('choreMarks', rewardMark(KID)));
     const synced = converge(onA, b);
-    // What `afterTick` asks on device B before writing (`marksOn(...).celebrated`).
+    // What the banner claim asks on device B before writing (`marksOn(...).celebrated`).
     const index = indexMarks(Object.values(plain(synced.b).choreMarks));
     expect(marksOn(index, KID, MON).celebrated.has(REWARD_MARK_REF)).toBe(true);
   });

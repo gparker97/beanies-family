@@ -494,6 +494,25 @@ describe('the once-only celebration', () => {
     }
   });
 
+  it('whenTicksSettled waits for the whole tick, commit included, so a celebration it starts has started (#148)', async () => {
+    await setup([
+      chore('c1'),
+      chore('c2', { sortOrder: 1 }),
+      chore('s1', { assigneeIds: ['sib'] }),
+    ]);
+    await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid' });
+    order.length = 0;
+    // Nothing in flight: resolves at once.
+    await store.whenTicksSettled('kid');
+    const finishing = store.toggleChore('c2', 'kid', { surface: 'wall', by: 'kid' });
+    const settled = store.whenTicksSettled('kid').then(() => order.push('settled'));
+    // Another bean's tick is not waited for.
+    await store.whenTicksSettled('sib');
+    await Promise.all([finishing, settled]);
+    expect(order.indexOf('celebrate:kid')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('settled')).toBeGreaterThan(order.indexOf('celebrate:kid'));
+  });
+
   it('two beans finishing at the same moment on the wall each hold and celebrate their own', async () => {
     await setup([chore('k1'), chore('s1', { assigneeIds: ['sib'] })]);
     order.length = 0;

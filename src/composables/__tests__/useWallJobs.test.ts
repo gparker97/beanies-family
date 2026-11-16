@@ -751,21 +751,21 @@ describe('useWallJobs chores (#146)', () => {
   });
 
   // ─── Stars (#148) ────────────────────────────────────────────────────────────
-  it('the chore writer hands its outcome to starStore.afterTick once, with surface wall, unawaited', async () => {
+  it('the chore writer is the chore store alone: a tick claims no reward banner (the lane does)', async () => {
     const landed = { action: 'tick' as const, completed: null, celebrated: false };
-    vi.spyOn(useChoreStore(), 'toggleChore').mockResolvedValue(landed);
-    const after = vi.spyOn(useStarStore(), 'afterTick').mockReturnValue(new Promise(() => {}));
+    const toggle = vi.spyOn(useChoreStore(), 'toggleChore').mockResolvedValue(landed);
+    const host = vi.spyOn(useStarStore(), 'hostRewardBanner');
     const wall = useWallJobs({ chores: true });
     const job = jobOf(wall, 'juno', 'dog');
     await wall.toggle(job);
     expect(wall.isPending(job)).toBe(false);
-    expect(after).toHaveBeenCalledTimes(1);
-    expect(after).toHaveBeenCalledWith({
-      memberId: 'juno',
-      outcome: landed,
-      surface: 'wall',
-      showsBanner: true,
-    });
+    expect(toggle).toHaveBeenCalledTimes(1);
+    expect(toggle).toHaveBeenCalledWith(
+      'dog',
+      'juno',
+      expect.objectContaining({ surface: 'wall' })
+    );
+    expect(host).not.toHaveBeenCalled();
   });
 
   it('stars off: no lane or row carries stars (the board is exactly as before)', () => {

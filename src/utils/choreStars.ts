@@ -508,7 +508,10 @@ export interface BreakdownDay {
   ymd: string;
   /** Stars from chores that day (the week's own `days`, so they add up to its `stars`). */
   stars: number;
-  /** Chores done of due that day, or `null` when not known (outside mark retention, or later). */
+  /**
+   * Chores done of due that day, or `null` when not known (outside mark retention, later than
+   * today, or the chores as they are now no longer agree with the week's stars for that day).
+   */
   chores: { done: number; due: number } | null;
 }
 
@@ -520,8 +523,8 @@ export interface WeekBreakdown {
   /** The net bonus (given minus taken away). */
   bonus: number;
   /**
-   * The week's bonus entries, oldest first, when the entries still there add up to `bonus`;
-   * `null` when only the frozen net is known (draw one net line).
+   * The week's bonus entries, oldest first (`weekBonusEntries`, the one rule), or `null` when
+   * only the net is known (draw one net line).
    */
   entries: ChoreStarGift[] | null;
   /** `stars + bonus`, never below 0: exactly the week's `total` (what its bar shows). */
@@ -531,14 +534,40 @@ export interface WeekBreakdown {
 }
 
 /**
+ * THE rule for which bonus and take-away entries a week lists, for every surface that lists
+ * them (the week's breakdown and the Star Report's Bonus summary): the child's gifts dated on
+ * the week's days, oldest first, but only when they add up to the week's own `bonus` (the
+ * frozen record's for a closed week, the live net for the open one). Otherwise `null`: the
+ * entries on this device are not what the week counted (a gift that synced after the week was
+ * frozen, or one on a day another frozen week holds), so a surface shows the net alone and
+ * never lists a gift as if it counted. No gift at all is `[]`.
+ */
+export function weekBonusEntries(
+  week: Pick<WeekStars, 'weekStart' | 'bonus'>,
+  gifts: readonly ChoreStarGift[]
+): ChoreStarGift[] | null {
+  const ymds = weekDays(week.weekStart);
+  const inWeek = gifts
+    .filter((g) => ymds.includes(g.date))
+    .sort(
+      (a, b) => a.date.localeCompare(b.date) || (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
+    );
+  const listed = inWeek.reduce((n, g) => n + Math.round(finite(g.stars)), 0);
+  return listed === finite(week.bonus) ? inWeek : null;
+}
+
+/**
  * THE breakdown of one child's week, for the summary a week's bar opens. The star numbers are the
  * week's own (`WeekStars`, so the frozen record for a closed week and the live week for the open
  * one): the days' stars add up to `stars`, `stars + bonus` floored at 0 is `total`, so the summary
- * always adds up to the bar. `gifts` are the child's gifts (any weeks); the ones on the week's days
- * are listed only when they sum to the week's `bonus` (a gift the record never took in is not
- * shown as if it counted). `record` is the week's chore record (`choreStore.weekFor`, from the
- * marks), read for done-of-due per day only while the week is inside mark retention and only for
- * days up to today; otherwise a day shows its stars alone.
+ * always adds up to the bar. The bonus entries are `weekBonusEntries` (an empty list reads as
+ * `null`: there is nothing to list). `record` is the week's chore record (`choreStore.weekFor`,
+ * the chores as they are now and the marks), read for a day's done-of-due only while the week is
+ * inside mark retention, for days up to today, and only when that day AGREES with the week's
+ * stars: the stars its done chores are worth now equal the stars the week has for it. A chore
+ * deleted, reassigned, moved or re-valued after a closed week was frozen (or a day another frozen
+ * week holds) would otherwise put "Nothing due" beside "3 stars"; such a day shows its stars
+ * alone.
  */
 export function weekBreakdown(
   week: WeekStars,
@@ -550,27 +579,21 @@ export function weekBreakdown(
   const cutoff = markCutoffYmd(todayYmd);
   const countsKnown = !!record && cutoff !== null && week.weekStart >= cutoff;
   const days = ymds.map((ymd, i) => {
-    const day = countsKnown ? record!.days.find((d) => d.ymd === ymd) : undefined;
-    return {
-      ymd,
-      stars: finite(week.days[i]),
-      chores: day && ymd <= todayYmd ? { done: day.done, due: day.total } : null,
-    };
+    const stars = finite(week.days[i]);
+    const day =
+      countsKnown && ymd <= todayYmd ? record!.days.find((d) => d.ymd === ymd) : undefined;
+    const agrees = !!day && dayStars(day, 'done') === stars;
+    return { ymd, stars, chores: agrees ? { done: day!.done, due: day!.total } : null };
   });
   const stars = days.reduce((n, d) => n + d.stars, 0);
   const bonus = finite(week.bonus);
-  const inWeek = gifts
-    .filter((g) => ymds.includes(g.date))
-    .sort(
-      (a, b) => a.date.localeCompare(b.date) || (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
-    );
-  const listed = inWeek.reduce((n, g) => n + Math.round(finite(g.stars)), 0);
+  const entries = weekBonusEntries(week, gifts);
   const sum = stars + bonus;
   return {
     days,
     stars,
     bonus,
-    entries: inWeek.length && listed === bonus ? inWeek : null,
+    entries: entries?.length ? entries : null,
     total: Math.max(0, sum),
     floored: sum < 0,
   };
@@ -841,7 +864,8 @@ export interface FairPrice {
   suggestedWeeks: number | null;
 }
 
-const oneDecimal = (n: number) => Math.round(n * 10) / 10;
+/** A number rounded to one decimal (a price in full weeks, a ratio): the one formatter. */
+export const oneDecimal = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * Is a stars price fair across the children (`fulls`: member id -> their full week in stars)?

@@ -60,8 +60,10 @@
  * special reward's row (on Stars and Rewards and on Star Report) open ONE special reward drawer
  * (`ChoreAwardModal`), owned here: each view only emits `open-award`.
  *
- * The weekly reward's banner is claimed only by a tick on a surface that draws it: a bean's day
- * passes `showsBanner: true` to the tick path, the home cards `false` (`onToggle`).
+ * The weekly reward's banner is claimed only while a surface that draws it is mounted: the day
+ * head is a banner host for its bean (`useRewardBannerHost`), so the banner plays when that
+ * bean's week is achieved and not yet celebrated, whichever surface or device ticked it (a
+ * grown-up's tick on a home card plays it when the bean's day is next open). Ticks claim nothing.
  *
  * Looking back (grown-ups, whether or not stars are on): the Chores Done board carries the week
  * stepper in its header (`ChoreWeekPanel`'s `weeks`), over this week and up to four back: while
@@ -125,6 +127,7 @@ import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useChoreClock } from '@/composables/useChoreClock';
 import { useChoreTicks } from '@/composables/useChoreTicks';
+import { useRewardBannerHost } from '@/composables/useRewardBannerHost';
 import { usePermissions } from '@/composables/usePermissions';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useMediaQuery } from '@/composables/useMediaQuery';
@@ -350,18 +353,9 @@ function canTickFor(memberId: string): boolean {
   return isAdult.value || me.value?.id === memberId;
 }
 
-/**
- * A tick, with where its celebration plays if it finishes the block (#146), and whether this
- * surface draws the weekly reward's banner for that bean (#148): a bean's day does (under its
- * head), the home cards do not, so a grown-up ticking there never uses the banner up unseen.
- */
-function onToggle(
-  choreId: string,
-  memberId: string,
-  anchor: ChoreCelebrationAnchor | null,
-  showsBanner: boolean
-): void {
-  void ticks.toggle(choreId, memberId, { anchor, showsBanner });
+/** A tick, with where its celebration plays if it finishes the block (#146). */
+function onToggle(choreId: string, memberId: string, anchor: ChoreCelebrationAnchor | null): void {
+  void ticks.toggle(choreId, memberId, { anchor });
 }
 
 /** A "No one's" chore's ✕: it has nobody left, so it is deleted (the store toasts a failure). */
@@ -536,6 +530,15 @@ const dayRail = computed(
 const dayArc = computed(() => (viewBeanId.value ? starStore.arcFor(viewBeanId.value) : null));
 const dayArcSegments = computed(() =>
   dayArc.value ? [{ value: dayArc.value.percent / 100, tone: 'fill' as const }] : []
+);
+/**
+ * The day head is a banner host for its bean while it is drawn (the store ignores a grown-up):
+ * the same condition as the day's template, so a host is registered only where the banner can
+ * show.
+ */
+useRewardBannerHost(
+  () => (viewBeanId.value && dayMember.value && day.value ? [viewBeanId.value] : []),
+  'app'
 );
 /** The achieved moment's banner on this kid's day, while it is up. */
 const dayRewardBanner = computed(() => {
@@ -828,7 +831,7 @@ function revealBlock(block: ChoreBlock): void {
               :can-edit="isAdult"
               :is-pending="pendingFor(viewBeanId)"
               :star-value="starStore.valueFor(viewBeanId)"
-              @toggle="(choreId, anchor) => onToggle(choreId, viewBeanId!, anchor, true)"
+              @toggle="(choreId, anchor) => onToggle(choreId, viewBeanId!, anchor)"
               @edit="openBeanEditor(viewBeanId)"
             />
           </div>
@@ -968,7 +971,7 @@ function revealBlock(block: ChoreBlock): void {
                   :can-edit="isAdult"
                   :is-pending="pendingFor(bean.member.id)"
                   :star-value="starStore.valueFor(bean.member.id)"
-                  @toggle="(choreId, anchor) => onToggle(choreId, bean.member.id, anchor, false)"
+                  @toggle="(choreId, anchor) => onToggle(choreId, bean.member.id, anchor)"
                   @edit-chores="openBeanEditor(bean.member.id)"
                   @open="openDay(bean.member.id)"
                   @copy="openCopy(bean.member.id)"

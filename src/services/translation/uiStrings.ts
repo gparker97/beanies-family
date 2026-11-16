@@ -16779,6 +16779,12 @@ const STRING_DEFS = {
     en: 'That week is finished and cannot be changed.',
     beanie: 'that week is finished and cannot be changed.',
   },
+  // Turning Stars and Rewards off could not record this week's stars first, so it stayed on.
+  'choreStars.error.offNotRecorded': {
+    en: "Stars and Rewards were not turned off, because this week's stars could not be saved first. Please try again.",
+    beanie:
+      "stars and rewards were not turned off, because this week's stars could not be saved first. please try again.",
+  },
   // A finished week no device recorded in time (the report and a stepped-back week).
   'choreStars.noRecord': { en: 'No record for this week', beanie: 'no record for this week' },
   'choreStars.noRecordHint': {
@@ -17007,6 +17013,12 @@ const STRING_DEFS = {
   'choreStars.awardForm.whoHint.some': {
     en: 'Only the children you pick can earn it.',
     beanie: 'only the children you pick can earn it.',
+  },
+  // Editing a special reward whose chosen children no longer earn stars (they left, or grew up).
+  'choreStars.awardForm.whoHint.nobody': {
+    en: 'Not for any child now: the children it was for no longer earn stars. Pick who it is for, or leave it as it is.',
+    beanie:
+      'not for any child now: the children it was for no longer earn stars. pick who it is for, or leave it as it is.',
   },
   'choreStars.awardForm.whoRequired': {
     en: 'Pick at least one child.',
@@ -17317,6 +17329,8 @@ const STRING_DEFS = {
     en: '{by} gave {count} bonus stars',
     beanie: '{by} gave {count} bonus stars',
   },
+  // A bonus entry's second line: the day, then the note (already in quotes).
+  'choreStars.report.bonusEntry.sub': { en: '{day}. {note}', beanie: '{day}. {note}' },
   'choreStars.report.remove.label': { en: 'Remove This Entry', beanie: 'remove this entry' },
   'choreStars.report.remove.title': { en: 'Remove This Entry?', beanie: 'remove this entry?' },
   'choreStars.report.remove.message': {

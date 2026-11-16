@@ -46,8 +46,8 @@ vi.mock('@/utils/autoWriteBudget', () => ({
 }));
 /**
  * The banner, as `celebrateReward` orders it: an optional wait (`duringWait` runs inside it, so a
- * test can untick meanwhile), then `stillAchieved()`, then `claim()`; `shown` counts the banners
- * actually shown. `result` is what a shown banner answers (`played` or `waited`).
+ * test can untick or leave meanwhile), then `stillClaimable()`, then `claim()`; `shown` counts the
+ * banners actually shown. `result` is what a shown banner answers (`played` or `waited`).
  */
 const banner = vi.hoisted(() => ({
   result: 'played' as 'played' | 'waited',
@@ -56,7 +56,7 @@ const banner = vi.hoisted(() => ({
   calls: [] as {
     memberId: string;
     beanName: string;
-    stillAchieved: () => boolean;
+    stillClaimable: () => boolean;
     claim: () => Promise<boolean>;
   }[],
 }));
@@ -67,7 +67,7 @@ vi.mock('@/composables/useCelebration', () => ({
       await Promise.resolve();
       banner.duringWait();
     }
-    if (!req.stillAchieved()) return 'dropped';
+    if (!req.stillClaimable()) return 'dropped';
     if (!(await req.claim())) return 'claimed-elsewhere';
     banner.shown++;
     return banner.result;
@@ -131,6 +131,8 @@ vi.mock('@/stores/settingsStore', () => ({ useSettingsStore: () => settings }));
 
 /** The STORE arrays (what the chore store holds), with the real rules over them. */
 const markWrites = vi.hoisted(() => ({ fail: false, calls: [] as unknown[][] }));
+/** This device's ticks still being written (`whenTicksSettled` waits for `pending`). */
+const ticking = vi.hoisted(() => ({ pending: null as Promise<void> | null, waits: 0 }));
 const chores = reactive({
   chores: [] as Chore[],
   choreMarks: [] as ChoreMark[],
@@ -152,6 +154,10 @@ const chores = reactive({
       wsd,
       this.livingIds
     );
+  },
+  async whenTicksSettled(_memberId: string) {
+    ticking.waits++;
+    await ticking.pending;
   },
   async writeCelebratedMark(memberId: string, ymd: string, ref: string, by: string) {
     markWrites.calls.push([memberId, ymd, ref, by]);
@@ -180,6 +186,8 @@ const proj = {
 };
 const clone = <V>(v: V): V => structuredClone(v);
 const reads = { chores: vi.fn(), marks: vi.fn(), weeks: vi.fn(), gifts: vi.fn(), awards: vi.fn() };
+/** The next projection read of the marks throws (then reads work again). */
+const readFail = { next: null as Error | null };
 const writes = {
   setChoreWeeks: vi.fn(),
   createAward: vi.fn(),
@@ -199,6 +207,11 @@ vi.mock('@/services/automerge/repositories/choreRepository', () => ({
   },
   getAllChoreMarks: async () => {
     reads.marks();
+    if (readFail.next) {
+      const e = readFail.next;
+      readFail.next = null;
+      throw e;
+    }
     return clone(proj.marks);
   },
 }));
@@ -404,6 +417,7 @@ beforeEach(() => {
   chores.todayYmd = MON;
   proj.failWrite = null;
   proj.goneNext = false;
+  readFail.next = null;
   budget.allow = true;
   budget.calls = [];
   banner.result = 'played';
@@ -412,6 +426,8 @@ beforeEach(() => {
   banner.calls = [];
   markWrites.fail = false;
   markWrites.calls = [];
+  ticking.pending = null;
+  ticking.waits = 0;
   store = useStarStore();
   vi.clearAllMocks();
 });
@@ -820,21 +836,44 @@ describe('turning it off records the books as they stand', () => {
     expect(settings.sent.at(-1)!.on).toBe(false);
   });
 
-  it('a failed record is reported (a warning) and the turn-off still goes ahead', async () => {
-    chores.todayYmd = FRI;
-    await setup({ marks: ticks('kid', days7(MON).slice(0, 5)) });
-    proj.failWrite = new Error('disk');
-    expect(await store.setRewards({ on: false }, 'mom')).toBe(true);
-    proj.failWrite = null;
-    expect(reportError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        surface: 'chore-stars',
-        severity: 'warning',
-        context: { action: 'off-record-failed' },
-      })
-    );
-    expect(settings.sent.at(-1)!.on).toBe(false);
-  });
+  it.each([
+    ['a read throws', () => (readFail.next = new Error('disk')), 'write-failed'],
+    ['the write throws', () => (proj.failWrite = new Error('disk')), 'write-failed'],
+    ['the doc is not loaded', () => (doc.loaded = false), 'not-loaded'],
+  ])(
+    'a record that cannot be written (%s) refuses the turn-off: null, no setting written, the switch stays on, a critical report and an error toast',
+    async (_n, breakIt, detail) => {
+      chores.todayYmd = FRI;
+      await setup({ marks: ticks('kid', days7(MON).slice(0, 5)) });
+      breakIt();
+      expect(await store.setRewards({ on: false }, 'mom')).toBeNull();
+      proj.failWrite = null;
+      readFail.next = null;
+      doc.loaded = true;
+      expect(settings.setChoreRewards).not.toHaveBeenCalled();
+      expect(settings.sent).toEqual([]);
+      expect(store.rewards.on).toBe(true);
+      expect(store.isOn).toBe(true);
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'chore-stars',
+          severity: 'critical',
+          context: { action: 'off-record-failed', detail },
+        })
+      );
+      expect(showToast).toHaveBeenCalledWith(
+        'error',
+        'choreStars.error.offNotRecorded',
+        undefined,
+        { silent: true }
+      );
+      expect(logged('rewards-set')).toEqual([]);
+      // Tried again once it works: recorded, then turned off.
+      expect(await store.setRewards({ on: false }, 'mom')).toBe(true);
+      expect(proj.weeks.some((w) => w.memberId === 'kid' && w.weekStart === MON)).toBe(true);
+      expect(settings.sent.at(-1)!.on).toBe(false);
+    }
+  );
 
   it('a patch that is not a turn-off (or off while already off) records nothing', async () => {
     chores.todayYmd = FRI;
@@ -950,6 +989,29 @@ describe('awards', () => {
     ]);
     expect(store.awards[0]).not.toHaveProperty('repeats');
     expect(store.awards[0]!.weekStart).toBe(MON);
+  });
+
+  it("an edit that sends back the stored kids keeps them as stored, even when none of them earns stars now (a rename never makes it everyone's)", async () => {
+    await setup();
+    const a = (await store.saveAward({ ...draft, memberIds: ['sib'] }, 'mom'))!;
+    expect(a.memberIds).toEqual(['sib']);
+    // The sib leaves; one kid remains. The drawer sends the stored list back with a new name.
+    family.members = ROSTER.filter((m) => m.id !== 'sib');
+    const renamed = await store.saveAward(
+      { ...draft, title: 'Movie night out', id: a.id, memberIds: ['sib'] },
+      'mom'
+    );
+    expect(renamed).not.toBeNull();
+    const patch = writes.updateAward.mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty('memberIds');
+    expect(patch.title).toBe('Movie night out');
+    expect(store.awards[0]!.memberIds).toEqual(['sib']);
+    // Not the kid who is left, and not a kid who joins later.
+    expect(store.awardsFor('kid').map((s) => s.award.id)).toEqual([]);
+    // A real change is still a change: for every kid now.
+    await store.saveAward({ ...draft, id: a.id, memberIds: undefined }, 'mom');
+    expect(writes.updateAward.mock.calls.at(-1)![1]).toHaveProperty('memberIds', undefined);
+    expect(store.awards[0]).not.toHaveProperty('memberIds');
   });
 
   it.each([
@@ -1091,200 +1153,229 @@ describe('gifts', () => {
 
 // ─── The achieved moment ────────────────────────────────────────────────────
 
-describe('afterTick', () => {
-  const tick = { action: 'tick' as const, completed: null, celebrated: false };
-  /** The kid has 6 of 7 stars; ticking Sunday's chore takes them to the bar (7). */
+describe('the achieved banner: claimed only while a banner host is mounted', () => {
+  /** Let the store's watcher run and every claim step settle. */
+  const settle = async () => {
+    for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
+  };
+  /** The kid has 6 of 7 stars on Sunday, the week's last day; Sunday's chore takes them to 7. */
   async function nearTheBar(): Promise<void> {
-    chores.todayYmd = '2026-11-22'; // Sunday, the week's last day
+    chores.todayYmd = '2026-11-22';
     await setup({ marks: ticks('kid', days7(MON).slice(0, 6)) });
+    __setStoresAuthoritativeForTesting(true);
   }
-  async function tickSunday(): Promise<void> {
+  const tickSunday = () => {
     chores.choreMarks = [...chores.choreMarks, ...ticks('kid', ['2026-11-22'])];
-  }
-  const run = (outcome: unknown = tick, surface: 'app' | 'wall' = 'app', showsBanner = true) =>
-    store.afterTick({ memberId: 'kid', outcome: outcome as never, surface, showsBanner });
+  };
+  const untickSunday = () => {
+    chores.choreMarks = chores.choreMarks.filter(
+      (m) => !(m.kind === 'done' && m.date === '2026-11-22')
+    );
+  };
+  const host = (memberId = 'kid', surface: 'app' | 'wall' = 'app') =>
+    store.hostRewardBanner(memberId, surface);
 
-  it('a tick that crosses the bar writes the reward mark once and plays the banner', async () => {
+  it('a tick past the bar while the kid’s lane is mounted writes the mark once and plays once', async () => {
     await nearTheBar();
-    await tickSunday();
-    await run(tick, 'wall');
+    host('kid', 'wall');
+    await settle();
+    expect(markWrites.calls).toEqual([]); // 6 of 7: nothing owed
+    tickSunday();
+    await settle();
     expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+    expect(banner.calls).toHaveLength(1);
+    expect(banner.shown).toBe(1);
+    expect(banner.calls[0]!.beanName).toBe('kid');
     expect(logged('reward-achieved')[0]!.context).toEqual({
       kind: 'weekly',
       detail: 'wall',
       stage: 'marked',
     });
-    expect(banner.calls).toHaveLength(1);
-    expect(banner.shown).toBe(1);
-    expect(banner.calls[0]!.beanName).toBe('kid');
-    expect(banner.calls[0]!.stillAchieved()).toBe(true);
     expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'played' });
-    // Every later tick that week finds the mark: no second write, no banner, nothing logged.
-    await run();
-    expect(markWrites.calls).toHaveLength(1);
-    expect(banner.calls).toHaveLength(1);
-    expect(logged('achieved-banner')).toHaveLength(1);
+    // It waited for this device's ticks of the kid to settle before the banner's own wait.
+    expect(ticking.waits).toBe(1);
   });
 
-  it('ignores null, a refusal and an untick by itself', async () => {
+  it('a marked week never replays: not on a later tick, an untick and re-tick, or a remount (a reload)', async () => {
     await nearTheBar();
-    await tickSunday();
-    await run(null);
-    await run({ action: 'refused', detail: 'not-yours' });
-    await run({ action: 'untick', completed: null, celebrated: false });
-    expect(markWrites.calls).toEqual([]);
-    expect(starEvents()).toEqual([]);
-  });
-
-  it('a tick below the bar does nothing', async () => {
-    await nearTheBar();
-    await run(); // 6 of 7: below
-    expect(markWrites.calls).toEqual([]);
-    expect(starEvents()).toEqual([]);
-  });
-
-  it('two ticks that land together across the bar play the banner once (neither "crossed" alone)', async () => {
-    // Two chores a day (full 14) at a 50% bar: 7 stars. 6 by Wednesday; Thursday's two ticks
-    // both land before either check runs, so each check sees 8, which is 7 (still the bar)
-    // without its own tick. The old "this tick crossed" test played nothing for either and
-    // wrote no mark that week.
-    setRewardsState({ ...ON, barPct: 50 });
-    chores.todayYmd = '2026-11-19';
-    const both = (d: string) => [mark(d, 'c-kid', 'kid'), mark(d, 'extra', 'kid')];
-    await setup({
-      chores: [chore('c-kid', ['kid']), chore('extra', ['kid'], { sortOrder: 1 })],
-      marks: days7(MON).slice(0, 3).flatMap(both),
-    });
-    expect(store.weekFor('kid')).toMatchObject({ total: 6, bar: 7 });
-    chores.choreMarks = [...chores.choreMarks, ...both('2026-11-19')];
-    await Promise.all([run(), run()]);
-    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
-    expect(banner.calls).toHaveLength(1);
-    expect(logged('reward-achieved')).toHaveLength(1);
-  });
-
-  it('an untick below the bar and a re-tick replay nothing (the week has its mark)', async () => {
-    await nearTheBar();
-    await tickSunday();
-    await run();
-    expect(banner.calls).toHaveLength(1);
-    // Untick: below the bar again. Then the same tick lands again.
-    chores.choreMarks = chores.choreMarks.filter(
-      (m) => !(m.kind === 'done' && m.date === '2026-11-22')
-    );
-    await run({ action: 'untick', completed: null, celebrated: false });
-    await tickSunday();
-    await run();
+    tickSunday();
+    const release = host();
+    await settle();
+    expect(banner.shown).toBe(1);
+    untickSunday();
+    await settle();
+    tickSunday();
+    await settle();
+    release();
+    host();
+    await settle();
     expect(markWrites.calls).toHaveLength(1);
     expect(banner.calls).toHaveLength(1);
   });
 
-  it('a bonus past the bar plays nothing by itself; the next tick plays the banner once', async () => {
-    chores.todayYmd = '2026-11-21'; // Saturday: 5 ticked, Sunday still to come
-    await setup({ marks: ticks('kid', days7(MON).slice(0, 5)) });
-    // A grown-up gives 2 bonus stars elsewhere: 7 of 7 with no tick on this device.
-    await store.giveStars({ memberId: 'kid', kind: 'bonus', count: 2 }, 'mom');
+  it('no host mounted: nothing is claimed, whoever ticks', async () => {
+    await nearTheBar();
+    tickSunday();
+    await settle();
     expect(markWrites.calls).toEqual([]);
     expect(banner.calls).toEqual([]);
-    chores.choreMarks = [...chores.choreMarks, ...ticks('kid', ['2026-11-21'])];
-    await run();
-    await run();
+    expect(starEvents()).toEqual([]);
+  });
+
+  it('a grown-up completes the week from a home card (no host): it plays when the kid’s day is next mounted', async () => {
+    await nearTheBar();
+    tickSunday(); // the bar-crossing tick is the week's last chore; there is no later tick
+    await settle();
+    expect(banner.calls).toEqual([]);
+    host('kid', 'app');
+    await settle();
+    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+    expect(banner.shown).toBe(1);
+  });
+
+  it('leaving during the wait claims nothing; returning plays it', async () => {
+    await nearTheBar();
+    const release = host('kid', 'wall');
+    banner.duringWait = release; // the wall leaves the chore view behind the block celebration
+    tickSunday();
+    await settle();
+    expect(markWrites.calls).toEqual([]);
+    expect(banner.shown).toBe(0);
+    expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'host-left' });
+    banner.duringWait = null;
+    host('kid', 'wall');
+    await settle();
+    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+    expect(banner.shown).toBe(1);
+  });
+
+  it('an untick below the bar during the wait drops it; the re-tick plays it', async () => {
+    await nearTheBar();
+    host();
+    banner.duringWait = untickSunday;
+    tickSunday();
+    await settle();
+    expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'dropped' });
+    expect(markWrites.calls).toEqual([]);
+    banner.duringWait = null;
+    tickSunday();
+    await settle();
+    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+    expect(banner.shown).toBe(1);
+  });
+
+  it('the claim waits for this device’s ticks of that kid to settle first', async () => {
+    await nearTheBar();
+    let release!: () => void;
+    ticking.pending = new Promise<void>((r) => (release = r));
+    host();
+    tickSunday();
+    await settle();
+    expect(banner.calls).toEqual([]); // the block celebration may not have started yet
+    release();
+    await settle();
+    expect(banner.shown).toBe(1);
+  });
+
+  it('a bonus past the bar plays it while a host is mounted (no tick needed)', async () => {
+    chores.todayYmd = '2026-11-21';
+    await setup({ marks: ticks('kid', days7(MON).slice(0, 5)) });
+    __setStoresAuthoritativeForTesting(true);
+    host();
+    await store.giveStars({ memberId: 'kid', kind: 'bonus', count: 2 }, 'mom');
+    await settle();
+    expect(markWrites.calls).toHaveLength(1);
+    expect(banner.shown).toBe(1);
+  });
+
+  it('two hosts of one kid on one device, and two changes at once: one claim, one banner', async () => {
+    await nearTheBar();
+    host('kid', 'app');
+    host('kid', 'wall');
+    tickSunday();
+    chores.choreMarks = [...chores.choreMarks];
+    await settle();
     expect(markWrites.calls).toHaveLength(1);
     expect(banner.calls).toHaveLength(1);
   });
 
-  it('a failed mark write still shows the banner here, once; the next tick retries the mark silently', async () => {
+  it('never for a grown-up’s or a pet’s host, while off, with no weekly reward, or on a snapshot copy', async () => {
     await nearTheBar();
-    await tickSunday();
+    tickSunday();
+    __setStoresAuthoritativeForTesting(false);
+    const releaseKid = host();
+    host('mom');
+    host('rex');
+    await settle();
+    expect(markWrites.calls).toEqual([]); // not authoritative yet
+    releaseKid();
+    __setStoresAuthoritativeForTesting(true);
+    setRewardsState({ ...ON, weeklyOn: false });
+    host();
+    await settle();
+    expect(markWrites.calls).toEqual([]);
+    setRewardsState({ ...ON, on: false });
+    await settle();
+    expect(markWrites.calls).toEqual([]);
+    // On, with the weekly reward, authoritative: the kid's host claims (the grown-ups' never).
+    setRewardsState({ ...ON });
+    await settle();
+    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+  });
+
+  it('a failed mark write still shows the banner here, once; the next claim retries the mark silently', async () => {
+    await nearTheBar();
+    host();
     markWrites.fail = true;
-    await run();
+    tickSunday();
+    await settle();
     expect(banner.shown).toBe(1);
     expect(logged('reward-achieved')[0]!.context).toMatchObject({ stage: 'unmarked' });
-    // Still failing: the on-device latch keeps it to one banner, and the mark is tried again.
-    await run();
+    // A later change re-runs the claim: the latch keeps it to one banner, the mark is retried.
+    chores.choreMarks = [...chores.choreMarks];
+    await settle();
     expect(banner.calls).toHaveLength(1);
     markWrites.fail = false;
-    await run();
+    chores.choreMarks = [...chores.choreMarks];
+    await settle();
     expect(markWrites.calls).toHaveLength(3);
     expect(banner.calls).toHaveLength(1);
-    // Marked now: nothing more is written.
-    await run();
-    expect(markWrites.calls).toHaveLength(3);
+    chores.choreMarks = [...chores.choreMarks];
+    await settle();
+    expect(markWrites.calls).toHaveLength(3); // marked now
   });
 
   it('the banner outcome (played, waited) is logged as the composable answers it', async () => {
     await nearTheBar();
-    await tickSunday();
     banner.result = 'waited';
-    await run();
+    host();
+    tickSunday();
+    await settle();
     expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'waited' });
   });
 
   it('a mark another device wrote first shows nothing (skipped-exists)', async () => {
     await nearTheBar();
-    await tickSunday();
-    // Synced in between the check and the write.
     const orig = chores.writeCelebratedMark;
     chores.writeCelebratedMark = async () => 'exists';
-    await run();
+    host();
+    tickSunday();
+    await settle();
     expect(banner.shown).toBe(0);
     expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'skipped-exists' });
     expect(logged('reward-achieved')).toEqual([]);
     chores.writeCelebratedMark = orig;
   });
 
-  it('a surface that draws no banner (the Chores view cards) claims nothing; the next tick on the day plays it once', async () => {
-    await nearTheBar();
-    await tickSunday();
-    // A grown-up ticks the child past the bar on the home cards: nothing written or played.
-    await run(tick, 'app', false);
-    expect(markWrites.calls).toEqual([]);
-    expect(banner.calls).toEqual([]);
-    expect(starEvents()).toEqual([]);
-    // The child's next tick on their own day (or lane) plays it, once.
-    await run(tick, 'app', true);
-    await run(tick, 'app', true);
-    expect(markWrites.calls).toHaveLength(1);
-    expect(banner.shown).toBe(1);
-  });
-
-  it('the mark is written only after the wait and the re-check: an untick during the wait claims nothing, and the re-tick plays the banner', async () => {
-    await nearTheBar();
-    await tickSunday();
-    // The child unticks Sunday while the banner waits behind the block celebration.
-    banner.duringWait = () => {
-      chores.choreMarks = chores.choreMarks.filter(
-        (m) => !(m.kind === 'done' && m.date === '2026-11-22')
-      );
-    };
-    await run();
-    expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'dropped' });
-    expect(markWrites.calls).toEqual([]);
-    expect(banner.shown).toBe(0);
-    // The re-tick: the week was never claimed, so it plays now, once.
-    banner.duringWait = null;
-    await tickSunday();
-    await run();
-    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
-    expect(banner.shown).toBe(1);
-  });
-
-  it('two ticks crossing at once on one device write and celebrate once', async () => {
-    await nearTheBar();
-    await tickSunday();
-    await Promise.all([run(), run()]);
-    expect(markWrites.calls).toHaveLength(1);
-    expect(banner.calls).toHaveLength(1);
-  });
-
   it('a throwing check is reported as achieved-check-failed and never escapes', async () => {
     await nearTheBar();
-    await tickSunday();
+    host();
     const weekFor = chores.weekFor;
     chores.weekFor = () => {
       throw new Error('boom');
     };
-    await expect(run()).resolves.toBeUndefined();
+    tickSunday();
+    await settle();
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({
         surface: 'chore-stars',
@@ -1293,14 +1384,6 @@ describe('afterTick', () => {
       })
     );
     chores.weekFor = weekFor;
-  });
-
-  it('no weekly reward: no banner, ever', async () => {
-    settings.settings = { choreRewards: { ...ON, weeklyOn: false } };
-    await nearTheBar();
-    await tickSunday();
-    await run();
-    expect(markWrites.calls).toEqual([]);
   });
 });
 
@@ -1317,12 +1400,10 @@ describe('a family that never turned stars on', () => {
     resetProjection();
     chores.todayYmd = '2026-11-17';
     await nextTick();
-    await store.afterTick({
-      memberId: 'kid',
-      outcome: { action: 'tick', completed: null, celebrated: false },
-      surface: 'app',
-      showsBanner: true,
-    });
+    __setStoresAuthoritativeForTesting(true);
+    store.hostRewardBanner('kid', 'app');
+    chores.choreMarks = [...chores.choreMarks, ...ticks('kid', ['2026-11-17'])];
+    await new Promise((r) => setTimeout(r, 0));
     expect(starEvents()).toEqual([]);
     expect(reportError).not.toHaveBeenCalled();
     for (const r of Object.values(reads)) expect(r).not.toHaveBeenCalled();

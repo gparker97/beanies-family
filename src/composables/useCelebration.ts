@@ -636,14 +636,15 @@ export interface RewardCelebrationRequest {
   title: string;
   emoji: string;
   /**
-   * Is the child still at or above the bar? Asked once any wait behind a block celebration has
-   * ended, before `claim` (the `stillDone` pattern): an untick below the bar meanwhile plays
-   * nothing and claims nothing.
+   * Is the claim still wanted (the store's re-check: the same week, still at or above the bar,
+   * not marked, and a banner host for the child still mounted)? Asked once any wait behind a
+   * block celebration has ended, before `claim` (the `stillDone` pattern): an untick below the
+   * bar, or leaving the child's day or lane, meanwhile plays nothing and claims nothing.
    */
-  stillAchieved: () => boolean;
+  stillClaimable: () => boolean;
   /**
    * Claim the week's once-only celebration (the store writes its `reward` mark). Called only
-   * after the wait and `stillAchieved`; the banner shows only when it answers `true`.
+   * after the wait and `stillClaimable`; the banner shows only when it answers `true`.
    */
   claim: () => Promise<boolean>;
 }
@@ -658,9 +659,9 @@ export interface ActiveRewardBanner {
 }
 
 /**
- * What `celebrateReward` did: shown at once, shown after waiting, not shown because the child
- * dropped below the bar (nothing claimed), or not shown because `claim` said no (another device
- * celebrated it first).
+ * What `celebrateReward` did: shown at once, shown after waiting, not shown because the claim
+ * was no longer wanted (`stillClaimable` said no; nothing claimed), or not shown because `claim`
+ * said no (another device celebrated it first).
  */
 export type RewardBannerOutcome = 'played' | 'waited' | 'dropped' | 'claimed-elsewhere';
 
@@ -712,14 +713,14 @@ function whenChoreCelebrationEnds(memberId: string, maxMs: number): Promise<void
 }
 
 /**
- * Show the weekly reward's achieved banner for a child (#148). Called only by
- * `starStore.afterTick`, for a tick on a surface that draws the banner. In this order: while that
- * child's block celebration is playing (it has already started by the time the tick resolves)
- * the banner waits for it to end; then it asks `stillAchieved()` and stops if the child has
- * unticked below the bar meanwhile (nothing claimed, so the re-tick plays it); then it asks
- * `claim()` (the store's once-only mark) and shows only on `true`. Once per child per week, on
- * the device that made the tick. The timer lives here, not in a component. Logs nothing: the
- * store logs the outcome.
+ * Show the weekly reward's achieved banner for a child (#148). Called only by the star store's
+ * claim (`claimReward`), which runs while a banner host for the child is mounted, after this
+ * device's ticks of that child have settled. In this order: while that child's block
+ * celebration is playing the banner waits for it to end; then it asks `stillClaimable()` and
+ * stops if the claim is no longer wanted (an untick below the bar, or the child's day or lane
+ * left meanwhile: nothing claimed, so it plays the next time it holds); then it asks `claim()`
+ * (the store's once-only mark) and shows only on `true`. Once per child per week. The timer
+ * lives here, not in a component. Logs nothing: the store logs the outcome.
  */
 export async function celebrateReward(req: RewardCelebrationRequest): Promise<RewardBannerOutcome> {
   let waited = false;
@@ -727,7 +728,7 @@ export async function celebrateReward(req: RewardCelebrationRequest): Promise<Re
     waited = true;
     await whenChoreCelebrationEnds(req.memberId, REWARD_BANNER_WAIT_MAX_MS);
   }
-  if (!req.stillAchieved()) return 'dropped';
+  if (!req.stillClaimable()) return 'dropped';
   if (!(await req.claim())) return 'claimed-elsewhere';
   dismissRewardBanner(req.memberId);
   const next = new Map(rewardBanners.value);

@@ -73,6 +73,7 @@ import { repoFile } from '@/test/repoFile';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useMediaQuery } from '@/composables/useMediaQuery';
 import {
+  bannerHosts,
   chore,
   choreActions,
   chores,
@@ -262,19 +263,20 @@ describe('a child viewer', () => {
 });
 
 describe('a grown-up viewer', () => {
-  it('the reward banner is claimed only by a surface that draws it: a day says yes, the home cards say no', async () => {
+  it("the reward banner's host is the kid's day head, never the home cards; ticks claim nothing", async () => {
+    // (Pages mounted by earlier tests follow the shared route too, so the check is on the set.)
     const day = await mountPage({ bean: 'kid' });
+    expect(new Set(bannerHosts)).toEqual(new Set(['kid:app']));
+    const registered = starActions.hostRewardBanner.mock.calls.length;
     await day.get('[data-chore-id="k1"] [data-testid="chore-tick"]').trigger('click');
     await flushPromises();
-    expect(starActions.afterTick).toHaveBeenLastCalledWith(
-      expect.objectContaining({ memberId: 'kid', surface: 'app', showsBanner: true })
-    );
+    expect(starActions.hostRewardBanner.mock.calls.length).toBe(registered);
+    // Home: no day head on screen, so every host is released, and a card tick registers none.
     const home = await mountPage();
+    expect(bannerHosts).toEqual([]);
     await home.get('[data-chore-id="k1"] [data-testid="chore-tick"]').trigger('click');
     await flushPromises();
-    expect(starActions.afterTick).toHaveBeenLastCalledWith(
-      expect.objectContaining({ memberId: 'kid', surface: 'app', showsBanner: false })
-    );
+    expect(bannerHosts).toEqual([]);
   });
 
   it('home: one card per living person (never a pet), and the manage controls', async () => {
@@ -1006,7 +1008,7 @@ describe('stars and rewards', () => {
         beanName: 'Pip',
         title: 'Ice cream',
         emoji: '🍦',
-        stillAchieved: () => true,
+        stillClaimable: () => true,
         claim: async () => true,
       });
       await flushPromises();

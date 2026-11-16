@@ -252,8 +252,8 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
    * A chore is ticked FOR the lane's bean (`ownerId`: a shared chore is one mark per bean) and
    * credited to `actor`, the same crediting rule as the other two. The store passes
    * `errorToast: false` for the wall, because `write()` below reports a failed toggle.
-   * Stars (#148): once the tick resolves, `starStore.afterTick` gets the outcome, not awaited.
-   * A chore ticked here is always on its bean's lane, which draws the reward banner.
+   * Stars (#148): nothing to do after a tick; the lane (a banner host) claims the weekly
+   * reward's banner itself.
    */
   const writers: Record<
     WallJob['source'],
@@ -261,21 +261,12 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
   > = {
     todo: (job, actor) => todoStore.toggleComplete(job.todoId as string, actor),
     list: (job, actor) => listStore.toggleItem(job.listId as string, job.itemId as string, actor),
-    chore: async (job, actor, anchor) => {
-      const choreId = job.choreId as string;
-      const outcome = await choreStore.toggleChore(choreId, job.ownerId, {
+    chore: (job, actor, anchor) =>
+      choreStore.toggleChore(job.choreId as string, job.ownerId, {
         surface: 'wall',
         by: actor,
         ...(anchor ? { anchor } : {}),
-      });
-      void starStore.afterTick({
-        memberId: job.ownerId,
-        outcome,
-        surface: 'wall',
-        showsBanner: true,
-      });
-      return outcome;
-    },
+      }),
   };
 
   /** `anchor`: a chore lane's block and tick, where an all-done celebration plays (#146). */

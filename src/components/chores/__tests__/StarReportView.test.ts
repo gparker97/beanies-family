@@ -230,6 +230,8 @@ describe('StarReportView', () => {
 
   it('the Bonus column is signed: "+2" for a bonus, "-3" for a take-away, never "moved back"', async () => {
     ss.state!.weeks.sib![THIS] = week(THIS, { stars: 4, bonus: -3, total: 1, full: 20, bar: 16 });
+    // The entries that make that net (the Bonus number is a button only when they add up).
+    ss.state!.gifts = [gift('t3', '2026-11-17', -3, 'Toys')];
     const w = await mountView();
     expect(bonusButton(w, 'sib').text()).toBe('-3');
     expect(fact(w, 'sib', 'star-report-bonus')).not.toMatch(/moved back/i);
@@ -347,6 +349,64 @@ describe('StarReportView', () => {
     await flushPromises();
     expect(document.body.querySelector('[data-testid="star-week-popover"]')).toBeNull();
     expect(document.activeElement).toBe(sibNow.element);
+    w.unmount();
+  });
+
+  it("one rule for the Bonus number and the week's breakdown: a closed week whose frozen bonus never took a late gift in shows a plain net, and neither lists the gift", async () => {
+    // Last week was frozen with no bonus; a +2 dated in it synced later (after the re-settle
+    // window), so the record never counted it.
+    ss.state!.weeks.sib![LAST] = week(LAST, {
+      stars: 12,
+      bonus: 0,
+      total: 12,
+      full: 20,
+      bar: 16,
+      days: [4, 4, 4, 0, 0, 0, 0],
+    });
+    ss.state!.gifts = [gift('late', '2026-11-12', 2, 'Late')];
+    const w = await mountView();
+    await stepBack(w);
+    const bonus = row(w, 'sib').get('[data-testid="star-report-bonus"]');
+    expect(bonus.text()).toBe('Bonus0');
+    expect(bonus.find('[data-testid="chore-week-panel-fact-action"]').exists()).toBe(false);
+    await w
+      .get(
+        `[data-testid="star-report-trend-kid"][data-member-id="sib"] [data-testid="star-report-bar"][data-week="${LAST}"]`
+      )
+      .trigger('click');
+    await flushPromises();
+    const pop = document.body.querySelector('[data-testid="star-week-popover"]')!;
+    expect(pop.querySelector('[data-testid="star-week-entries"]')).toBeNull();
+    expect(pop.textContent).not.toContain('+2');
+    expect(pop.querySelector('[data-testid="star-week-total-value"]')!.textContent).toBe(
+      '12 stars'
+    );
+    w.unmount();
+  });
+
+  it('the open week: the Bonus number and the breakdown list the same entries', async () => {
+    const w = await mountView();
+    await bonusButton(w, 'sib').trigger('click');
+    await flushPromises();
+    const fromBonus = [
+      ...document.body.querySelectorAll(
+        '[data-testid="star-bonus-popover"] [data-testid="star-bonus-entry"]'
+      ),
+    ].map((e) => e.getAttribute('data-gift-id'));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await flushPromises();
+    await w
+      .get(
+        `[data-testid="star-report-trend-kid"][data-member-id="sib"] [data-testid="star-report-bar"][data-week="${THIS}"]`
+      )
+      .trigger('click');
+    await flushPromises();
+    const fromWeek = document.body.querySelectorAll(
+      '[data-testid="star-week-popover"] [data-testid="star-week-entry"]'
+    );
+    expect(fromBonus).toEqual(['g1']);
+    expect(fromWeek).toHaveLength(1);
+    expect(fromWeek[0]!.textContent).toContain('Tue. "Helped"');
     w.unmount();
   });
 
@@ -509,6 +569,12 @@ describe('StarReportView', () => {
         .findAll('[data-testid="star-report-bar"]')
     ).toHaveLength(2);
     w.unmount();
+  });
+
+  it("a bonus entry's day and note are one template per language (no hard-coded English full stop)", async () => {
+    const { ZH_STRINGS } = await import('@/services/translation/zh');
+    expect(ZH_STRINGS['choreStars.report.bonusEntry.sub']).toBe('{day}。{note}');
+    expect(repoFile('src/components/chores/StarReportView.vue')).not.toContain(".join('. ')");
   });
 
   it('Stars by Week: the layout is a column per kid across the card, the bars stretching to a cap', () => {

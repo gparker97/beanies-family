@@ -1,6 +1,6 @@
 /**
  * The weekly reward's achieved banner (#148): `celebrateReward` waits behind that child's block
- * celebration (if one plays), asks `stillAchieved()` and drops the banner if the child unticked
+ * celebration (if one plays), asks `stillClaimable()` and drops the banner if the child unticked
  * below the bar, THEN claims the week (`claim()`, the store's mark) and shows only when the
  * claim says yes; the banner ends on its own timer. It logs
  * nothing (the star store logs its answer).
@@ -37,7 +37,7 @@ const req = (over: Partial<RewardCelebrationRequest> = {}): RewardCelebrationReq
   beanName: 'Max',
   title: 'Ice cream',
   emoji: '🍦',
-  stillAchieved: () => true,
+  stillClaimable: () => true,
   claim: async () => true,
   ...over,
 });
@@ -93,7 +93,7 @@ describe('celebrateReward', () => {
   it('drops the banner when the child unticked below the bar during the wait', async () => {
     let still = true;
     celebrateChore({ memberId: 'max', block: 'evening', beanName: 'Max', count: 3 });
-    const played = celebrateReward(req({ stillAchieved: () => still }));
+    const played = celebrateReward(req({ stillClaimable: () => still }));
     still = false;
     dismissChoreCelebration('max:evening');
     expect(await played).toBe('dropped');
@@ -104,7 +104,7 @@ describe('celebrateReward', () => {
     let still = true;
     const claim = vi.fn(async () => true);
     celebrateChore({ memberId: 'max', block: 'evening', beanName: 'Max', count: 3 });
-    const played = celebrateReward(req({ stillAchieved: () => still, claim }));
+    const played = celebrateReward(req({ stillClaimable: () => still, claim }));
     await Promise.resolve();
     expect(claim).not.toHaveBeenCalled();
     still = false;
@@ -118,9 +118,9 @@ describe('celebrateReward', () => {
     expect(rewardBannerFor('max')).toBeNull();
   });
 
-  it('with no wait it still asks stillAchieved before claiming', async () => {
+  it('with no wait it still asks stillClaimable before claiming', async () => {
     const claim = vi.fn(async () => true);
-    expect(await celebrateReward(req({ stillAchieved: () => false, claim }))).toBe('dropped');
+    expect(await celebrateReward(req({ stillClaimable: () => false, claim }))).toBe('dropped');
     expect(claim).not.toHaveBeenCalled();
   });
 

@@ -45,6 +45,8 @@ vi.mock('@/composables/useConfirm', () => ({ confirm: confirmFn }));
 const ss = vi.hoisted(() => ({
   fulls: {} as Record<string, number>,
   weeklyOn: true,
+  /** The kids who earn stars now (a test can make one leave). */
+  earners: ['kid', 'sib'] as string[],
   saveAward: vi.fn(),
   deleteAward: vi.fn(),
 }));
@@ -52,9 +54,11 @@ vi.mock('@/stores/starStore', async () => {
   const kit = await import('./choreTestKit');
   return {
     useStarStore: () => ({
-      earners: ['kid', 'sib'],
+      get earners() {
+        return ss.earners;
+      },
       get earnerMembers() {
-        return kit.earnerMembersOf(['kid', 'sib']);
+        return kit.earnerMembersOf(ss.earners);
       },
       get rewards() {
         return { on: true, weeklyOn: ss.weeklyOn, barPct: 80 };
@@ -130,6 +134,7 @@ beforeEach(() => {
   toast.mockReset();
   ss.fulls = { kid: 40, sib: 20 };
   ss.weeklyOn = true;
+  ss.earners = ['kid', 'sib'];
   ss.saveAward.mockReset();
   ss.saveAward.mockResolvedValue({ id: 'new' });
   ss.deleteAward.mockReset();
@@ -451,5 +456,53 @@ describe('ChoreAwardModal: who it is for', () => {
       expect.objectContaining({ id: 'a1', memberIds: ['kid', 'sib'] }),
       'mom'
     );
+  });
+
+  const rename = async (w: VueWrapper, title: string) => {
+    await w.get('input[data-testid="chore-award-title"]').setValue(title);
+    await w.get('[data-testid="save"]').trigger('click');
+    await flushPromises();
+  };
+
+  it("for Juno, Juno leaves, one kid remains: the control still shows, says it is for nobody now, and a rename keeps it Juno's (never everyone's)", async () => {
+    ss.earners = ['kid'];
+    const w = await openModal({ ...AWARD, memberIds: ['sib'] });
+    expect(w.find('[data-testid="chore-award-who"]').exists()).toBe(true);
+    expect(w.get('[data-testid="chore-award-who-hint"]').text()).toContain('Not for any child now');
+    await rename(w, 'Disneyland trip');
+    expect(ss.saveAward).toHaveBeenCalledTimes(1);
+    expect(ss.saveAward.mock.calls[0]![0]).toMatchObject({
+      id: 'a1',
+      title: 'Disneyland trip',
+      memberIds: ['sib'],
+    });
+  });
+
+  it('that same reward: using the control changes it (All Kids, or the one kid left)', async () => {
+    ss.earners = ['kid'];
+    const w = await openModal({ ...AWARD, memberIds: ['sib'] });
+    await tab(w, 'chore-award-who', 'All Kids').trigger('click');
+    await rename(w, 'Disneyland');
+    expect(ss.saveAward.mock.calls[0]![0].memberIds).toBeUndefined();
+    const v = await openModal({ ...AWARD, memberIds: ['sib'] });
+    await pickKid(v, 'Pip');
+    await rename(v, 'Disneyland');
+    expect(ss.saveAward.mock.calls[1]![0].memberIds).toEqual(['kid']);
+  });
+
+  it('an edit that never touches the control sends the stored kids back as they are', async () => {
+    // Juno and Pip both kids now, the third kid on the list has left: untouched, it stays the
+    // stored list (sending "both" would have made it every kid, a later joiner included).
+    const w = await openModal({ ...AWARD, memberIds: ['sib', 'kid', 'left-the-family'] });
+    await rename(w, 'Zoo');
+    expect(ss.saveAward.mock.calls[0]![0].memberIds).toEqual(['sib', 'kid', 'left-the-family']);
+  });
+
+  it('one kid and a reward for every kid: no control, and an edit keeps it for every kid', async () => {
+    ss.earners = ['kid'];
+    const w = await openModal({ ...AWARD });
+    expect(w.find('[data-testid="chore-award-who"]').exists()).toBe(false);
+    await rename(w, 'Zoo');
+    expect(ss.saveAward.mock.calls[0]![0].memberIds).toBeUndefined();
   });
 });

@@ -63,6 +63,7 @@ describe('PAGING_SURFACES', () => {
         "photo-upload",
         "recipe-extract",
         "beanie-wall",
+        "chore-stars",
         "recurring-processor",
         "quick-add-composer",
         "calendar-sync",

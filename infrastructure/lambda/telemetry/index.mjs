@@ -57,6 +57,7 @@ export const SLACK_ESCALATE_SURFACES = new Set([
   'calendar-import', // calendar import failed to save
   'calendar-sync', // calendar sync failed for a non-auth reason (auth class stays at error)
   'change-password', // credential rotation half-applied: possible lockout
+  'chore-stars', // turning stars off could not record the week first: the turn-off was refused
   'createPod.adoptExisting', // adopting an existing pod during create failed
   'createPod.connectDrive', // Drive connect blocked a create (drive-api-disabled, unknown)
   'createPod.handOff', // create hand-off reached a finish surface without an owner
