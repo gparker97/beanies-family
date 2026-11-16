@@ -704,8 +704,15 @@ describe('useWallJobs chores (#146)', () => {
     await expect(
       useWallJobs({ chores: true }).addChore('pip', '  feed fish ', 'mama')
     ).resolves.toBe(true);
+    // The picture the name suggests, as the app's editors pick it.
     expect(create).toHaveBeenCalledWith(
-      { title: 'feed fish', emoji: '🧹', assigneeIds: ['pip'], block: 'morning' },
+      { title: 'feed fish', emoji: '🐟', assigneeIds: ['pip'], block: 'morning' },
+      'mama'
+    );
+    // A name that suggests nothing keeps the broom.
+    await useWallJobs({ chores: true }).addChore('pip', 'zzz qqq', 'mama');
+    expect(create).toHaveBeenLastCalledWith(
+      { title: 'zzz qqq', emoji: '🧹', assigneeIds: ['pip'], block: 'morning' },
       'mama'
     );
     expect(logEvent).toHaveBeenCalledWith({

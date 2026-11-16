@@ -94,8 +94,7 @@ export function choreBlockHint(
 }
 
 /**
- * A chore's picture when none was picked or suggested (`suggestChoreEmoji`), and every chore
- * added on the wall.
+ * A chore's picture when none was picked and its title suggests none (`suggestChoreEmoji`).
  */
 export const DEFAULT_CHORE_EMOJI = '🧹';
 
