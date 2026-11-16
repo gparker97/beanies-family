@@ -185,7 +185,6 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
       :key-value="buildAccomKeyValue(item)"
       :collapsed="collapsedMap[item.id] ?? true"
       deletable
-      @update:title="updateItem(index, 'title', $event)"
       @update:collapsed="collapsedMap[item.id] = $event"
       @delete="removeItem(index)"
     >

@@ -1887,7 +1887,11 @@ export type VacationTransportationType =
 export interface VacationTravelSegment {
   id: UUID;
   type: VacationTravelType;
+  /** For an activity: the person's title. For every other type: a copy kept for older builds
+   *  only. Never read it for display; call `segmentDisplayTitle`. */
   title: string;
+  /** The title a person typed for a non-activity segment. Absent means automatic. */
+  customTitle?: string;
   status: VacationSegmentStatus;
   sortDate?: ISODateString;
   bookingReference?: string;

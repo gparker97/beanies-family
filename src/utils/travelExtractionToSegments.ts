@@ -210,7 +210,10 @@ function toTravelSegment(draft: TravelSegmentDraft): VacationTravelSegment {
     id: generateUUID(),
     type,
     status: draft.status,
-    title: draft.title.trim() || buildTravelSegmentTitle({ ...mapped, type }),
+    // The model's free-text title is not trusted for a transport segment: the automatic title
+    // is built from the route like every other path. For an activity it is the model's title
+    // (or "activity"). Never a `customTitle`: that is only ever typed by a person.
+    title: buildTravelSegmentTitle({ ...mapped, type, title: draft.title.trim() }),
     ...mapped,
     ...(draft.arrivesNextDay ? { arrivesNextDay: true } : {}),
     ...(draft.bookingReference.trim() ? { bookingReference: draft.bookingReference.trim() } : {}),

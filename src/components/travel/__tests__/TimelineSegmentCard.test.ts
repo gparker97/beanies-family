@@ -50,7 +50,7 @@ function mountCard(over?: Partial<TimelineItem>, props?: Record<string, unknown>
       stubs: {
         VacationSegmentCard: {
           name: 'VacationSegmentCard',
-          emits: ['edit', 'delete', 'update:title', 'update:collapsed'],
+          emits: ['edit', 'delete', 'update:collapsed'],
           template:
             '<div><slot name="header-trailing" /><slot name="header-below" /><slot /></div>',
         },

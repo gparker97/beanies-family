@@ -29,6 +29,9 @@ import {
   buildCruisePortOptions,
   buildTravelSegmentTitle,
 } from '@/utils/vacation';
+import { orUndefined } from '@/utils/diffPayload';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { CHORE_TITLE_MAX } from '@/constants/choreBlocks';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { safeExternalHref } from '@/utils/url';
 import type { VacationTravelSegment, VacationSegmentStatus } from '@/types/models';
@@ -68,7 +71,13 @@ const { t } = useTranslation();
 const vacationStore = useVacationStore();
 
 // Form fields
+/** An activity's own (required) title. Non-activity segments use `customTitle` instead. */
 const title = ref('');
+/** A non-activity segment's own title; blank means the automatic title (`autoTitle`). */
+const customTitle = ref('');
+/** The longest custom title: the app's one short-title bound (a chore or reward name), reused
+ *  rather than a second number. `maxlength` on the input, and a cut in `buildPayload`. */
+const CUSTOM_TITLE_MAX = CHORE_TITLE_MAX;
 const status = ref<VacationSegmentStatus>('pending');
 const airline = ref('');
 const flightNumber = ref('');
@@ -133,7 +142,13 @@ const tripAssigneeIds = computed(
 function buildPayload() {
   const sortDate = departureDate.value || embarkationDate.value || '';
   return {
-    title: effectiveTitle.value,
+    // An activity's title is the person's text. Every other type sends `customTitle` (blank is
+    // a clear) and never `title`: the store settles the stored copy for older builds.
+    title: isActivity.value ? title.value : undefined,
+    customTitle: isActivity.value
+      ? undefined
+      : // Cut by code point, so an emoji at the bound is never split.
+        orUndefined([...customTitle.value.trim()].slice(0, CUSTOM_TITLE_MAX).join('')),
     status: status.value,
     airline: airline.value,
     flightNumber: flightNumber.value,
@@ -186,6 +201,7 @@ const { isSubmitting, formDiff } = useFormModal<VacationTravelSegment, SegmentPa
   {
     onEdit(seg) {
       title.value = seg.title ?? '';
+      customTitle.value = seg.customTitle ?? '';
       status.value = seg.status ?? 'pending';
       airline.value = seg.airline ?? '';
       flightNumber.value = seg.flightNumber ?? '';
@@ -228,6 +244,7 @@ const { isSubmitting, formDiff } = useFormModal<VacationTravelSegment, SegmentPa
     },
     onNew() {
       title.value = '';
+      customTitle.value = '';
       status.value = 'pending';
       airline.value = '';
       flightNumber.value = '';
@@ -299,7 +316,8 @@ const activityCategoryOptions = computed(() => [
   { value: 'other', label: `✨ ${t('vacation.activityCategory.other')}` },
 ]);
 
-/** Auto-generated title based on current form fields (non-activity types) */
+/** The automatic title from the current form fields (non-activity types): the title field's
+ *  placeholder, shown whenever `customTitle` is blank. */
 const autoTitle = computed(() =>
   buildTravelSegmentTitle({
     type: props.segment?.type,
@@ -309,7 +327,10 @@ const autoTitle = computed(() =>
     route: route.value,
     departureStation: departureStation.value,
     arrivalStation: arrivalStation.value,
+    airline: airline.value,
+    flightNumber: flightNumber.value,
     cruiseLine: cruiseLine.value,
+    shipName: shipName.value,
     carType: carType.value,
     carLabel: carLabel.value,
     title: title.value,
@@ -317,9 +338,19 @@ const autoTitle = computed(() =>
   })
 );
 
-/** The title to save — auto-generated for non-activities, user-entered for activities */
-const effectiveTitle = computed(() =>
-  props.segment?.type === 'activity' ? title.value : autoTitle.value
+/** The title field's hint: the automatic title as readable text at all times (the placeholder
+ *  that also shows it is hidden once something is typed, and is too pale to rely on). */
+const customTitleHint = computed(() =>
+  autoTitle.value
+    ? fillTemplate(
+        t(
+          customTitle.value.trim()
+            ? 'vacation.field.titleAutoHintCustom'
+            : 'vacation.field.titleAutoHintEmpty'
+        ),
+        { title: autoTitle.value }
+      )
+    : ''
 );
 
 /**
@@ -526,14 +557,8 @@ function returnFlightPatch(
   follow('arrivalAirport', prev.departureAirport, departureAirport.value);
   follow('airline', prev.airline, airline.value);
   follow('bookingReference', prev.bookingReference, bookingReference.value);
-  // Regenerate the return flight's title only when its airports moved.
-  if ('departureAirport' in patch || 'arrivalAirport' in patch) {
-    patch.title = buildTravelSegmentTitle({
-      type: ret.type,
-      departureAirport: (patch.departureAirport as string | undefined) ?? ret.departureAirport,
-      arrivalAirport: (patch.arrivalAirport as string | undefined) ?? ret.arrivalAirport,
-    });
-  }
+  // No title here: the return flight's display title is built from its merged fields, and the
+  // store settles its stored copy.
   return Object.keys(patch).length ? { id: ret.id, patch } : null;
 }
 
@@ -623,7 +648,9 @@ async function handleSave() {
         </div>
       </FormFieldGroup>
 
-      <!-- Title: editable for activities, auto-generated for others -->
+      <!-- Title: required for activities. Every other type shows its automatic title as the
+           placeholder and takes an optional title of the person's own. Self-contained: depends
+           only on `customTitle` and `autoTitle`. -->
       <FormFieldGroup
         v-if="isActivity"
         :label="t('vacation.field.title')"
@@ -631,12 +658,26 @@ async function handleSave() {
       >
         <BaseInput v-model="title" />
       </FormFieldGroup>
-      <div
-        v-else
-        class="font-outfit dark:bg-surface-overlay dark:text-ink rounded-xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold text-gray-800"
-      >
-        {{ autoTitle }}
-      </div>
+      <FormFieldGroup v-else :label="t('vacation.field.title')" optional>
+        <template #label-extra>
+          <button
+            v-if="customTitle.trim()"
+            type="button"
+            class="font-outfit text-primary-700 dark:text-accent-lift ml-auto text-xs font-semibold whitespace-nowrap underline underline-offset-2"
+            data-testid="segment-title-use-automatic"
+            @click="customTitle = ''"
+          >
+            {{ t('vacation.field.titleUseAutomatic') }}
+          </button>
+        </template>
+        <BaseInput
+          v-model="customTitle"
+          :placeholder="autoTitle"
+          :hint="customTitleHint"
+          :maxlength="CUSTOM_TITLE_MAX"
+          data-testid="segment-custom-title"
+        />
+      </FormFieldGroup>
 
       <!-- ═══ Flight fields — kicker + bordered container (no fieldset; sidesteps min-content bug) ═══ -->
       <template v-if="isFlight">

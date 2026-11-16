@@ -97,9 +97,11 @@ const weather = computed(() => (weatherSize.value === 'off' ? null : weatherStor
 const weatherLayout = computed(() => (weatherSize.value === 'off' ? 'now' : weatherSize.value));
 
 /**
- * The card's teaser. `item.title` is `buildTravelSegmentTitle`, which already
- * renders a flight as "SIN → HND", so the glance value survives the move off
- * the wall's own (capped, travel-only) leg model.
+ * The card's teaser. `item.title` is the segment's display title
+ * (`segmentDisplayTitle`): a person's own title when they typed one, else the
+ * automatic one, which renders a flight as "SIN → HND". So the glance value
+ * survives the move off the wall's own (capped, travel-only) leg model, and a
+ * custom title shows here in place of the route.
  */
 const tripLegs = computed(() => timelineItems.value.filter((i) => i.kind === 'travel').slice(0, 2));
 

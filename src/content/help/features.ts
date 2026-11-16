@@ -1280,7 +1280,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Plan family trips from start to finish \u2014 flights, hotels, transport, activities, and ideas \u2014 all in one place.',
     icon: '\u2708\uFE0F',
     readTime: 5,
-    updatedDate: '2026-06-04',
+    updatedDate: '2026-11-16',
     sections: [
       {
         type: 'heading',
@@ -1382,6 +1382,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Once your trip is saved, you\u2019ll see a visual <strong>timeline</strong> showing everything in chronological order \u2014 flights, hotel check-ins, transport, and planned activities. Each segment is a collapsible card that you can tap to see full details or click <strong>Edit</strong> to change.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A segment\u2019s title is built from its details: a flight reads as its route (for example <strong>SIN \u2192 CAN</strong>), and a train or ferry as its stations. The same title shows on the calendar, the timeline, and your reminders. To call a segment something else, type your own <strong>Title</strong> in its edit drawer; clear it, or tap <strong>Use Automatic Title</strong>, to go back.',
       },
       {
         type: 'paragraph',

@@ -145,7 +145,6 @@ async function copy(value: string): Promise<void> {
     deletable
     :hint="hint?.message"
     :attachment-count="item.photoIds?.length ?? 0"
-    @update:title="emit('inline-save', item, 'title', $event)"
     @update:collapsed="emit('update:collapsed', item.id, $event)"
     @edit="emit('edit', item)"
     @delete="emit('delete', item)"

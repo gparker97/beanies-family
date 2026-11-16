@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useVacationStore } from './vacationStore';
 import { showToast } from '@/composables/useToast';
 import { logEvent } from '@/services/telemetry/logEvent';
+import * as errorReporter from '@/utils/errorReporter';
 
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
@@ -133,6 +134,45 @@ describe('vacationStore', () => {
   // ── Create ──
 
   describe('createVacation', () => {
+    it('a null element in travelSegments is saved as it is beside a settled segment', async () => {
+      // The wizard path supplies dates, so nothing before the settle reads the segments: the
+      // settle must not be the thing that throws on a damaged array.
+      const store = useVacationStore();
+      vi.mocked(activityRepo.createActivity).mockResolvedValue(makeActivity({ id: 'act-new' }));
+      vi.mocked(vacationRepo.createVacation).mockResolvedValue(
+        makeVacation({ id: 'vac-new', activityId: 'act-new' })
+      );
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      const result = await store.createVacation({
+        name: 'Trip',
+        tripType: 'fly_and_stay' as const,
+        assigneeIds: ['m-1'],
+        startDate: '2026-07-01',
+        endDate: '2026-07-10',
+        travelSegments: [
+          null,
+          {
+            id: 's-out',
+            type: 'flight_outbound',
+            title: 'Departure Flight',
+            status: 'booked',
+            departureAirport: 'SIN',
+            arrivalAirport: 'CAN',
+          },
+        ] as unknown as VacationTravelSegment[],
+        accommodations: [] as VacationAccommodation[],
+        transportation: [] as VacationTransportation[],
+        ideas: [] as VacationIdea[],
+        createdBy: 'm-1',
+      });
+
+      expect(result).not.toBeNull();
+      const saved = vi.mocked(vacationRepo.createVacation).mock.calls[0]![0].travelSegments!;
+      expect(saved[0]).toBeNull();
+      expect(saved[1]!.title).toBe('SIN → CAN');
+    });
+
     it('creates vacation and linked activity with bidirectional IDs', async () => {
       const store = useVacationStore();
 
@@ -873,7 +913,8 @@ describe('vacationStore', () => {
     });
 
     it('safeExtract swallows thrown errors and continues with the rest', () => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const reportSpy = vi.spyOn(errorReporter, 'reportError').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       // Build a corrupt segment whose data-field access throws. Vue's
       // reactivity probes for internal symbols (`__v_isRef`, etc.) when
@@ -902,14 +943,45 @@ describe('vacationStore', () => {
       // Corrupt segment yields 0 occurrences; healthy one still yields 2.
       expect(out).toHaveLength(2);
       expect(out.every((o) => o.segmentId === 'good-seg')).toBe(true);
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          '[vacationStore] failed to extract occurrences for segment corrupt-seg'
-        ),
+      expect(reportSpy).toHaveBeenCalledOnce();
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'vacation-segment',
+          severity: 'error',
+          message: 'occurrence failed',
+          error: expect.any(Error),
+          // The segment type only: no allowlisted key exists for an id.
+          context: { action: 'occurrence_failed', kind: 'flight_outbound' },
+        })
+      );
+      // The ids stay on the device, in the console, for a developer looking at it.
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/corrupt-seg.*v1/),
         expect.any(Error)
       );
 
-      errorSpy.mockRestore();
+      reportSpy.mockRestore();
+      consoleSpy.mockRestore();
+    });
+
+    it('a null element yields no occurrences and one report; the other segments are intact', () => {
+      const reportSpy = vi.spyOn(errorReporter, 'reportError').mockImplementation(() => {});
+      const store = useVacationStore();
+      store.vacations = [
+        makeVacation({
+          id: 'v1',
+          travelSegments: [null as unknown as VacationTravelSegment, flightSegment()],
+        }),
+      ];
+
+      const out = store.allTravelSegmentOccurrences;
+      expect(out).toHaveLength(2);
+      expect(out.every((o) => o.segmentId === 'seg-flight-1')).toBe(true);
+      expect(reportSpy).toHaveBeenCalledOnce();
+      expect(reportSpy.mock.calls[0]![0]).toMatchObject({ message: 'occurrence failed' });
+      // No readable type, so no `kind`.
+      expect(reportSpy.mock.calls[0]![0].context).toEqual({ action: 'occurrence_failed' });
+      reportSpy.mockRestore();
     });
 
     it('reactively reflects mutations to vacations[]', () => {
@@ -1122,9 +1194,10 @@ describe('vacationStore', () => {
     function tripWithThree() {
       return makeVacation({
         travelSegments: [
-          { id: 's-a', type: 'flight_outbound', title: 'A', status: 'booked' },
-          { id: 's-b', type: 'ferry', title: 'B', status: 'booked' },
-          { id: 's-c', type: 'flight_return', title: 'C', status: 'booked' },
+          // Titles a person typed (`customTitle`), so the settled stored `title` equals them.
+          { id: 's-a', type: 'flight_outbound', title: 'A', customTitle: 'A', status: 'booked' },
+          { id: 's-b', type: 'ferry', title: 'B', customTitle: 'B', status: 'booked' },
+          { id: 's-c', type: 'flight_return', title: 'C', customTitle: 'C', status: 'booked' },
         ],
       });
     }
@@ -1139,7 +1212,7 @@ describe('vacationStore', () => {
       }));
       vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
 
-      expect(await store.updateSegment('vac-1', 's-b', { title: 'Renamed' })).toBe('saved');
+      expect(await store.updateSegment('vac-1', 's-b', { customTitle: 'Renamed' })).toBe('saved');
 
       const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
         string,
@@ -1442,6 +1515,142 @@ describe('vacationStore', () => {
       expect(
         await store.saveExtractedTrip({ kind: 'attach', vacationId: 'nope' }, buckets(), 'm-1')
       ).toBeNull();
+    });
+  });
+
+  describe('travel segment titles (the stored copy is settled at the two write actions)', () => {
+    function staleTrip() {
+      return makeVacation({
+        travelSegments: [
+          {
+            id: 's-out',
+            type: 'flight_outbound',
+            title: 'Departure Flight',
+            status: 'booked',
+            departureAirport: 'Singapore (SIN)',
+            arrivalAirport: 'Guangzhou (CAN)',
+          },
+          {
+            id: 's-ret',
+            type: 'flight_return',
+            title: 'flight',
+            status: 'booked',
+            departureAirport: 'Guangzhou (CAN)',
+            arrivalAirport: 'Singapore (SIN)',
+          },
+          { id: 's-act', type: 'activity', title: '', status: 'pending' },
+        ],
+      });
+    }
+
+    function wire(existing: FamilyVacation) {
+      const store = useVacationStore();
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+      return store;
+    }
+
+    function handedSegments(call = 0): VacationTravelSegment[] {
+      const input = vi.mocked(vacationRepo.updateVacation).mock.calls[call]![1] as {
+        travelSegments: VacationTravelSegment[];
+      };
+      return input.travelSegments;
+    }
+
+    function titleEvents() {
+      return vi
+        .mocked(logEvent)
+        .mock.calls.map((c) => c[0])
+        .filter((e) => e.message === 'segment title set');
+    }
+
+    it('createVacation settles each non-activity title and leaves an activity alone', async () => {
+      const store = useVacationStore();
+      vi.mocked(activityRepo.createActivity).mockResolvedValue(makeActivity({ id: 'act-new' }));
+      vi.mocked(vacationRepo.createVacation).mockResolvedValue(makeVacation({ id: 'vac-new' }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      await store.createVacation({
+        name: 'Trip',
+        tripType: 'fly_and_stay',
+        assigneeIds: ['m-1'],
+        travelSegments: staleTrip().travelSegments,
+        accommodations: [],
+        transportation: [],
+        ideas: [],
+        createdBy: 'm-1',
+      });
+
+      const created = vi.mocked(vacationRepo.createVacation).mock.calls[0]![0];
+      expect(created.travelSegments.map((x) => x.title)).toEqual(['SIN → CAN', 'CAN → SIN', '']);
+    });
+
+    it('updateVacation settles titles and never adds a travelSegments key the input lacked', async () => {
+      const store = wire(staleTrip());
+      await store.updateVacation('vac-1', { name: 'Renamed trip' });
+      const input = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1];
+      expect('travelSegments' in input).toBe(false);
+    });
+
+    it('a save that edits one segment also corrects a stale sibling, and the next save writes the same', async () => {
+      const store = wire(staleTrip());
+      expect(await store.updateSegment('vac-1', 's-out', { notes: 'window seats' })).toBe('saved');
+
+      const first = handedSegments(0);
+      expect(first.find((x) => x.id === 's-out')!.title).toBe('SIN → CAN');
+      expect(first.find((x) => x.id === 's-ret')!.title).toBe('CAN → SIN'); // the sibling
+      expect(first.find((x) => x.id === 's-act')!.title).toBe(''); // never prefilled
+
+      // The store now holds the settled segments; saving them again hands over equal values.
+      const stored = store.getVacationById('vac-1')!.travelSegments;
+      await store.updateVacation('vac-1', { travelSegments: stored });
+      expect(handedSegments(1)).toEqual(stored);
+    });
+
+    it('a custom title is stored, settled into title, and logged as title_custom', async () => {
+      const store = wire(staleTrip());
+      await store.updateSegment('vac-1', 's-out', { customTitle: 'To Grandma' });
+      const seg = handedSegments().find((x) => x.id === 's-out')!;
+      expect(seg).toMatchObject({ customTitle: 'To Grandma', title: 'To Grandma' });
+      expect(titleEvents()).toEqual([
+        expect.objectContaining({
+          level: 'info',
+          surface: 'vacation-segment',
+          context: { action: 'title_custom', kind: 'flight_outbound' },
+        }),
+      ]);
+    });
+
+    it('clearing the custom title (present but undefined) restores the route and logs title_automatic', async () => {
+      const existing = staleTrip();
+      existing.travelSegments[0]!.customTitle = 'To Grandma';
+      const store = wire(existing);
+      await store.updateSegment('vac-1', 's-out', { customTitle: undefined });
+      const seg = handedSegments().find((x) => x.id === 's-out')!;
+      // The key is present and undefined, which the reconciler deletes.
+      expect('customTitle' in seg).toBe(true);
+      expect(seg.customTitle).toBeUndefined();
+      expect(seg.title).toBe('SIN → CAN');
+      expect(titleEvents()).toEqual([
+        expect.objectContaining({
+          context: { action: 'title_automatic', kind: 'flight_outbound' },
+        }),
+      ]);
+    });
+
+    it('a patch without customTitle emits no title event, and neither does a failed save', async () => {
+      const store = wire(staleTrip());
+      await store.updateSegment('vac-1', 's-out', { departureAirport: 'Hong Kong (HKG)' });
+      expect(handedSegments().find((x) => x.id === 's-out')!.title).toBe('HKG → CAN');
+      expect(titleEvents()).toEqual([]);
+
+      vi.mocked(vacationRepo.updateVacation).mockRejectedValueOnce(new Error('disk'));
+      expect(await store.updateSegment('vac-1', 's-out', { customTitle: 'X' })).toBe('failed');
+      expect(titleEvents()).toEqual([]);
     });
   });
 });

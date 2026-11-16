@@ -5093,8 +5093,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'vacation.carType.rental_car': '租车',
   'vacation.carType.other': '其他',
   'vacation.segment.car': '汽车',
-  'vacation.travel.outboundFlight': '去程航班',
-  'vacation.travel.returnFlight': '返程航班',
   'vacation.travel.flights': '航班',
   'vacation.travel.outbound': '去程',
   'vacation.travel.return': '返程',
@@ -5299,6 +5297,9 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'vacation.documentsCount': '已附加 {n} 个',
   'vacation.field.status': '状态',
   'vacation.field.title': '标题',
+  'vacation.field.titleAutoHintEmpty': '自动标题：{title}。在此输入可使用你自己的标题。',
+  'vacation.field.titleAutoHintCustom': '自动标题：{title}',
+  'vacation.field.titleUseAutomatic': '使用自动标题',
   'vacation.field.openInMaps': '在 Google 地图中打开',
 
   // Delete

@@ -212,3 +212,37 @@ describe('identity keys must not collide for two bookings at one place', () => {
     expect(a).toBeTruthy();
   });
 });
+
+describe('mergeExtractedIntoVacation: titles', () => {
+  it("keeps the existing segment's custom title and ignores an incoming one", () => {
+    const existing = buckets({
+      travelSegments: [flight({ customTitle: 'To Grandma', title: 'To Grandma' })],
+    });
+    const incoming = buckets({
+      travelSegments: [
+        flight({
+          id: 'new',
+          customTitle: 'From the import',
+          title: 'Departure Flight',
+          arrivalAirport: 'NRT',
+        }),
+      ],
+    });
+    const { merged } = mergeExtractedIntoVacation(existing, incoming);
+    expect(merged.travelSegments).toHaveLength(1);
+    const seg = merged.travelSegments[0]!;
+    expect(seg.arrivalAirport).toBe('NRT'); // the newer document still wins on route fields
+    expect(seg.customTitle).toBe('To Grandma');
+    expect(seg.title).toBe('To Grandma');
+  });
+
+  it('re-derives an automatic title from the merged route, never keeping a heading', () => {
+    const existing = buckets({ travelSegments: [flight({ title: 'Departure Flight' })] });
+    const incoming = buckets({
+      travelSegments: [flight({ id: 'new', title: 'Whatever', arrivalAirport: 'NRT' })],
+    });
+    const { merged } = mergeExtractedIntoVacation(existing, incoming);
+    expect(merged.travelSegments[0]!.customTitle).toBeUndefined();
+    expect(merged.travelSegments[0]!.title).toBe('SIN → NRT');
+  });
+});

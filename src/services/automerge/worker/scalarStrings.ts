@@ -279,6 +279,7 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
  */
 export const TEXT_FIELDS: ReadonlySet<string> = new Set([
   'title',
+  'customTitle',
   'name',
   'note',
   'notes',

@@ -56,6 +56,42 @@ describe('travelExtractionToSegments', () => {
     expect(seg.id).toMatch(/[0-9a-f-]{36}/);
   });
 
+  it("ignores the model's own heading for a transport segment and derives the route", () => {
+    const r = result([
+      draft({
+        type: 'flight_return',
+        title: 'Departure Flight',
+        fields: { departureAirport: 'CAN', arrivalAirport: 'SIN', departureDate: '2026-08-20' },
+      }),
+      draft({ type: 'flight_outbound', title: 'Flight 1: Singapore to Guangzhou', fields: {} }),
+      draft({ type: 'train', title: 'Eurostar booking', fields: { operator: 'Eurostar' } }),
+    ]);
+    const segs = travelExtractionToSegments(r).buckets.travelSegments;
+    expect(segs.map((x) => x.title)).toEqual(['CAN → SIN', 'outbound flight', 'train']);
+  });
+
+  it("keeps the model's title for an activity, and falls back to 'activity'", () => {
+    const r = result([
+      draft({ type: 'activity', title: '  Night Safari  ' }),
+      draft({ type: 'activity', title: '' }),
+    ]);
+    const segs = travelExtractionToSegments(r).buckets.travelSegments;
+    expect(segs.map((x) => x.title)).toEqual(['Night Safari', 'activity']);
+  });
+
+  it('never sets a customTitle, even when the model puts one in its fields', () => {
+    const r = result([
+      draft({
+        type: 'flight_outbound',
+        title: 'Departure Flight',
+        fields: { customTitle: 'Injected', departureAirport: 'SIN', arrivalAirport: 'CAN' },
+      }),
+    ]);
+    const seg = travelExtractionToSegments(r).buckets.travelSegments[0]!;
+    expect('customTitle' in seg).toBe(false);
+    expect(seg.title).toBe('SIN → CAN');
+  });
+
   it('maps an accommodation draft and keeps the model title', () => {
     const r = result([
       draft({

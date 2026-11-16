@@ -22,7 +22,6 @@ import TravelExtractReviewModal from '@/components/travel/TravelExtractReviewMod
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { isFlightType } from '@/utils/travelCodes';
-import { flightLabel } from '@/utils/flightStatus/occurrenceNotice';
 import { hasFlightChip } from '@/utils/flightStatus/copy';
 import { datePart, normaliseTime } from '@/utils/flightStatus/schedule';
 import { usePhotoStore } from '@/stores/photoStore';
@@ -58,6 +57,7 @@ import {
   tripDayNumber,
   tripDurationDays,
   overrideTripTarget,
+  segmentFlightLabel,
 } from '@/utils/vacation';
 import TodayTimelineMarker from '@/components/travel/TodayTimelineMarker.vue';
 import StayingNowChip from '@/components/travel/StayingNowChip.vue';
@@ -419,7 +419,7 @@ const liveCheckRows = computed(() => {
       .sort((a, b) => liveCheckSortKey(a.seg).localeCompare(liveCheckSortKey(b.seg)))
       .map(({ seg, verification }) => ({
         id: seg.id,
-        label: flightLabel(seg),
+        label: segmentFlightLabel(seg),
         departureDate: seg.departureDate,
         verification: verification!,
         trackUrl: flightStatusStore.trackUrlFor(seg.id),

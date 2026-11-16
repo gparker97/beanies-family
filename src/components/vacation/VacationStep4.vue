@@ -143,7 +143,6 @@ function isBus(type: VacationTransportationType): boolean {
       :key-value="buildTransportKeyValue(item)"
       :collapsed="collapsedMap[item.id] ?? true"
       deletable
-      @update:title="updateItem(index, 'title', $event)"
       @update:collapsed="collapsedMap[item.id] = $event"
       @delete="removeItem(index)"
     >

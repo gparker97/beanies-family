@@ -24,10 +24,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - On the Beanie Wall's Choreboard, finished times of day are now listed in the order of the day (morning, afternoon, evening, anytime) at the bottom of each lane, under a "Done" line, so what is finished and what is still to do are easy to tell apart.
 - A chore's picture is now re-picked when the chore is renamed to something different, and kept on a small edit.
 - A chore added on the Beanie Wall now gets the picture its name suggests, as chores added in the app do.
+- A travel segment's title can now be typed in the segment editor, with a way back to the automatic title.
 
 ### Fixed
 
 - A family that left setup early is now counted as having finished creating its pod.
+- Travel segment titles are now built from the segment's details everywhere they appear, so imported trips no longer show a document's own headings on the calendar.
 
 ## 2026-11-15
 

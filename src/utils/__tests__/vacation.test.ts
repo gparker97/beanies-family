@@ -11,6 +11,9 @@ import {
   segmentDateRange,
   tripsOverlappingRange,
   buildTravelSegmentTitle,
+  segmentDisplayTitle,
+  withSettledTitles,
+  segmentFlightLabel,
   flightCodeLabel,
   airportLabel,
   airlineLabel,
@@ -22,6 +25,7 @@ import {
   type SupportedTravelType,
   type TravelSegmentOccurrence,
 } from '../vacation';
+import { flightLabel } from '../flightStatus/occurrenceNotice';
 import { AIRPORTS } from '@/constants/airports';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 
@@ -627,6 +631,79 @@ describe('buildTravelSegmentTitle — flights', () => {
   });
 });
 
+// The fallbacks only: a route title is never touched by these (no flight number on a route).
+describe('buildTravelSegmentTitle — fallbacks use what the segment has', () => {
+  it('a flight with no airports but a flight number is titled by its flight code', () => {
+    expect(
+      buildTravelSegmentTitle({
+        type: 'flight_outbound',
+        airline: 'Singapore Airlines (SQ)',
+        flightNumber: '318',
+      })
+    ).toBe('SQ318');
+    expect(buildTravelSegmentTitle({ type: 'flight_return', flightNumber: 'MU 5678' })).toBe(
+      'MU5678'
+    );
+  });
+
+  it('the flight code is the same one flightLabel prints for that flight', () => {
+    const f = { airline: 'China Eastern (MU)', flightNumber: '5678' };
+    expect(buildTravelSegmentTitle({ type: 'flight_other', ...f })).toBe(
+      flightLabel({ ...f, title: '' })
+    );
+  });
+
+  it('two flights with no airports and different flight numbers get different titles', () => {
+    const a = buildTravelSegmentTitle({
+      type: 'flight_outbound',
+      airline: 'SQ',
+      flightNumber: '318',
+    });
+    const b = buildTravelSegmentTitle({
+      type: 'flight_outbound',
+      airline: 'SQ',
+      flightNumber: '25',
+    });
+    expect(a).not.toBe(b);
+  });
+
+  it('a blank flight number or an airline alone still gives the generic word', () => {
+    expect(buildTravelSegmentTitle({ type: 'flight_outbound', flightNumber: '  ' })).toBe(
+      'outbound flight'
+    );
+    expect(buildTravelSegmentTitle({ type: 'flight_return', airline: 'SQ' })).toBe('return flight');
+  });
+
+  it('one known airport still wins over the flight number, and a route never gains it', () => {
+    const fn = { airline: 'SQ', flightNumber: '318' };
+    expect(
+      buildTravelSegmentTitle({ type: 'flight_outbound', departureAirport: 'SIN', ...fn })
+    ).toBe('SIN');
+    expect(
+      buildTravelSegmentTitle({
+        type: 'flight_outbound',
+        departureAirport: 'SIN',
+        arrivalAirport: 'CAN',
+        ...fn,
+      })
+    ).toBe('SIN → CAN');
+  });
+
+  it('a cruise with no cruise line is titled by its ship; the line still wins', () => {
+    expect(buildTravelSegmentTitle({ type: 'cruise', shipName: 'Wonder of the Seas' })).toBe(
+      'Wonder of the Seas'
+    );
+    expect(
+      buildTravelSegmentTitle({
+        type: 'cruise',
+        cruiseLine: 'Royal Caribbean',
+        shipName: 'Wonder of the Seas',
+      })
+    ).toBe('Royal Caribbean');
+    expect(buildTravelSegmentTitle({ type: 'cruise' })).toBe('cruise');
+  });
+});
+
 describe('flightCodeLabel', () => {
   it('prints the carrier beside a plain flight number', () => {
     expect(flightCodeLabel('China Eastern (MU)', '5678')).toBe('MU 5678');
@@ -813,5 +890,219 @@ describe('travelSegmentLabels', () => {
 
   it('gives an empty time for an untimed segment', () => {
     expect(travelSegmentLabels(occ({ time: undefined }), t).formattedTime).toBe('');
+  });
+});
+
+// ── segmentDisplayTitle / withSettledTitles: one title rule ──
+
+describe('segmentDisplayTitle', () => {
+  const base = { id: 's', status: 'booked' as const };
+  it.each([
+    [
+      'flight, automatic',
+      {
+        type: 'flight_outbound',
+        title: 'Departure Flight',
+        departureAirport: 'Singapore (SIN)',
+        arrivalAirport: 'CAN',
+      },
+      'SIN → CAN',
+    ],
+    ['flight, no airports', { type: 'flight_return', title: 'flight' }, 'return flight'],
+    [
+      'flight, custom',
+      {
+        type: 'flight_outbound',
+        title: 'SIN → CAN',
+        customTitle: 'To Grandma',
+        departureAirport: 'SIN',
+        arrivalAirport: 'CAN',
+      },
+      'To Grandma',
+    ],
+    [
+      'flight, custom is trimmed',
+      { type: 'flight_other', title: 'x', customTitle: '  Hop  ' },
+      'Hop',
+    ],
+    [
+      'flight, empty custom',
+      { type: 'flight_outbound', title: 'x', customTitle: '', departureAirport: 'SIN' },
+      'SIN',
+    ],
+    [
+      'flight, whitespace custom',
+      { type: 'flight_outbound', title: 'x', customTitle: '   ', arrivalAirport: 'CAN' },
+      'CAN',
+    ],
+    [
+      'cruise',
+      { type: 'cruise', title: 'Cruise 1', cruiseLine: 'Royal Caribbean' },
+      'Royal Caribbean',
+    ],
+    [
+      'train',
+      { type: 'train', title: 'Train', departureStation: 'Paris', arrivalStation: 'Lyon' },
+      'Paris → Lyon',
+    ],
+    ['ferry, no stations', { type: 'ferry', title: 'Boat!' }, 'ferry'],
+    ['car', { type: 'car', title: 'Car', carType: 'rental_car' }, 'rental car'],
+    ['car, custom', { type: 'car', title: 'car', customTitle: 'The van' }, 'The van'],
+    ['activity with a title', { type: 'activity', title: 'Zoo' }, 'Zoo'],
+    ['activity, empty title', { type: 'activity', title: '' }, 'activity'],
+    [
+      'activity ignores a customTitle',
+      { type: 'activity', title: 'Zoo', customTitle: 'Nope' },
+      'Zoo',
+    ],
+  ] as const)('%s', (_name, seg, expected) => {
+    expect(segmentDisplayTitle({ ...base, ...seg })).toBe(expected);
+  });
+
+  it('never throws on a bare object', () => {
+    expect(segmentDisplayTitle({})).toBe('');
+  });
+
+  // A damaged or foreign record: fields of the wrong type count as absent, never a throw.
+  const loose = (seg: unknown) => segmentDisplayTitle(seg as VacationTravelSegment);
+  it('a non-string customTitle counts as none', () => {
+    expect(
+      loose({
+        type: 'flight_outbound',
+        customTitle: 42,
+        departureAirport: 'SIN',
+        arrivalAirport: 'CAN',
+      })
+    ).toBe('SIN → CAN');
+  });
+
+  it('wrong-type fields are read as absent', () => {
+    expect(loose({ type: 'flight_outbound', departureAirport: 7, arrivalAirport: 'CAN' })).toBe(
+      'CAN'
+    );
+    expect(loose({ type: 'flight_return', flightNumber: 318 })).toBe('return flight');
+    expect(loose({ type: 'car', carType: 3 })).toBe('car');
+    expect(loose({ type: 'cruise', cruiseLine: {}, shipName: 'Wonder' })).toBe('Wonder');
+    expect(loose({ type: 'activity', title: 9 })).toBe('activity');
+  });
+
+  it('a missing or non-string type falls through to a string stored title, else empty', () => {
+    expect(loose({ title: 'Old' })).toBe('Old');
+    expect(loose({ type: 5, title: 'Old' })).toBe('Old');
+    expect(loose({ title: 5 })).toBe('');
+  });
+
+  it('a non-object gives an empty title', () => {
+    expect(loose(null)).toBe('');
+    expect(loose(undefined)).toBe('');
+    expect(loose('flight')).toBe('');
+  });
+});
+
+describe('segmentFlightLabel', () => {
+  it('is flightLabel over the segment with its display title', () => {
+    const cases: Partial<VacationTravelSegment>[] = [
+      { airline: 'Singapore Airlines (SQ)', flightNumber: '318', customTitle: 'To Grandma' },
+      { departureAirport: 'SIN', arrivalAirport: 'CAN' },
+      { departureAirport: 'SIN', arrivalAirport: 'CAN', customTitle: 'Home' },
+      { airline: 'Singapore Airlines' },
+      {},
+    ];
+    for (const c of cases) {
+      const seg = { type: 'flight_outbound', ...c } as VacationTravelSegment;
+      expect(segmentFlightLabel(seg)).toBe(
+        flightLabel({
+          airline: seg.airline,
+          flightNumber: seg.flightNumber,
+          title: segmentDisplayTitle(seg),
+        })
+      );
+    }
+  });
+
+  it('names a flight with a number by its code, else by its display title', () => {
+    expect(
+      segmentFlightLabel({
+        type: 'flight_outbound',
+        airline: 'SQ',
+        flightNumber: '318',
+        customTitle: 'X',
+      })
+    ).toBe('SQ318');
+    expect(
+      segmentFlightLabel({
+        type: 'flight_outbound',
+        departureAirport: 'SIN',
+        arrivalAirport: 'CAN',
+      })
+    ).toBe('SIN → CAN');
+  });
+});
+
+describe('withSettledTitles', () => {
+  const segs = (): VacationTravelSegment[] => [
+    {
+      id: 'a',
+      type: 'flight_outbound',
+      title: 'Departure Flight',
+      status: 'booked',
+      departureAirport: 'SIN',
+      arrivalAirport: 'CAN',
+    },
+    {
+      id: 'b',
+      type: 'flight_return',
+      title: 'flight',
+      status: 'booked',
+      customTitle: 'Home again',
+    },
+    { id: 'c', type: 'activity', title: '', status: 'pending' },
+    { id: 'd', type: 'activity', title: 'Zoo', status: 'pending', customTitle: 'ignored' },
+  ];
+
+  it('sets each non-activity title to its display title and leaves activities alone', () => {
+    const out = withSettledTitles({ travelSegments: segs() });
+    expect(out.travelSegments!.map((x) => x.title)).toEqual(['SIN → CAN', 'Home again', '', 'Zoo']);
+    expect(out.travelSegments![3]!.customTitle).toBe('ignored'); // untouched, never read
+  });
+
+  it('returns input without travelSegments as is, without adding the key', () => {
+    const input = { name: 'Trip' } as { name: string; travelSegments?: VacationTravelSegment[] };
+    const out = withSettledTitles(input);
+    expect(out).toBe(input);
+    expect('travelSegments' in out).toBe(false);
+  });
+
+  it('settling twice equals settling once', () => {
+    const once = withSettledTitles({ travelSegments: segs() });
+    expect(withSettledTitles(once)).toEqual(once);
+  });
+
+  it('keeps a present-but-undefined customTitle key (the clear the reconciler deletes)', () => {
+    const seg = { ...segs()[0]!, customTitle: undefined };
+    const out = withSettledTitles({ travelSegments: [seg] });
+    expect('customTitle' in out.travelSegments![0]!).toBe(true);
+    expect(out.travelSegments![0]!.title).toBe('SIN → CAN');
+  });
+
+  it('passes a non-object element through as it is and still settles the others', () => {
+    const input = {
+      travelSegments: [null, segs()[0]!] as unknown as VacationTravelSegment[],
+    };
+    const out = withSettledTitles(input);
+    expect(out.travelSegments![0]).toBeNull();
+    expect(out.travelSegments![1]!.title).toBe('SIN → CAN');
+    const odd = [7, 'x', [1]] as unknown as VacationTravelSegment[];
+    expect(withSettledTitles({ travelSegments: odd }).travelSegments).toEqual([7, 'x', [1]]);
+  });
+
+  it('keeps every other key of the input', () => {
+    const out = withSettledTitles({ name: 'Trip', travelSegments: segs() });
+    expect(out.name).toBe('Trip');
+    expect(out.travelSegments![0]).toMatchObject({
+      id: 'a',
+      departureAirport: 'SIN',
+      arrivalAirport: 'CAN',
+    });
   });
 });

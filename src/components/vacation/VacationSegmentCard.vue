@@ -42,7 +42,6 @@ const cardClass = computed(() => {
 });
 
 const emit = defineEmits<{
-  'update:title': [value: string];
   'update:collapsed': [value: boolean];
   edit: [];
   delete: [];

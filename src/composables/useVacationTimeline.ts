@@ -10,7 +10,8 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import {
   arrivalDayOffset,
   computeAccommodationGaps,
-  buildTravelSegmentTitle,
+  segmentDisplayTitle,
+  segmentFlightLabel,
   buildAccommodationTitle,
   buildTransportationTitle,
   airlineLabel,
@@ -25,7 +26,6 @@ import {
 } from '@/utils/vacation';
 import { isTravellerSubset, resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { isFlightType } from '@/utils/travelCodes';
-import { flightLabel } from '@/utils/flightStatus/occurrenceNotice';
 import { airportCheck, fieldCheck, type FieldCheck } from '@/utils/flightStatus/copy';
 import { splitLocal } from '@/utils/flightStatus/schedule';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -676,8 +676,7 @@ export function useVacationTimeline(
         !!date,
         today.value
       );
-      const title =
-        seg.type === 'activity' ? seg.title || 'activity' : buildTravelSegmentTitle(seg);
+      const title = segmentDisplayTitle(seg);
       items.push({
         id: seg.id,
         kind: 'travel',
@@ -685,7 +684,7 @@ export function useVacationTimeline(
         ...(isFlight
           ? {
               flight: {
-                label: flightLabel({ airline: seg.airline, flightNumber: seg.flightNumber, title }),
+                label: segmentFlightLabel(seg),
                 airline: seg.airline,
                 flightNumber: seg.flightNumber,
                 bookingReference: seg.bookingReference,

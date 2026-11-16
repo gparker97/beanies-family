@@ -8,8 +8,7 @@
  */
 import type { LanguageCode, SegmentLiveState } from '@/types/models';
 import type { TranslateFn } from '@/utils/format';
-import { flightCodeLabel, type TravelSegmentOccurrence } from '@/utils/vacation';
-import { normaliseFlightNumber } from './flightNumber';
+import { flightCode, type TravelSegmentOccurrence } from '@/utils/vacation';
 import { cancelSentence, changeSentence, wasLine } from './copy';
 import { tupleFromWas } from './schedule';
 import { isCancelRevision } from './verify';
@@ -41,11 +40,7 @@ export interface OccurrenceNotice {
 export function flightLabel(
   o: Pick<TravelSegmentOccurrence, 'airline' | 'flightNumber' | 'title'>
 ): string {
-  return (
-    normaliseFlightNumber(o.airline, o.flightNumber)?.query ||
-    flightCodeLabel(o.airline, o.flightNumber) ||
-    o.title
-  );
+  return flightCode(o.airline, o.flightNumber) || o.title;
 }
 
 function parseMs(iso: string | undefined): number | null {

@@ -19,7 +19,7 @@ import { useFormValidation } from '@/composables/useFormValidation';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { formatDateShort } from '@/utils/date';
-import { airportLabel } from '@/utils/vacation';
+import { airportLabel, segmentDisplayTitle } from '@/utils/vacation';
 import { matchTravellerIds, learnableAliases } from '@/utils/segmentTravellers';
 import MagicMiscategorisedBanner from '@/components/ai/MagicMiscategorisedBanner.vue';
 import type { TravelReady } from '@/composables/useDocumentToTravel';
@@ -164,7 +164,8 @@ function travelRow(s: VacationTravelSegment): ReviewRow {
   return {
     id: s.id,
     emoji: TRAVEL_EMOJI[s.type] ?? '✈️',
-    title: s.title || route || t('travelExtract.kind.travel'),
+    // The same title the calendar will show (`segmentDisplayTitle`), never the model's heading.
+    title: segmentDisplayTitle(s) || t('travelExtract.kind.travel'),
     // The route is shown whenever there IS one. It used to be suppressed when it equalled the
     // title, which assumed the title was a SHORTENED form of it — no longer true once a title
     // can be the full route verbatim, and the row then lost the route entirely.

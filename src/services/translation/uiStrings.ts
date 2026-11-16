@@ -11371,8 +11371,6 @@ const STRING_DEFS = {
   'vacation.carType.rental_car': { en: 'Rental Car', beanie: 'rental car' },
   'vacation.carType.other': { en: 'Other', beanie: 'other' },
   'vacation.segment.car': { en: 'Car', beanie: 'car' },
-  'vacation.travel.outboundFlight': { en: 'Outbound Flight', beanie: 'outbound flight' },
-  'vacation.travel.returnFlight': { en: 'Return Flight', beanie: 'return flight' },
   'vacation.travel.flights': { en: 'Flights', beanie: 'flights' },
   'vacation.travel.outbound': { en: 'Outbound', beanie: 'outbound' },
   'vacation.travel.return': { en: 'Return', beanie: 'return' },
@@ -11647,6 +11645,15 @@ const STRING_DEFS = {
   'vacation.documentsCount': { en: '{n} attached', beanie: '{n} attached' },
   'vacation.field.status': { en: 'Status', beanie: 'status' },
   'vacation.field.title': { en: 'Title', beanie: 'title' },
+  'vacation.field.titleAutoHintEmpty': {
+    en: 'Automatic title: {title}. Type here to use your own.',
+    beanie: 'automatic title: {title}. type here to use your own.',
+  },
+  'vacation.field.titleAutoHintCustom': {
+    en: 'Automatic title: {title}',
+    beanie: 'automatic title: {title}',
+  },
+  'vacation.field.titleUseAutomatic': { en: 'Use Automatic Title', beanie: 'use automatic title' },
   'vacation.field.openInMaps': { en: 'Open in Google Maps', beanie: 'open in google maps' },
 
   // Delete

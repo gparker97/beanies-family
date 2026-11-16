@@ -12,6 +12,7 @@ import {
   collectSegmentDates,
   extractSegmentOccurrences,
   tripPhase,
+  withSettledTitles,
   type TravelSegmentOccurrence,
 } from '@/utils/vacation';
 import { toISODateString, extractDatePart } from '@/utils/date';
@@ -19,6 +20,7 @@ import { mergeExtractedIntoVacation } from '@/utils/segmentMerge';
 import { useToday } from '@/composables/useToday';
 import { trackFeature } from '@/services/analytics/plausible';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 /** `missing` = vacation or segment not found (toast shown); `failed` = save errored (toast shown by wrapAsync). */
 export type SegmentWriteResult = 'saved' | 'missing' | 'failed';
 
@@ -71,8 +73,8 @@ export const useVacationStore = defineStore('vacations', () => {
    * All travel-segment calendar occurrences across every vacation. Pure
    * derivation — extraction lives in `extractSegmentOccurrences`. Wrapped
    * in `safeExtract` so a single corrupt segment cannot break calendar
-   * render for the whole vacation: errors are logged with `[vacationStore]`
-   * prefix and the segment contributes zero occurrences instead of throwing.
+   * render for the whole vacation: the failure is reported (`occurrence failed`)
+   * and the segment contributes zero occurrences instead of throwing.
    */
   const allTravelSegmentOccurrences = computed<TravelSegmentOccurrence[]>(() =>
     vacations.value.flatMap((v) =>
@@ -89,10 +91,23 @@ export const useVacationStore = defineStore('vacations', () => {
     try {
       return extractSegmentOccurrences(vacationId, seg, idx, tripAssigneeIds);
     } catch (err) {
+      // Bounded: the computed re-runs only when `vacations` changes (a save or a sync, not a
+      // render), and `logEvent` rate-limits each surface (50 a minute). No allowlisted key
+      // exists for a vacation or segment id, so those go to the device console only.
+      // A damaged record's `type` may hold anything, so only a type-shaped value is sent.
+      const kind =
+        typeof seg?.type === 'string' && /^[a-z_]{1,32}$/.test(seg.type) ? seg.type : undefined;
       console.error(
-        `[vacationStore] failed to extract occurrences for segment ${seg?.id ?? '<no id>'} on vacation ${vacationId}:`,
+        `[vacationStore] occurrence failed for segment ${seg?.id ?? '<no id>'} on vacation ${vacationId}:`,
         err
       );
+      reportError({
+        surface: 'vacation-segment',
+        severity: 'error',
+        message: 'occurrence failed',
+        error: err,
+        context: { action: 'occurrence_failed', ...(kind ? { kind } : {}) },
+      });
       return [];
     }
   }
@@ -165,8 +180,9 @@ export const useVacationStore = defineStore('vacations', () => {
         const activity = await activityRepo.createActivity(activityInput);
 
         // Create vacation with link to activity
+        // `withSettledTitles`: the stored `title` copy for older builds (see its doc comment).
         const vacation = await vacationRepo.createVacation({
-          ...input,
+          ...withSettledTitles(input),
           activityId: activity.id,
           startDate,
           endDate,
@@ -251,7 +267,7 @@ export const useVacationStore = defineStore('vacations', () => {
         }
 
         const updated = await vacationRepo.updateVacation(id, {
-          ...input,
+          ...withSettledTitles(input),
           startDate: nextStart,
           endDate: nextEnd,
         });
@@ -457,9 +473,25 @@ export const useVacationStore = defineStore('vacations', () => {
       const saved = await updateVacation(vacationId, {
         [key]: nextArr,
       } as UpdateFamilyVacationInput);
-      return saved !== null ? 'saved' : 'failed';
+      if (saved === null) return 'failed';
+      if (key === 'travelSegments' && 'customTitle' in patch) {
+        logTitleSet(arr[idx] as VacationTravelSegment, patch.customTitle);
+      }
+      return 'saved';
     }
     return segmentMissing('update_missing', 'segment');
+  }
+
+  /** A segment's own title was set or cleared (success path, so the share of custom titles is
+   *  measurable). The title text never leaves the device: only the action and the segment type. */
+  function logTitleSet(seg: VacationTravelSegment, customTitle: unknown): void {
+    const custom = typeof customTitle === 'string' && customTitle.trim() !== '';
+    logEvent({
+      level: 'info',
+      surface: 'vacation-segment',
+      message: 'segment title set',
+      context: { action: custom ? 'title_custom' : 'title_automatic', kind: seg.type },
+    });
   }
 
   /** `updateSegment`'s `sortDate` rule for a travel segment patch (see there). A cleared date

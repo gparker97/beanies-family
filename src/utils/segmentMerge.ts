@@ -3,7 +3,7 @@
 // fields; genuinely-new facts append to notes; travellers union (undefined = whole trip).
 
 import {
-  buildTravelSegmentTitle,
+  segmentDisplayTitle,
   buildAccommodationTitle,
   buildTransportationTitle,
 } from '@/utils/vacation';
@@ -22,6 +22,8 @@ type SegmentKind = 'travel' | 'accommodation' | 'transportation';
 const SPECIAL_KEYS = new Set([
   'id',
   'title',
+  // A person's own title: an import never brings or overwrites one.
+  'customTitle',
   'notes',
   'travellerIds',
   'photoIds',
@@ -201,7 +203,7 @@ export function mergeExtractedIntoVacation(
       existing.travelSegments,
       incoming.travelSegments,
       'travel',
-      (s) => buildTravelSegmentTitle(s),
+      (s) => segmentDisplayTitle(s),
       idRemap
     ),
     accommodations: mergeKind(

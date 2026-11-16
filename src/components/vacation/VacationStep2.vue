@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateUUID } from '@/utils/id';
 import { addHourToTime, addDaysYmd } from '@/utils/date';
-import { arrivalDayOffset, MAX_ARRIVAL_DAY_OFFSET } from '@/utils/vacation';
+import { arrivalDayOffset, MAX_ARRIVAL_DAY_OFFSET, segmentDisplayTitle } from '@/utils/vacation';
 import { isFlightType } from '@/utils/travelCodes';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
@@ -60,17 +60,6 @@ const segmentIcons: Record<VacationTravelType, string> = {
   ferry: '⛴️',
   car: '🚗',
   activity: '🎭',
-};
-
-const defaultTitles: Record<VacationTravelType, string> = {
-  flight_outbound: 'flight',
-  flight_return: 'flight',
-  flight_other: 'flight',
-  cruise: 'cruise',
-  train: 'train',
-  ferry: 'ferry',
-  car: 'car',
-  activity: '',
 };
 
 const statusOptions = computed(() => [
@@ -158,7 +147,9 @@ function addSegment(type: VacationTravelType) {
   const newSegment: VacationTravelSegment = withPrefill({
     id,
     type,
-    title: defaultTitles[type],
+    // The display title is built from the segment's fields (`segmentDisplayTitle`); the store
+    // settles the stored copy on save.
+    title: '',
     status: 'pending' as VacationSegmentStatus,
   });
   collapsedMap.value[id] = false;
@@ -171,7 +162,7 @@ function addFlightSegments(returnFlight: boolean) {
   const outbound: VacationTravelSegment = withPrefill({
     id: outId,
     type: 'flight_outbound',
-    title: defaultTitles['flight_outbound'],
+    title: '',
     status: 'pending' as VacationSegmentStatus,
   });
   collapsedMap.value[outId] = false;
@@ -181,7 +172,7 @@ function addFlightSegments(returnFlight: boolean) {
     const ret: VacationTravelSegment = withPrefill({
       id: retId,
       type: 'flight_return',
-      title: defaultTitles['flight_return'],
+      title: '',
       status: 'pending' as VacationSegmentStatus,
     });
     collapsedMap.value[retId] = false;
@@ -321,10 +312,6 @@ function updateSegment(index: number, field: keyof VacationTravelSegment, value:
   emit('update:segments', updated);
 }
 
-function updateSegmentTitle(index: number, value: string) {
-  updateSegment(index, 'title', value);
-}
-
 function updateSegmentStatus(index: number, value: string) {
   updateSegment(index, 'status', value as VacationSegmentStatus);
 }
@@ -367,12 +354,11 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
       v-for="{ seg, idx } in sortedSegments"
       :key="seg.id"
       :icon="segmentIcon(seg.type)"
-      :title="seg.title"
+      :title="segmentDisplayTitle(seg)"
       :status="seg.status"
       :key-value="buildKeyValue(seg)"
       :collapsed="collapsedMap[seg.id] ?? true"
       :deletable="true"
-      @update:title="updateSegmentTitle(idx, $event)"
       @update:collapsed="collapsedMap[seg.id] = $event"
       @delete="removeSegment(idx)"
     >

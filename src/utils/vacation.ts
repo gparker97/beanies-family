@@ -29,6 +29,7 @@ import {
   isFlightType,
 } from './travelCodes';
 import { pickLiveState, tupleFromSegment } from './flightStatus/schedule';
+import { normaliseFlightNumber } from './flightStatus/flightNumber';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type {
   FamilyVacation,
@@ -953,48 +954,124 @@ export function flightCodeLabel(airline?: string, flightNumber?: string): string
   return `${carrier} ${fn}`.trim();
 }
 
-/** Build a display title for a travel segment based on its type and fields */
-export function buildTravelSegmentTitle(seg: {
+/**
+ * A flight's code as the family would say it ("SQ318"): the Lambda query form when the fields
+ * make one, else `flightCodeLabel`. '' when there is neither an airline nor a flight number.
+ * Shared by `flightLabel` (the live-check sentences, the bell, the briefing),
+ * `segmentFlightLabel` and the title's no-route fallback, so those cannot spell a flight two
+ * ways. (`flightHintTitle` still prints `flightCodeLabel`'s spaced form on another card's hint.)
+ */
+export function flightCode(airline?: string, flightNumber?: string): string {
+  return (
+    normaliseFlightNumber(airline, flightNumber)?.query || flightCodeLabel(airline, flightNumber)
+  );
+}
+
+/** The fields a travel title is built from. Loose on purpose: a stored segment, the editor's
+ *  form values and the import mapper's half-built segment all fit. */
+export type TravelTitleFields = {
   type?: string;
   departureAirport?: string;
   arrivalAirport?: string;
+  airline?: string;
+  flightNumber?: string;
   operator?: string;
   route?: string;
   departureStation?: string;
   arrivalStation?: string;
   cruiseLine?: string;
+  shipName?: string;
   carType?: string;
   carLabel?: string;
   title?: string;
   activityCategory?: string;
-}): string {
-  const t = seg.type;
+};
+
+/** A non-null, non-array object: the only shape the title functions read fields from. */
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** A stored field read as text: anything that is not a string (a damaged or foreign record)
+ *  counts as absent, so the title functions never call a string method on it. */
+function textField(seg: object, key: string): string | undefined {
+  const v = (seg as Record<string, unknown>)[key];
+  return typeof v === 'string' ? v : undefined;
+}
+
+/** The AUTOMATIC title of a travel segment, built from its type and fields. For display call
+ *  `segmentDisplayTitle`, which puts a person's own title first. Total: a field of the wrong
+ *  type is read as absent, and a non-object gives ''. */
+export function buildTravelSegmentTitle(seg: TravelTitleFields): string {
+  if (!isRecord(seg)) return '';
+  const f = (key: keyof TravelTitleFields) => textField(seg, key);
+  const t = f('type');
   if (isFlightType(t)) {
-    const from = airportCode(seg.departureAirport);
-    const to = airportCode(seg.arrivalAirport);
+    const from = airportCode(f('departureAirport'));
+    const to = airportCode(f('arrivalAirport'));
     if (from && to) return `${from} → ${to}`;
     if (from) return from;
     if (to) return to;
+    // No route: a flight number names this flight better than a generic word.
+    if (f('flightNumber')?.trim()) return flightCode(f('airline'), f('flightNumber'));
     return t === 'flight_outbound'
       ? 'outbound flight'
       : t === 'flight_return'
         ? 'return flight'
         : 'flight';
   }
-  if (t === 'cruise') return seg.cruiseLine || 'cruise';
+  if (t === 'cruise') return f('cruiseLine') || f('shipName') || 'cruise';
   if (t === 'train' || t === 'ferry') {
-    const from = seg.departureStation;
-    const to = seg.arrivalStation;
+    const from = f('departureStation');
+    const to = f('arrivalStation');
     if (from && to) return `${from} → ${to}`;
     if (from) return from;
     if (to) return to;
     return t === 'train' ? 'train' : 'ferry';
   }
   if (t === 'car') {
-    return seg.carLabel || (seg.carType ? seg.carType.replace(/_/g, ' ') : 'car');
+    const carType = f('carType');
+    return f('carLabel') || (carType ? carType.replace(/_/g, ' ') : 'car');
   }
-  if (t === 'activity') return seg.title || 'activity';
-  return seg.title || '';
+  if (t === 'activity') return f('title') || 'activity';
+  return f('title') || '';
+}
+
+/** THE display title of a travel segment: the person's own title when they typed one, else the
+ *  automatic one. Every surface calls this; nothing else reads `seg.title`. Total: never throws
+ *  (a non-string `customTitle` counts as none). */
+export function segmentDisplayTitle(seg: TravelTitleFields & { customTitle?: string }): string {
+  if (!isRecord(seg)) return '';
+  const custom = seg.type === 'activity' ? '' : (textField(seg, 'customTitle')?.trim() ?? '');
+  return custom || buildTravelSegmentTitle(seg);
+}
+
+/** How a flight segment is labelled where the flight code leads (the timeline's flight label,
+ *  the Live checks rail): its code, else its display title. `flightLabel`'s rule for a raw
+ *  segment, so a surface holding a segment never builds the occurrence shape by hand. */
+export function segmentFlightLabel(seg: TravelTitleFields & { customTitle?: string }): string {
+  if (!isRecord(seg)) return '';
+  return (
+    flightCode(textField(seg, 'airline'), textField(seg, 'flightNumber')) ||
+    segmentDisplayTitle(seg)
+  );
+}
+
+/** For older builds only: sets each non-activity segment's stored `title` to its display title.
+ *  This build never reads that copy. Activities are left alone (their `title` is the person's
+ *  text, and is '' while a new activity is being created). Input without `travelSegments` is
+ *  returned as is, so a save that did not touch segments never gains the key. Total: an element
+ *  that is not an object (a null in a damaged array) is passed through exactly as it is. */
+export function withSettledTitles<T extends { travelSegments?: VacationTravelSegment[] }>(
+  input: T
+): T {
+  if (!input.travelSegments) return input;
+  return {
+    ...input,
+    travelSegments: input.travelSegments.map((seg) =>
+      !isRecord(seg) || seg.type === 'activity' ? seg : { ...seg, title: segmentDisplayTitle(seg) }
+    ),
+  };
 }
 
 /** Build a display title for an accommodation based on its type and name */
@@ -1185,7 +1262,7 @@ function buildCruiseItems(v: FamilyVacation): DatedItem[] {
     .map((s) => ({
       id: s.id,
       range: dateRange(s.embarkationDate, s.disembarkationDate),
-      title: s.title || 'cruise',
+      title: segmentDisplayTitle(s),
     }))
     .filter((c): c is DatedItem => !!c.range);
 }
@@ -1196,7 +1273,7 @@ function buildFlightItems(v: FamilyVacation): DatedItem[] {
     .map((s) => ({
       id: s.id,
       range: dateRange(s.departureDate, s.arrivalDate ?? s.departureDate),
-      title: s.title || 'flight',
+      title: segmentDisplayTitle(s),
     }))
     .filter((f): f is DatedItem => !!f.range);
 }
@@ -1311,7 +1388,8 @@ function detectOutOfRange(v: FamilyVacation, addHint: AddHint, t: Translate): vo
 
   for (const seg of v.travelSegments) {
     const primary = seg.departureDate ?? seg.embarkationDate;
-    if (primary) items.push({ id: seg.id, date: primary, title: seg.title || 'item' });
+    if (primary)
+      items.push({ id: seg.id, date: primary, title: segmentDisplayTitle(seg) || 'item' });
   }
   for (const acc of v.accommodations) {
     if (acc.checkInDate) {
@@ -1364,11 +1442,12 @@ function hintStamp(date: string | undefined, time: string | undefined): string |
   return d && tm ? `${d}T${tm}` : null;
 }
 
-/** How a flight is named on ANOTHER card's hint: its code ("SQ318"), else its route. */
+/** How a flight is named on ANOTHER card's hint: its code ("SQ318"), else its display title. */
 function flightHintTitle(seg: VacationTravelSegment): string {
-  return isFlightType(seg.type)
-    ? flightCodeLabel(seg.airline, seg.flightNumber) || buildTravelSegmentTitle(seg)
-    : buildTravelSegmentTitle(seg) || seg.title;
+  return (
+    (isFlightType(seg.type) ? flightCodeLabel(seg.airline, seg.flightNumber) : '') ||
+    segmentDisplayTitle(seg)
+  );
 }
 
 /**
@@ -1698,7 +1777,7 @@ export function extractSegmentOccurrences(
       status: seg.status,
       date: d,
       time: rawTime || undefined,
-      title: seg.title,
+      title: segmentDisplayTitle(seg),
       travellerIds: seg.travellerIds,
       tripAssigneeIds,
       airline: seg.airline,
