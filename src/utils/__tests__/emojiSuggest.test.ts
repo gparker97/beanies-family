@@ -1,16 +1,17 @@
 /**
  * The shared keyword matcher behind the chore and reward suggesters (`emojiSuggester`), and the
- * rename rule both follow (`emojiAfterRename`).
+ * rename rule both follow (`pictureAfterRename`).
  */
 import { describe, it, expect } from 'vitest';
-import { emojiAfterRename, emojiSuggester } from '@/utils/emojiSuggest';
+import { emojiSuggester, pictureAfterRename } from '@/utils/emojiSuggest';
 
-const suggest = emojiSuggester([
+const suggester = emojiSuggester([
   { emoji: 'A', words: ['cat', 'cat food'] },
   { emoji: 'B', words: ['feed'], weak: true },
   { emoji: 'C', words: ['dog', '狗'] },
   { emoji: 'D', words: ['dog'] },
 ]);
+const suggest = suggester.suggest;
 
 describe('emojiSuggester', () => {
   it.each([
@@ -31,23 +32,74 @@ describe('emojiSuggester', () => {
   });
 });
 
-describe('emojiAfterRename: only a change of suggestion re-picks', () => {
+describe('matches: every picture a name matches, in its strongest tier', () => {
   it.each([
-    ['a new suggestion re-picks over a hand pick', '🍦', '💵', '🐷', '💵'],
-    ['a first suggestion re-picks over a followed picture', undefined, '🎬', '🎁', '🎬'],
-    ['the same suggestion keeps a hand pick', '💵', '💵', '🐷', '🐷'],
-    ['no suggestion keeps a hand pick', '🍦', undefined, '🐷', '🐷'],
+    ['buy cat food for the dog', ['A', 'C', 'D']],
+    // A weak word counts only when no strong word is there.
+    ['feed', ['B']],
+    ['feed the cat', ['A']],
+    ['education', []],
+    ['', []],
+  ])('%s -> %j', (name, want) => {
+    expect([...suggester.matches(name)].sort()).toEqual(want);
+  });
+});
+
+/**
+ * `pictureAfterRename`, the rule itself, over a tiny table. The chore and reward wrappers pin
+ * the real examples (`choreBlocks.test.ts`, `choreStarsConstants.test.ts`).
+ */
+describe('pictureAfterRename', () => {
+  const rule = emojiSuggester([
+    { emoji: 'TRASH', words: ['trash'] },
+    { emoji: 'DINNER', words: ['dinner'] },
+    { emoji: 'DOG', words: ['dog'] },
+    { emoji: 'BRUSH', words: ['brush'], weak: true },
+    { emoji: 'HAIR', words: ['hair'] },
+  ]);
+  const DEFAULT = 'DEF';
+  const next = (settledName: string, newName: string, current: string, hasArt = false) =>
+    pictureAfterRename(rule, { settledName, newName, current, hasArt, plainDefault: DEFAULT });
+
+  it.each([
     [
-      'no suggestion keeps a followed picture (no jump to the default)',
-      '🍦',
+      'a longer keyword on the same thing keeps a hand pick',
+      'trash',
+      'trash after dinner',
+      'X',
       undefined,
-      '🍦',
-      '🍦',
     ],
-    ['no picture, the same suggestion: the suggestion', '💵', '💵', undefined, '💵'],
-    ['no picture, no suggestion: the default', undefined, undefined, undefined, '🎁'],
-    ['an empty picture counts as none', undefined, undefined, '', '🎁'],
-  ] as const)('%s', (_n, before, after, current, expected) => {
-    expect(emojiAfterRename({ before, after, current, fallback: '🎁' })).toBe(expected);
+    [
+      'the meaning moved: the new suggestion, over a hand pick',
+      'trash',
+      'walk the dog',
+      'X',
+      'DOG',
+    ],
+    [
+      'a weak word does not hold a picture once a specific one is there',
+      'brush',
+      'brush hair',
+      'X',
+      'HAIR',
+    ],
+    ['the new name suggests nothing: keep', 'trash', 'help out', 'X', undefined],
+    ['the old name suggested nothing: a hand pick stays', 'help', 'walk the dog', 'X', undefined],
+    [
+      'the old name suggested nothing: the plain default yields',
+      '',
+      'walk the dog',
+      DEFAULT,
+      'DOG',
+    ],
+    ['no picture at all: the suggestion', 'trash', 'trash after dinner', '', 'DINNER'],
+    ['the name unchanged (opening): keep', 'dog', 'dog', 'X', undefined],
+  ] as const)('%s', (_n, settled, renamed, current, want) => {
+    expect(next(settled, renamed, current)).toBe(want);
+  });
+
+  it('card art is a real picture even on the default emoji', () => {
+    expect(next('help', 'trash after dinner', DEFAULT, true)).toBeUndefined();
+    expect(next('help', 'trash after dinner', DEFAULT, false)).toBe('DINNER');
   });
 });

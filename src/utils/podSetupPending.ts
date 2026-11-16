@@ -16,11 +16,22 @@
  *     seed). The creating device is the only one that ever writes it, which is what makes "only
  *     the owner's device that created the pod sends the late completion" true by construction.
  *   - STEP updated by `ResumePodSetup`'s phase watcher with each post-write step SHOWN.
- *   - CLEARED by `completePodSetup` once its Slack post has gone out (normal and late path), and
- *     by `familyContext.deleteLocalFamily` when the family is forgotten on this device (the
- *     "sign out and clear all data" sweep, an eviction). A plain sign-out keeps it on purpose:
- *     the marker names the creating member, so only that person signing back in on this device
- *     can act on it, and that is exactly the completion still owed.
+ *   - REPLACED by a "done" record (`markPodSetupDone`) by `completePodSetup` once the completion
+ *     has been sent (wizard or late path). The done record is what makes "sent once" hold across
+ *     tabs and reloads: every path checks it first and sends nothing when it is there. It
+ *     expires like the marker does.
+ *   - CLEARED (marker or done record) by `familyContext.deleteLocalFamily` when the family is
+ *     forgotten on this device (the "sign out and clear all data" sweep, an eviction). A plain
+ *     sign-out keeps it on purpose: the marker names the creating member, so only that person
+ *     signing back in on this device can act on it, and that is exactly the completion still owed.
+ *
+ * ⚠️ ONE SENDER AT A TIME, ACROSS TABS. localStorage is shared by every tab of the profile, the
+ * per-tab latch in `syncStore` is not. So the wizard HOLDS a Web Lock named for the family
+ * (`holdPodSetupLock`) from the pod write until its completion returns or it unmounts, and the
+ * late path asks for the same lock with `ifAvailable` (`withPodSetupLockIfAvailable`): while the
+ * wizard (or another tab's late send) owns it, the late path skips. Where `navigator.locks` is
+ * unavailable (or refuses), both fall back to running unlocked, the pre-lock behaviour; the done
+ * record still stops any send that starts after another one finished.
  *
  * ⚠️ localStorage, one key per family (`beanies:setup-pending:<familyId>`), through `storedJson`,
  * which never throws: storage being unavailable can never break the wizard or the sign-in. The
@@ -28,8 +39,10 @@
  *
  * Firehose (`surface: 'onboarding'`, message `setup-marker`, allowlisted keys only):
  *   - `{ action: 'set', detail: <step> }`        the marker was written at the pod write;
- *   - `{ action: 'cleared', detail: <reason> }`  completed | family-forgotten | corrupt | expired;
- *   - `{ action: 'storage-failed', stage }`      set | step | clear refused by storage (`warn`).
+ *   - `{ action: 'done' }`                       the completion was sent, the done record written;
+ *   - `{ action: 'cleared', detail: <reason> }`  family-forgotten | corrupt | expired | done-expired;
+ *   - `{ action: 'storage-failed', stage }`      set | step | done | clear refused by storage (`warn`);
+ *   - `{ action: 'lock-failed' }`                the Web Lock request was refused (`warn`), unlocked.
  * A step update logs nothing on success: the wizard's own `step shown` events already record it.
  */
 
@@ -69,6 +82,8 @@ export interface PodSetupPending {
 
 export type PodSetupPendingRead =
   | { kind: 'ok'; value: PodSetupPending }
+  /** The completion was sent (on this device, from any tab): nothing more to send. */
+  | { kind: 'done' }
   | { kind: 'missing' }
   | { kind: 'corrupt' }
   | { kind: 'expired' };
@@ -94,10 +109,10 @@ export type SignInVia =
 /**
  * How the person came back to a pod whose setup was left unfinished. A restored session is told
  * apart by platform only (the code cannot know more); a fresh sign-in by its method when the
- * login flow knows it, else plain `signed-in` (a load or join surface that signs in directly).
+ * login flow knows it, else no method (a load or join surface that signs in directly).
  */
 export type SetupReturnVia =
-  'app-restarted' | 'page-reloaded' | 'signed-in' | `signed-in-${SignInVia}`;
+  { kind: 'restored'; native: boolean } | { kind: 'signed-in'; method?: SignInVia };
 
 /** A setup finished on a later open rather than in the wizard. */
 export interface LateSetupFinish {
@@ -122,11 +137,26 @@ const SIGN_IN_WORDS: Record<SignInVia, string> = {
   'recovery-passphrase': 'recovery passphrase',
 };
 
-function viaWords(via: SetupReturnVia): string {
-  if (via === 'app-restarted') return 'app restarted';
-  if (via === 'page-reloaded') return 'page reloaded';
-  if (via === 'signed-in') return 'signed in';
-  return `signed in with ${SIGN_IN_WORDS[via.slice('signed-in-'.length) as SignInVia]}`;
+/**
+ * The ONE place a way back is spelled: the telemetry `kind` string and the Slack words, together,
+ * so the two cannot drift.
+ */
+function describeReturn(via: SetupReturnVia): { kind: string; words: string } {
+  if (via.kind === 'restored') {
+    return via.native
+      ? { kind: 'app-restarted', words: 'app restarted' }
+      : { kind: 'page-reloaded', words: 'page reloaded' };
+  }
+  if (!via.method) return { kind: 'signed-in', words: 'signed in' };
+  return {
+    kind: `signed-in-${via.method}`,
+    words: `signed in with ${SIGN_IN_WORDS[via.method]}`,
+  };
+}
+
+/** The firehose `kind` for a way back: `app-restarted`, `page-reloaded`, `signed-in[-<method>]`. */
+export function setupReturnKind(via: SetupReturnVia): string {
+  return describeReturn(via).kind;
 }
 
 /**
@@ -146,7 +176,7 @@ export function heardViaSlackLine(survey: SetupSurveyOutcome): string {
 /** The "Setup" line, present ONLY when setup finished on a later open. Internal ops copy. */
 export function setupSlackLine(late: LateSetupFinish | undefined): string {
   if (!late) return '';
-  return `\n*Setup:* left at the ${STEP_WORDS[late.leftAt]} step, finished on next open (${viaWords(late.via)})`;
+  return `\n*Setup:* left at the ${STEP_WORDS[late.leftAt]} step, finished on next open (${describeReturn(late.via).words})`;
 }
 
 export function podSetupPendingKey(familyId: string): string {
@@ -211,9 +241,30 @@ export function notePodSetupStep(familyId: string, step: PodSetupStep): void {
     log('warn', { action: 'storage-failed', stage: 'step', detail: step }, written.error);
 }
 
+/** The record that replaces the marker once the completion was sent: when, nothing else. */
+interface PodSetupDone {
+  done: true;
+  /** `Date.now()` when the completion was sent; it expires like the marker does. */
+  doneAt: number;
+}
+
+function parseDone(value: unknown): PodSetupDone | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  if (v.done !== true || typeof v.doneAt !== 'number' || !Number.isFinite(v.doneAt)) return null;
+  return { done: true, doneAt: v.doneAt };
+}
+
+/** Older than the max age, or from the future (the clock moved back): untrustworthy either way. */
+function isStale(at: number, now: number): boolean {
+  const age = now - at;
+  return age > POD_SETUP_PENDING_MAX_AGE_MS || age < 0;
+}
+
 /**
  * Read the marker for a family. A corrupt or expired record is removed here (and logged), so the
- * next open classifies the same way at most once more if the removal is refused.
+ * next open classifies the same way at most once more if the removal is refused. An expired done
+ * record is removed too and reads as `missing`: its job (stopping a second send) is long over.
  */
 export function readPodSetupPending(
   familyId: string,
@@ -221,14 +272,18 @@ export function readPodSetupPending(
 ): PodSetupPendingRead {
   const read = readStoredJson(podSetupPendingKey(familyId), LABEL);
   if (read.kind === 'missing') return { kind: 'missing' };
+  const done = read.kind === 'ok' ? parseDone(read.value) : null;
+  if (done) {
+    if (!isStale(done.doneAt, now)) return { kind: 'done' };
+    remove(familyId, 'done-expired');
+    return { kind: 'missing' };
+  }
   const value = read.kind === 'ok' ? parse(read.value) : null;
   if (!value) {
     remove(familyId, 'corrupt');
     return { kind: 'corrupt' };
   }
-  const age = now - value.createdAt;
-  // A record from the future (clock moved back) is as untrustworthy as an old one.
-  if (age > POD_SETUP_PENDING_MAX_AGE_MS || age < 0) {
+  if (isStale(value.createdAt, now)) {
     remove(familyId, 'expired');
     return { kind: 'expired' };
   }
@@ -236,14 +291,84 @@ export function readPodSetupPending(
 }
 
 /**
- * Remove the marker. `completed`: the completion's Slack post has gone out. `family-forgotten`:
- * the family left this device. Silent when there is none, so the family-delete sweep adds no
- * line for the families that never had one.
+ * The completion was sent: replace the marker (or nothing) with the done record, in one write,
+ * so no reader in another tab ever sees neither. Never throws; a refused write is logged at
+ * `warn` (the marker may then still be there, and the next open could send once more).
  */
-export function clearPodSetupPending(
-  familyId: string,
-  reason: 'completed' | 'family-forgotten'
-): void {
+export function markPodSetupDone(familyId: string, now: number = Date.now()): void {
+  const record: PodSetupDone = { done: true, doneAt: now };
+  const written = writeStoredJson(podSetupPendingKey(familyId), record, LABEL);
+  if (written.ok) log('info', { action: 'done' });
+  else log('warn', { action: 'storage-failed', stage: 'done' }, written.error);
+}
+
+/**
+ * Remove the marker or the done record: the family left this device. Silent when there is none,
+ * so the family-delete sweep adds no line for the families that never had one.
+ */
+export function clearPodSetupPending(familyId: string, reason: 'family-forgotten'): void {
   if (readStoredJson(podSetupPendingKey(familyId), LABEL).kind === 'missing') return;
   remove(familyId, reason);
+}
+
+/** The Web Lock that says "this context is sending (or about to send) the family's completion". */
+export function podSetupLockName(familyId: string): string {
+  return `beanies-pod-setup:${familyId}`;
+}
+
+function lockManager(): LockManager | undefined {
+  if (typeof navigator === 'undefined') return undefined;
+  const locks = (navigator as Navigator & { locks?: LockManager }).locks;
+  return typeof locks?.request === 'function' ? locks : undefined;
+}
+
+/**
+ * The wizard's hold on the family's setup lock, from the pod write until its completion returns
+ * or it unmounts. Requested at once and never awaited (the wizard must not wait on it); the
+ * returned function lets it go, and is safe to call more than once or before the grant.
+ *
+ * Fallback: no Web Locks (or a refused request, logged `lock-failed`) means no hold, the pre-lock
+ * behaviour; the done record still stops a late send that starts after the wizard's.
+ */
+export function holdPodSetupLock(familyId: string): () => void {
+  const locks = lockManager();
+  if (!locks) return () => {};
+  let release: () => void = () => {};
+  const untilReleased = new Promise<void>((r) => {
+    release = r;
+  });
+  // Not `ifAvailable`: nothing else holds a brand-new family's lock for more than a send, and
+  // queueing behind one is right. Returning the pending promise HOLDS the lock.
+  locks
+    .request(podSetupLockName(familyId), () => untilReleased)
+    .catch((e: unknown) => log('warn', { action: 'lock-failed', stage: 'hold' }, e));
+  return release;
+}
+
+/**
+ * Run `fn` holding the family's setup lock, only if no other context holds (or waits for) it:
+ * `{ granted: false }` at once otherwise, and `fn` never runs. With no Web Locks, or a request
+ * refused before `fn` started, `fn` runs unlocked (the pre-lock behaviour). A throw from `fn`
+ * itself is passed through.
+ */
+export async function withPodSetupLockIfAvailable<T>(
+  familyId: string,
+  fn: () => Promise<T>
+): Promise<{ granted: true; value: T } | { granted: false }> {
+  const locks = lockManager();
+  if (!locks) return { granted: true, value: await fn() };
+  let started = false;
+  let result: { granted: true; value: T } | { granted: false } = { granted: false };
+  try {
+    await locks.request(podSetupLockName(familyId), { ifAvailable: true }, async (lock) => {
+      if (!lock) return;
+      started = true;
+      result = { granted: true, value: await fn() };
+    });
+  } catch (e) {
+    if (started) throw e;
+    log('warn', { action: 'lock-failed', stage: 'request' }, e);
+    return { granted: true, value: await fn() };
+  }
+  return result;
 }

@@ -432,7 +432,10 @@ describe('ChoreAddSheet: the rows', () => {
     // ...and replaced by a title that suggests something different.
     await commit('Feed the fish');
     expect(ownEmoji()).toBe('🐟');
-    // A set row with card art renamed to something different: the emoji replaces the art.
+    // A set row with card art renamed to something different: the emoji replaces the art. (The
+    // test kit's `t` returns the key, which suggests nothing, so the row is first given its real
+    // English title: a title that suggested nothing keeps the art.)
+    await commitTitle(w, 'pack-bag', 'Pack your school bag');
     await commitTitle(w, 'pack-bag', 'Feed the cat');
     await submit(w);
     expect(sentDrafts().find((d) => d.title === 'Feed the fish')!.emoji).toBe('🐟');

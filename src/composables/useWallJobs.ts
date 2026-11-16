@@ -30,7 +30,7 @@ import { plateClock } from '@/utils/todoPlate';
 import { assertNever } from '@/utils/assertNever';
 import { currentBlock, isChoreRefusal, type BeanChoreDay } from '@/utils/chores';
 import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
-import { DEFAULT_CHORE_EMOJI, suggestChoreEmoji } from '@/constants/choreBlocks';
+import { DEFAULT_CHORE_EMOJI, chorePictureAfterRename } from '@/constants/choreBlocks';
 import { useAuthStore } from '@/stores/authStore';
 import { UNASSIGNED } from '@/utils/wallJobs';
 import type { WallChoreLane, WallJob, WallListGroup } from '@/types/wall';
@@ -374,8 +374,9 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
       const created = await choreStore.createChore(
         {
           title: trimmed,
-          // The picture the name suggests, as the app's editors pick it; the broom when nothing matches.
-          emoji: suggestChoreEmoji(trimmed) ?? DEFAULT_CHORE_EMOJI,
+          // A first title, by the one rule the app's editors use (a blank row with the default
+          // picture): the picture the name suggests, else the broom.
+          emoji: chorePictureAfterRename('', trimmed, { emoji: DEFAULT_CHORE_EMOJI }).emoji,
           assigneeIds: [memberId],
           block,
         },

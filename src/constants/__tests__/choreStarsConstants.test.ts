@@ -2,7 +2,7 @@
  * Stars and rewards (#148): the reward picture options and their suggester. The keyword table is
  * private; it is tested through `suggestRewardEmoji` (every option reachable from a name) and the
  * rename rule the weekly reward and the special reward drawer share (`rewardEmojiAfterRename`;
- * the rule itself, `emojiAfterRename`, is tested beside it in `utils/emojiSuggest.test.ts`).
+ * the rule itself, `pictureAfterRename`, is tested beside it in `utils/emojiSuggest.test.ts`).
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -147,6 +147,28 @@ describe('rewardEmojiAfterRename: the rule with the reward suggester', () => {
     ['the name unchanged (opening): the picture stays', 'Ice cream', 'Ice cream', '🐷', '🐷'],
     ['no picture, no name: the default', '', '', undefined, DEFAULT_REWARD_EMOJI],
     ['a Chinese keyword', 'Ice cream', '零花钱', '🐷', '💵'],
+    ['a Chinese small edit keeps a hand pick', '零花钱', '每周零花钱', '🐷', '🐷'],
+    [
+      'an unmatched name with a hand pick renamed to "Allowance": the hand pick stays',
+      'Something nice',
+      'Allowance',
+      '🐷',
+      '🐷',
+    ],
+    [
+      'an unmatched name on the plain default renamed to "Allowance": money',
+      'Something nice',
+      'Allowance',
+      DEFAULT_REWARD_EMOJI,
+      '💵',
+    ],
+    [
+      'a new reward on the default named "Movie night"',
+      '',
+      'Movie night',
+      DEFAULT_REWARD_EMOJI,
+      '🎬',
+    ],
   ] as const)('%s', (_n, settledName, newName, current, expected) => {
     expect(rewardEmojiAfterRename(settledName, newName, current, DEFAULT_REWARD_EMOJI)).toBe(
       expected

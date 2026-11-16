@@ -121,9 +121,10 @@ export function addBlankRow(block: ChoreBlock): ChoreAddRow {
 
 /**
  * Give `row` the committed `title`; its picture follows the one rename rule
- * (`chorePictureAfterRename`) against the title it had: a title whose suggestion changes
- * re-picks (a set's picture and card art and a hand pick alike), a small edit or a title that
- * suggests nothing keeps it. A blank row takes its first title's suggestion, else the default.
+ * (`chorePictureAfterRename`) against the title it had: a title whose meaning moved away from its
+ * picture re-picks (a set's picture and card art and a hand pick alike), a small edit or a title
+ * that suggests nothing keeps it. A blank row with the default picture takes its first title's
+ * suggestion, else the default.
  */
 export function renameRow(row: ChoreAddRow, title: string): void {
   const picture = chorePictureAfterRename(row.draft.title, title, row.draft);

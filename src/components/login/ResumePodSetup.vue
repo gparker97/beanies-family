@@ -447,6 +447,9 @@ onBeforeUnmount(() => {
   // route, a hard navigation). A stuck flag would suppress the ALREADY_AUTH
   // redirect for the rest of the session.
   syncStore.membersStepActive = false;
+  // And let the family's setup Web Lock go (held since the pod write): a wizard left mid-setup
+  // must not stop the late completion in another tab. A no-op once `completePodSetup` returned.
+  syncStore.releasePodSetupLock();
 });
 
 /**

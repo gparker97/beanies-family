@@ -12,12 +12,15 @@
  * `kind`), and answered by the store's re-read:
  *  - rename (Enter or blur; Escape cancels), time, picture, days: `updateChore`. A rename's
  *    picture follows the one rename rule (`chorePictureAfterRename`) against the stored title: a
- *    title whose suggestion changes re-picks (the new emoji replaces a hand pick or card art, in
- *    the same write), a small edit or a title that suggests nothing keeps the picture. A pick by
- *    hand is saved at once, so the stored title is always the one it was settled against;
+ *    title whose meaning moved away from its picture (it no longer matches the old title's
+ *    suggestion at all) re-picks (the new emoji replaces a hand pick or card art, in the same
+ *    write); a small edit, even one that adds a longer keyword, or a title that suggests nothing
+ *    keeps the picture. A pick by hand is saved at once, so the stored title is always the one
+ *    it was settled against;
  *  - a new row: created when its title is committed (`createChore`, for this bean, its picture
- *    by the same rule from the blank row's: the title's suggestion, else the default, or what
- *    was picked by hand while the title suggests nothing); a row left empty is dropped; Enter
+ *    by the same rule from the blank row's: the title's suggestion while the row still has the
+ *    default picture, else the default, or what was picked by hand); a row left empty is
+ *    dropped; Enter
  *    opens the next row in its block. The row's key IS its chore's id, minted when the row is
  *    added, and the row is drawn from here until its create has fully settled, so it never
  *    remounts (an open chooser stays open, focus stays put); a change made while the create is

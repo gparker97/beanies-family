@@ -1,5 +1,5 @@
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import { emojiAfterRename, emojiSuggester, type EmojiKeywordEntry } from '@/utils/emojiSuggest';
+import { emojiSuggester, pictureAfterRename, type EmojiKeywordEntry } from '@/utils/emojiSuggest';
 
 /**
  * Stars and rewards for chores (#148): the bounds and options every star surface and rule reads.
@@ -205,13 +205,14 @@ const REWARD_EMOJI_KEYWORDS: readonly EmojiKeywordEntry[] = [
  * `undefined` when nothing in the name is known: "Allowance" is money, "Ice cream" 🍦,
  * "Disneyland" 🏰, "Movie night" 🎬. Pure.
  */
-export const suggestRewardEmoji: (name: string) => string | undefined =
-  emojiSuggester(REWARD_EMOJI_KEYWORDS);
+const REWARD_SUGGESTER = emojiSuggester(REWARD_EMOJI_KEYWORDS);
+export const suggestRewardEmoji: (name: string) => string | undefined = REWARD_SUGGESTER.suggest;
 
 /**
- * `emojiAfterRename` (`utils/emojiSuggest.ts`, the rule chores share) with the reward
+ * `pictureAfterRename` (`utils/emojiSuggest.ts`, the rule chores share) with the reward
  * suggester: the ONE rule for the weekly reward and the special reward drawer. `settledName`
- * is the name `current` was last settled against.
+ * is the name `current` was last settled against; `fallback` is the plain default (shown when
+ * there is no picture, and the one picture an unknown name gives way from).
  */
 export function rewardEmojiAfterRename(
   settledName: string | undefined,
@@ -219,10 +220,12 @@ export function rewardEmojiAfterRename(
   current: string | undefined,
   fallback: string
 ): string {
-  return emojiAfterRename({
-    before: suggestRewardEmoji(settledName ?? ''),
-    after: suggestRewardEmoji(newName ?? ''),
+  const next = pictureAfterRename(REWARD_SUGGESTER, {
+    settledName: settledName ?? '',
+    newName: newName ?? '',
     current,
-    fallback,
+    hasArt: false,
+    plainDefault: fallback,
   });
+  return next ?? (current || fallback);
 }

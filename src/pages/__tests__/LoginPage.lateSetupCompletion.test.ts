@@ -25,8 +25,9 @@ const holder = vi.hoisted(() => {
     ownsAttempt: false,
     finishPendingPodSetup: null as unknown as ReturnType<typeof vi.fn>,
   };
-  state.finishPendingPodSetup = vi.fn((via: string) => {
-    state.calls.push(`finishPendingPodSetup:${via}`);
+  state.finishPendingPodSetup = vi.fn((via: { kind: string; method?: string }) => {
+    // A sign-in with no method names none (`method` undefined drops out of the JSON).
+    state.calls.push(`finishPendingPodSetup:${JSON.stringify(via)}`);
     return state.ownsAttempt;
   });
   return state;
@@ -148,7 +149,7 @@ describe('LoginPage.handleSignedIn: the late setup completion comes first', () =
     await signInFromResume();
 
     expect(holder.calls).toEqual([
-      'finishPendingPodSetup:signed-in',
+      'finishPendingPodSetup:{"kind":"signed-in"}',
       'endCreateAttempt:superseded',
       'ensureRegistered:true',
     ]);
@@ -159,6 +160,9 @@ describe('LoginPage.handleSignedIn: the late setup completion comes first', () =
 
     await signInFromResume();
 
-    expect(holder.calls).toEqual(['finishPendingPodSetup:signed-in', 'ensureRegistered:true']);
+    expect(holder.calls).toEqual([
+      'finishPendingPodSetup:{"kind":"signed-in"}',
+      'ensureRegistered:true',
+    ]);
   });
 });

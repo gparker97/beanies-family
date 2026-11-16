@@ -106,7 +106,7 @@ import {
   isFailOpenReason,
 } from '@/services/telemetry/openCycle';
 import type { OpenToken, OpenOutcome } from '@/services/telemetry/openCycle';
-import { slackNotify } from '@/utils/slackNotify';
+import { slackNotify, slackNotifyWithOutcome } from '@/utils/slackNotify';
 import { getPlatformLabel, getDeviceLabel } from '@/utils/platformLabel';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
 import { isSafetyCopyName } from '@/constants/compaction';
@@ -167,12 +167,15 @@ import { clearAttribution, peekAttribution } from '@/utils/attributionStash';
 import { currentCreateAttempt } from '@/utils/createAttemptState';
 import { endCreateAttempt, trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
 import {
-  clearPodSetupPending,
   heardViaSlackLine,
+  holdPodSetupLock,
+  markPodSetupDone,
   markPodSetupPending,
   notePodSetupStep as notePodSetupStepFor,
   readPodSetupPending,
+  setupReturnKind,
   setupSlackLine,
+  withPodSetupLockIfAvailable,
   type LateSetupFinish,
   type PodSetupStep,
   type SetupReturnVia,
@@ -3642,12 +3645,27 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * The family whose setup `completePodSetup` has already completed in this session, or null.
-   * Its own latch, deliberately NOT `membersStepActive`: that is a router-guard flag with three
-   * writers, and overloading it as a completion latch would couple the two. Cleared by
-   * `resetState` (sign-out), so a second family created after a sign-out completes normally.
+   * The family whose setup completion has started or finished in this session, or null. Its own
+   * latch, deliberately NOT `membersStepActive`: that is a router-guard flag with three writers,
+   * and overloading it as a completion latch would couple the two. Cleared by `resetState`
+   * (sign-out), so a second family created after a sign-out completes normally, and by a late
+   * attempt that did not send (deferred, skipped), so the next signed-in open retries. Per TAB:
+   * across tabs the done record and the setup Web Lock do that job (`podSetupPending`).
    */
   let completedSetupFamilyId: string | null = null;
+
+  /**
+   * The wizard's hold on the family's setup lock (`holdPodSetupLock`), from the pod write in
+   * `createNewFile` until the wizard's `completePodSetup` returns or `ResumePodSetup` unmounts.
+   * While it is held, a late completion in another tab skips (`wizard-active`).
+   */
+  let releaseSetupLockHold: (() => void) | null = null;
+
+  /** Let the wizard's setup lock go. Safe with none held. */
+  function releasePodSetupLock(): void {
+    releaseSetupLockHold?.();
+    releaseSetupLockHold = null;
+  }
 
   /**
    * #128: the setup-completion registry write while it is still in flight (settled either way,
@@ -3664,16 +3682,162 @@ export const useSyncStore = defineStore('sync', () => {
    * after at most `PENDING_REGISTRY_WRITE_MAX_MS` even if the write hangs. Cleared on settle and
    * on sign-out (`resetState`); a write already queued behind it is bound to its family by
    * `afterPendingRegistryWrite`, so it never lands on another family's row. The late completion
-   * (`finishPendingPodSetup`) uses the same queue: it starts the completion write just before
-   * `handleSignedIn`'s login register, which therefore queues behind it too.
+   * (`finishPendingPodSetup`) cannot start its write synchronously (it waits for the setup Web
+   * Lock first), so it puts a GATE here synchronously instead (`holdRegistryQueue`), released
+   * when its completion write settles or when it decides not to write: `handleSignedIn`'s login
+   * register, called right after it, queues behind that gate.
    */
   let pendingRegistryWrite: Promise<void> | null = null;
+
+  /**
+   * Put a gate on the registry queue now, released by the returned function (idempotent) or
+   * after `PENDING_REGISTRY_WRITE_MAX_MS`, whichever comes first. See `pendingRegistryWrite`.
+   */
+  function holdRegistryQueue(): () => void {
+    let release: () => void = () => {};
+    const released = new Promise<void>((r) => {
+      release = r;
+    });
+    const gate = raceTimeout(
+      released.then(() => true),
+      PENDING_REGISTRY_WRITE_MAX_MS
+    ).then((done) => {
+      if (!done) registryActionLog('complete-setup')('queue-released-timeout', 'warn');
+    });
+    pendingRegistryWrite = gate;
+    void gate.then(() => {
+      if (pendingRegistryWrite === gate) pendingRegistryWrite = null;
+    });
+    return release;
+  }
+
+  /**
+   * Everything the completion's registry write and Slack post need, captured SYNCHRONOUSLY at the
+   * start (both paths), so a sign-out or a family switch during the awaits can never build the
+   * post or the payload from another family's stores. `familyId` null only on the wizard path
+   * with no active family (logged `no-family`; the post still goes out, as it always did).
+   */
+  interface PodSetupSnapshot {
+    familyId: string | null;
+    familyName: string;
+    ownerName: string;
+    storageLabel: string;
+    membersAdded: number;
+    registryBody: registry.RegistryWritePayload;
+  }
+
+  function capturePodSetupSnapshot(heardViaId: HeardViaId | null): PodSetupSnapshot {
+    const ctx = useFamilyContextStore();
+    const familyStoreInst = useFamilyStore();
+    const providerType = syncService.getProviderType();
+    return {
+      familyId: ctx.activeFamilyId,
+      familyName: ctx.activeFamilyName ?? '',
+      ownerName: familyStoreInst.owner?.name ?? '',
+      storageLabel:
+        providerType === 'google_drive'
+          ? 'Google Drive'
+          : providerType === 'local'
+            ? 'Local File'
+            : '(unknown)',
+      membersAdded: familyStoreInst.members.filter((m) => m.role !== 'owner').length,
+      // `setupComplete` is transient (never stored, client or server). This is the one write
+      // that sends it, so it is spread on here rather than added to the shared builder.
+      registryBody: {
+        ...buildRegistryPayload({}, { isLoginEvent: false, heardVia: heardViaId }),
+        setupComplete: true,
+      },
+    };
+  }
+
+  /**
+   * Start the completion registry write and make every later registry write queue behind it
+   * (`pendingRegistryWrite`), for at most `PENDING_REGISTRY_WRITE_MAX_MS`. Returns the write
+   * (which never rejects: `registerFamily` resolves null on failure, logged there) and its
+   * bounded settle. Its real outcome is logged when it settles, even after the caller gave up.
+   */
+  function startCompletionWrite(
+    familyId: string,
+    body: registry.RegistryWritePayload
+  ): { write: Promise<registry.RegistryWriteResult | null>; settled: Promise<void> } {
+    const log = registryActionLog('complete-setup');
+    const write = registry.registerFamily(familyId, body);
+    // The clear is chained FIRST, so it runs before any write queued behind it.
+    const settled = raceTimeout(
+      write.then(
+        () => true,
+        () => true
+      ),
+      PENDING_REGISTRY_WRITE_MAX_MS
+    ).then((done) => {
+      if (!done) log('queue-released-timeout', 'warn');
+    });
+    pendingRegistryWrite = settled;
+    void settled.then(() => {
+      if (pendingRegistryWrite === settled) pendingRegistryWrite = null;
+    });
+    void write.then((r) => log(r ? 'ok' : 'failed', r ? 'info' : 'warn'));
+    return { write, settled };
+  }
+
+  /** Wait at most `COMPLETE_SETUP_WAIT_MS` for the completion write; `undefined` on a timeout. */
+  async function awaitCompletionWrite(
+    write: Promise<registry.RegistryWriteResult | null>
+  ): Promise<registry.RegistryWriteResult | null | undefined> {
+    const registered = await raceTimeout(write, COMPLETE_SETUP_WAIT_MS);
+    if (registered === undefined) registryActionLog('complete-setup')('timeout', 'warn');
+    return registered;
+  }
+
+  /** The "Family pod created!" Slack text, from the snapshot and THIS write's response only. */
+  function podCreatedSlackText(
+    snap: PodSetupSnapshot,
+    survey: SetupSurveyOutcome,
+    late: LateSetupFinish | undefined,
+    cameFrom: string,
+    registered: registry.RegistryWriteResult | null | undefined
+  ): string {
+    return (
+      `🎉 *Family pod created!*\n*Family:* ${snap.familyName}\n*Owner:* ${snap.ownerName}\n*Storage:* ${snap.storageLabel}` +
+      // Always present: "(skipped)" and "(not seen)" tell a skip and a survey never reached
+      // apart from each other and from a missing line.
+      heardViaSlackLine(survey) +
+      // Only when setup finished on a later open: where they left and how they came back.
+      setupSlackLine(late) +
+      // One code span: the value charset admits `_` `~` `:`, which Slack would render
+      // as italic / strike / emoji, and excludes the backtick, so nothing breaks out.
+      // Omitted when the tag has none of source / campaign / content (ad ids only), and always
+      // on the late path (see `sendLateCompletion`).
+      (cameFrom ? `\n*Came from:* \`${cameFrom}\`` : '') +
+      // From THIS write's response: the band after the Lambda re-scored it against the
+      // survey answer.
+      inferredSlackLine(registered?.attributionInferred) +
+      `\n*Members added:* ${snap.membersAdded}` +
+      podSlackFooter(registered?.deviceCountry)
+    );
+  }
+
+  /**
+   * The conversion: Plausible `pod_created`, then the funnel's `done` and the end of the create
+   * attempt. The wizard's completion ends the open attempt, as always. A late one ends it only
+   * when it is still the attempt that created this pod: another attempt open on this device (a
+   * Create tap since) is not this pod's to end, and an expired one is already gone.
+   */
+  function countPodCreated(late: LateSetupFinish | undefined): void {
+    track('pod_created');
+    if (!late || (late.attemptId !== null && currentCreateAttempt()?.id === late.attemptId)) {
+      trackOnboardingStep('done', 'submitted');
+      endCreateAttempt('done');
+    }
+  }
 
   /**
    * #128: the create wizard's completion, run once after the kit, members and survey steps
    * (`ResumePodSetup.handleSetupComplete`). The "Family pod created!" Slack post moved here
    * from `createNewFile` so it can carry the survey answer and the member count.
    *
+   *   0. Everything the write and the post need is captured synchronously first
+   *      (`capturePodSetupSnapshot`).
    *   1. One registry write with `heardVia` (the Lambda stamps it write-once on an owner write
    *      and re-scores the inferred attribution against it) and the transient `setupComplete`,
    *      which asks the Lambda for the device country and the inferred band even when the
@@ -3682,116 +3846,73 @@ export const useSyncStore = defineStore('sync', () => {
    *      `COMPLETE_SETUP_WAIT_MS` because `registerFamily` has no timeout of its own and the
    *      person is waiting to enter the app; the write's real outcome is logged when it
    *      settles either way.
-   *   2. The Slack post, built from live state plus THIS write's response.
+   *   2. The Slack post (fire-and-forget: the person is never held at the door for it), built
+   *      from the snapshot plus THIS write's response.
    *   3. `clearAttribution('consumed')`, now that the Slack line has the tag.
-   *   4. Plausible `pod_created`, the `done` funnel step, and the end of the create attempt.
+   *   4. The done record replaces the device marker (`markPodSetupDone`), so no other tab and no
+   *      later open sends it again.
+   *   5. Plausible `pod_created`, the `done` funnel step, and the end of the create attempt.
    *
    * Never throws and never blocks entry to the app: a registry failure is a `warning`, and
-   * step 4 runs whatever happened before it (the pod already exists). Idempotent per family:
-   * a second call returns early with an `onboarding` `complete-setup` `skipped` line. The demo
-   * seed never reaches this (it stops at `createNewFile` with `suppressRemoteSideEffects`).
+   * step 5 runs whatever happened before it (the pod already exists). Idempotent per family:
+   * a second call in this tab returns early with an `onboarding` `complete-setup` `skipped`
+   * line, and a completion another tab already sent (the done record) is skipped with
+   * `done-elsewhere` and counts nothing. The setup Web Lock this wizard held since the pod write
+   * is released when this returns. The demo seed never reaches this (it stops at `createNewFile`
+   * with `suppressRemoteSideEffects`).
    *
-   * Two callers, ONE completion:
-   *   - the wizard (`ResumePodSetup.handleSetupComplete`), with the survey `answered` or
-   *     `skipped` and no `late`;
-   *   - `finishPendingPodSetup`, on the next signed-in open of a pod whose wizard was left after
-   *     the pod write, with the survey `not-seen` and `late` saying where they left and how they
-   *     came back (the Slack post's Setup line). `late.attemptId` scopes the funnel's `done`:
-   *     only THAT create attempt is ended, never another one open on this device.
-   * Either way the device marker (`podSetupPending`) is cleared once the Slack post has gone
-   * out, which makes the latch durable across reloads; a throw before the post keeps it, so the
-   * next open retries.
+   * The LATE completion (a setup left in the wizard, finished on a later open) does not come
+   * through here: see `finishPendingPodSetup`, which shares steps 0, 1, 2 (awaited), 4 and 5.
    */
-  async function completePodSetup({
-    survey,
-    late,
-  }: {
-    survey: SetupSurveyOutcome;
-    late?: LateSetupFinish;
-  }): Promise<void> {
-    const ctx = useFamilyContextStore();
-    const familyId = ctx.activeFamilyId;
-    const stage = late ? 'late' : 'wizard';
-    if (familyId && completedSetupFamilyId === familyId) {
-      logEvent({
-        level: 'info',
-        surface: 'onboarding',
-        message: 'complete-setup',
-        context: { action: 'skipped', stage },
-      });
-      return;
+  async function completePodSetup({ survey }: { survey: SetupSurveyOutcome }): Promise<void> {
+    const familyId = useFamilyContextStore().activeFamilyId;
+    try {
+      if (familyId && completedSetupFamilyId === familyId) {
+        logEvent({
+          level: 'info',
+          surface: 'onboarding',
+          message: 'complete-setup',
+          context: { action: 'skipped', stage: 'wizard' },
+        });
+        return;
+      }
+      if (familyId && readPodSetupPending(familyId).kind === 'done') {
+        // Another tab (or an earlier open) already sent it; possible only where Web Locks are
+        // missing, since the wizard holds the setup lock from the pod write.
+        logEvent({
+          level: 'info',
+          surface: 'onboarding',
+          message: 'complete-setup',
+          context: { action: 'skipped', stage: 'wizard', detail: 'done-elsewhere' },
+        });
+        return;
+      }
+      await runWizardCompletion(familyId, survey);
+    } finally {
+      releasePodSetupLock();
     }
+  }
+
+  async function runWizardCompletion(
+    familyId: string | null,
+    survey: SetupSurveyOutcome
+  ): Promise<void> {
     // Latched BEFORE the first await, so a concurrent second call is skipped too.
     completedSetupFamilyId = familyId;
-    const log = registryActionLog('complete-setup');
-    // `null` for both `skipped` and `not-seen`: the Lambda accepts only a survey id here.
-    const heardViaId = survey.kind === 'answered' ? survey.heardVia.id : null;
     try {
-      const familyStoreInst = useFamilyStore();
-      const membersAdded = familyStoreInst.members.filter((m) => m.role !== 'owner').length;
-
+      // `null` for `skipped`: the Lambda accepts only a survey id here.
+      const snap = capturePodSetupSnapshot(survey.kind === 'answered' ? survey.heardVia.id : null);
       let registered: registry.RegistryWriteResult | null | undefined;
-      if (familyId) {
-        // `setupComplete` is transient (never stored, client or server). This is the one write
-        // that sends it, so it is spread on here rather than added to the shared builder.
-        // ⚠️ STILL SYNCHRONOUS UP TO `pendingRegistryWrite` BELOW, and `finishPendingPodSetup`
-        // relies on it: it calls this un-awaited just before `handleSignedIn`'s login register,
-        // which must find the completion write already in flight and queue behind it.
-        const write = registry.registerFamily(familyId, {
-          ...buildRegistryPayload({}, { isLoginEvent: false, heardVia: heardViaId }),
-          setupComplete: true,
-        });
-        // Every later registry write waits for this one (see `pendingRegistryWrite`), but for
-        // at most `PENDING_REGISTRY_WRITE_MAX_MS`: a hung PUT must not starve the queue. The
-        // clear is chained FIRST, so it runs before any write queued behind it.
-        const settled = raceTimeout(
-          write.then(
-            () => true,
-            () => true
-          ),
-          PENDING_REGISTRY_WRITE_MAX_MS
-        ).then((done) => {
-          if (!done) log('queue-released-timeout', 'warn');
-        });
-        pendingRegistryWrite = settled;
-        void settled.then(() => {
-          if (pendingRegistryWrite === settled) pendingRegistryWrite = null;
-        });
-        // `registerFamily` never rejects (a transport failure resolves null, logged there as
-        // `put-failed`), so this logs the real outcome even when the wait below gave up.
-        void write.then((r) => log(r ? 'ok' : 'failed', r ? 'info' : 'warn'));
-        registered = await raceTimeout(write, COMPLETE_SETUP_WAIT_MS);
-        if (registered === undefined) log('timeout', 'warn');
+      if (snap.familyId) {
+        registered = await awaitCompletionWrite(
+          startCompletionWrite(snap.familyId, snap.registryBody).write
+        );
       } else {
-        log('no-family', 'warn');
+        registryActionLog('complete-setup')('no-family', 'warn');
       }
-
-      const providerType = syncService.getProviderType();
-      const storageLabel =
-        providerType === 'google_drive'
-          ? 'Google Drive'
-          : providerType === 'local'
-            ? 'Local File'
-            : '(unknown)';
       const attribution = peekAttribution();
       const cameFrom = attribution ? summariseAttribution(attribution) : '';
-      slackNotify(
-        `🎉 *Family pod created!*\n*Family:* ${ctx.activeFamilyName ?? ''}\n*Owner:* ${familyStoreInst.owner?.name ?? ''}\n*Storage:* ${storageLabel}` +
-          // Always present: "(skipped)" and "(not seen)" tell a skip and a survey never reached
-          // apart from each other and from a missing line.
-          heardViaSlackLine(survey) +
-          // Only when setup finished on a later open: where they left and how they came back.
-          setupSlackLine(late) +
-          // One code span: the value charset admits `_` `~` `:`, which Slack would render
-          // as italic / strike / emoji, and excludes the backtick, so nothing breaks out.
-          // Omitted when the tag has none of source / campaign / content (ad ids only).
-          (cameFrom ? `\n*Came from:* \`${cameFrom}\`` : '') +
-          // From THIS write's response: the band after the Lambda re-scored it against the
-          // survey answer.
-          inferredSlackLine(registered?.attributionInferred) +
-          `\n*Members added:* ${membersAdded}` +
-          podSlackFooter(registered?.deviceCountry)
-      );
+      slackNotify(podCreatedSlackText(snap, survey, undefined, cameFrom, registered));
       // The one count of completions, split wizard vs late (`stage`); `detail` is the survey
       // outcome. A late one also has its `late-complete` `sent` line, with the step and the way
       // back, so CloudWatch alone counts both paths and the late ones by step.
@@ -3799,100 +3920,78 @@ export const useSyncStore = defineStore('sync', () => {
         level: 'info',
         surface: 'onboarding',
         message: 'complete-setup',
-        context: { action: 'sent', stage, detail: survey.kind },
+        context: { action: 'sent', stage: 'wizard', detail: survey.kind },
       });
-      if (late) {
-        logEvent({
-          level: 'info',
-          surface: 'onboarding',
-          message: 'late-complete',
-          context: {
-            action: 'sent',
-            detail: late.leftAt,
-            kind: late.via,
-            // Explicit, for the join when the attempt itself has expired off the device.
-            ...(late.attemptId ? { create_attempt_id: late.attemptId } : {}),
-          },
-        });
-      }
       // Consume once, now that the registry row (stamped at the signup write) and the Slack
       // line both have it.
       clearAttribution('consumed');
       // Only now, after the post: a throw above keeps the marker for the next open's retry.
-      if (familyId) clearPodSetupPending(familyId, 'completed');
+      if (snap.familyId) markPodSetupDone(snap.familyId);
     } catch (e) {
       reportError({
         surface: 'onboarding',
         message: `complete-setup failed: ${e instanceof Error ? e.message : String(e)}`,
         error: e,
         severity: 'warning',
-        context: { action: 'complete-setup', detail: 'failed', stage },
+        context: { action: 'complete-setup', detail: 'failed', stage: 'wizard' },
       });
     }
-    track('pod_created');
-    // The wizard's completion ends the open attempt, as always. A late one ends it only when it
-    // is still the attempt that created this pod: another attempt open on this device (a Create
-    // tap since) is not this pod's to end, and an expired one is already gone.
-    if (!late || (late.attemptId !== null && currentCreateAttempt()?.id === late.attemptId)) {
-      trackOnboardingStep('done', 'submitted');
-      endCreateAttempt('done');
-    }
+    countPodCreated(undefined);
   }
 
   /**
    * Finish a setup left unfinished in the wizard, on a signed-in open (2026-11-16). Called from
-   * the two places a signed-in family opens: App init's boot health check (a restored session,
-   * `app-restarted` / `page-reloaded`) and `LoginPage.handleSignedIn` (every fresh sign-in, with
-   * the method when the login flow knows it).
+   * the two places a signed-in family opens: App init's boot health check (a restored session)
+   * and `LoginPage.handleSignedIn` (every fresh sign-in, with the method when the login flow
+   * knows it).
    *
-   * Runs `completePodSetup` (the SAME completion, survey `not-seen`, with the Setup line) when
-   * this device holds a `podSetupPending` marker for the active family AND the signed-in member
-   * is the one who created the pod. The marker is only ever written on the creating owner's
-   * device (`createNewFile`), so no other device can send it.
+   * Sends the SAME completion (survey `not-seen`, with the Setup line) when this device holds a
+   * `podSetupPending` marker for the active family AND the signed-in member is the one who
+   * created the pod. The marker is only ever written on the creating owner's device
+   * (`createNewFile`), so no other device can send it.
    *
-   * ⚠️ IT CANNOT RACE THE WIZARD, for three reasons:
-   *   - the boot health check never runs in a page load that shows the post-write wizard (a
-   *     podless boot returns before it, and the pod is written later in that same page);
-   *   - the wizard emits `signed-in` only after its own `completePodSetup`, which has latched
-   *     the family and cleared the marker;
-   *   - and, belt and braces, `membersStepActive` (true from the pod write until the wizard's
-   *     completion) makes this a logged skip.
+   * ⚠️ IT CANNOT RACE THE WIZARD OR ANOTHER TAB:
+   *   - in this tab, `membersStepActive` (true from the pod write until the wizard's completion)
+   *     makes it a logged `wizard-active` skip, and the latch makes the wizard's own entry into
+   *     the app a silent no-op;
+   *   - across tabs (localStorage is shared, the latch is not), the send runs inside the
+   *     family's setup Web Lock taken with `ifAvailable`: while the wizard holds it in another
+   *     tab, or another tab's late send does, this is a `wizard-active` skip; inside the lock the
+   *     marker is read again, and a done record written meanwhile is a `done-elsewhere` skip.
+   *     Without Web Locks the send runs unlocked (the pre-lock behaviour), still behind the done
+   *     record.
    *
-   * ⚠️ IT CANNOT CLOBBER THE LOGIN REGISTER. `completePodSetup` is started un-awaited and
-   * reaches `pendingRegistryWrite` synchronously, so the caller's `ensureRegistered(true)`,
-   * called next, queues behind the completion write exactly as on the wizard path.
+   * ⚠️ IT CANNOT CLOBBER THE LOGIN REGISTER. Before anything async, it gates the registry queue
+   * (`holdRegistryQueue`), so the caller's `ensureRegistered(true)`, called next, queues behind
+   * the completion write exactly as on the wizard path.
    *
    * Never throws and never delays entry: the completion runs in the background. Returns true
    * when the completion took over the OPEN create attempt (the one the marker names), so
    * `handleSignedIn` leaves it for the completion to end as `done` instead of `superseded`.
    */
   function finishPendingPodSetup(via: SetupReturnVia): boolean {
-    const skipped = (detail: string, level: 'debug' | 'info' = 'info'): false => {
-      logEvent({
-        level,
-        surface: 'onboarding',
-        message: 'late-complete',
-        context: { action: 'skipped', detail, kind: via },
-      });
-      return false;
-    };
+    const kind = setupReturnKind(via);
     try {
-      if (membersStepActive.value) return skipped('wizard-active');
+      if (membersStepActive.value) return lateSkipped('wizard-active', kind);
       const familyId = useFamilyContextStore().activeFamilyId;
       const memberId = useAuthStore().currentUser?.memberId;
-      if (!familyId || !memberId) return skipped('no-session');
-      // The wizard's own entry into the app lands here: its completion already ran.
-      if (completedSetupFamilyId === familyId) return skipped('already-done', 'debug');
-      // A marker for another family is under another key, so it reads as `missing` here.
-      // `debug`: every ordinary open passes this line.
+      if (!familyId || !memberId) return lateSkipped('no-session', kind);
+      // Silent from here to the marker check: every ordinary open passes these lines (the
+      // wizard's own entry into the app, a pod with no marker, one already completed).
+      if (completedSetupFamilyId === familyId) return false;
       const read = readPodSetupPending(familyId);
-      if (read.kind === 'missing') return skipped('no-marker', 'debug');
-      if (read.kind !== 'ok') return skipped(read.kind); // corrupt | expired, removed by the read
+      if (read.kind === 'missing' || read.kind === 'done') return false;
+      if (read.kind !== 'ok') return lateSkipped(read.kind, kind); // corrupt | expired, removed
       const marker = read.value;
       // A shared device: someone else in the family signed in. Kept for the creator.
-      if (marker.memberId !== memberId) return skipped('other-member');
+      if (marker.memberId !== memberId) return lateSkipped('other-member', kind);
       const ownsAttempt =
         marker.attemptId !== null && currentCreateAttempt()?.id === marker.attemptId;
+      // All synchronous, before the first await: the snapshot, the latch, the registry gate.
+      const snap = capturePodSetupSnapshot(null);
+      completedSetupFamilyId = familyId;
+      const releaseQueue = holdRegistryQueue();
+      const late: LateSetupFinish = { leftAt: marker.step, via, attemptId: marker.attemptId };
       logEvent({
         level: 'info',
         surface: 'onboarding',
@@ -3900,29 +3999,151 @@ export const useSyncStore = defineStore('sync', () => {
         context: {
           action: 'started',
           detail: marker.step,
-          kind: via,
+          kind,
           ...(marker.attemptId ? { create_attempt_id: marker.attemptId } : {}),
         },
       });
-      // `completePodSetup` never rejects (its body is caught); the catch is belt and braces.
-      void completePodSetup({
-        survey: { kind: 'not-seen' },
-        late: { leftAt: marker.step, via, attemptId: marker.attemptId },
-      }).catch((e: unknown) => reportLateFailure(e, via));
+      void runLateCompletion(familyId, snap, late, releaseQueue);
       return ownsAttempt;
     } catch (e) {
-      reportLateFailure(e, via);
+      reportLateFailure(e, kind);
       return false;
     }
   }
 
-  function reportLateFailure(e: unknown, via: SetupReturnVia): void {
+  function lateSkipped(detail: string, kind: string): false {
+    logEvent({
+      level: 'info',
+      surface: 'onboarding',
+      message: 'late-complete',
+      context: { action: 'skipped', detail, kind },
+    });
+    return false;
+  }
+
+  /**
+   * The late completion's background half: inside the family's setup lock when it is free, else
+   * a `wizard-active` skip. Never rejects. Whatever happens, the registry gate is released, and
+   * the latch is dropped unless the completion was sent, so the next signed-in open retries.
+   */
+  async function runLateCompletion(
+    familyId: string,
+    snap: PodSetupSnapshot,
+    late: LateSetupFinish,
+    releaseQueue: () => void
+  ): Promise<void> {
+    const kind = setupReturnKind(late.via);
+    // Set once the completion write has started: from then on the gate opens when THAT write
+    // settles (bounded), never earlier, or a login register queued on the gate could read the
+    // row before the completion write lands.
+    const started: { settled: Promise<void> | null } = { settled: null };
+    let sent = false;
+    try {
+      const run = await withPodSetupLockIfAvailable(familyId, () =>
+        sendLateCompletion(familyId, snap, late, (settled) => {
+          started.settled = settled;
+        })
+      );
+      // Not granted: the wizard holds it in another tab (or another tab's late send does).
+      if (!run.granted) lateSkipped('wizard-active', kind);
+      else sent = run.value;
+    } catch (e) {
+      reportLateFailure(e, kind);
+    } finally {
+      if (started.settled) void started.settled.then(releaseQueue);
+      else releaseQueue();
+      if (!sent && completedSetupFamilyId === familyId) completedSetupFamilyId = null;
+    }
+  }
+
+  /**
+   * Send the late completion for the CAPTURED family (`snap`), even if the active family changed
+   * during the awaits; only that family's marker is touched. True only when it was sent.
+   *
+   *   - The marker is read again first, inside the lock: a done record another tab wrote since
+   *     is a `done-elsewhere` skip.
+   *   - Sent means the Slack post was dispatched (or the webhook URL is not configured, the dev
+   *     case) AND the device is online. Otherwise the marker is KEPT and `late-complete`
+   *     `deferred` names why (`offline`, `slack-network-error`); the next signed-in open retries.
+   *     Offline before anything is sent, nothing is attempted.
+   *   - A failed registry write alone does not block (it never did on the wizard path); it is
+   *     logged by the write (`registry` `complete-setup failed` / `timeout`).
+   *   - No "Came from" line and the attribution stash is neither read nor cleared: days later the
+   *     stash holds the RETURN visit's tag (it is re-captured from the landing URL on every boot
+   *     and cleared on sign-out), not the sign-up's. The registry row already carries the
+   *     attribution stamped at sign-up, and the inferred line from this write still shows.
+   *   - The conversion (`pod_created`, the funnel's `done`, the attempt end) counts only on a
+   *     send, so a deferred or failed attempt and its retry count it once between them.
+   */
+  async function sendLateCompletion(
+    familyId: string,
+    snap: PodSetupSnapshot,
+    late: LateSetupFinish,
+    onWriteStarted: (settled: Promise<void>) => void
+  ): Promise<boolean> {
+    const kind = setupReturnKind(late.via);
+    const deferred = (detail: 'offline' | 'slack-network-error'): false => {
+      logEvent({
+        level: 'info',
+        surface: 'onboarding',
+        message: 'late-complete',
+        context: { action: 'deferred', detail, kind },
+      });
+      return false;
+    };
+    const again = readPodSetupPending(familyId);
+    if (again.kind === 'done') return lateSkipped('done-elsewhere', kind);
+    // Forgotten, corrupt or expired since the first read (the read logged the last two).
+    if (again.kind !== 'ok') return false;
+    if (isOffline()) return deferred('offline');
+    try {
+      const { write, settled } = startCompletionWrite(familyId, snap.registryBody);
+      onWriteStarted(settled);
+      const registered = await awaitCompletionWrite(write);
+      const posted = await slackNotifyWithOutcome(
+        podCreatedSlackText(snap, { kind: 'not-seen' }, late, '', registered)
+      );
+      if (posted.outcome === 'network_error') return deferred('slack-network-error');
+      if (isOffline()) return deferred('offline');
+      markPodSetupDone(familyId);
+      logEvent({
+        level: 'info',
+        surface: 'onboarding',
+        message: 'complete-setup',
+        context: { action: 'sent', stage: 'late', detail: 'not-seen' },
+      });
+      logEvent({
+        level: 'info',
+        surface: 'onboarding',
+        message: 'late-complete',
+        context: {
+          action: 'sent',
+          detail: late.leftAt,
+          kind,
+          // Explicit, for the join when the attempt itself has expired off the device.
+          ...(late.attemptId ? { create_attempt_id: late.attemptId } : {}),
+        },
+      });
+      countPodCreated(late);
+      return true;
+    } catch (e) {
+      reportLateFailure(e, kind);
+      return false;
+    }
+  }
+
+  /** `navigator.onLine === false`; an unknown state counts as online (the send then says). */
+  function isOffline(): boolean {
+    return typeof navigator !== 'undefined' && navigator.onLine === false;
+  }
+
+  function reportLateFailure(e: unknown, kind: string): void {
     reportError({
       surface: 'onboarding',
       message: `late-complete failed: ${e instanceof Error ? e.message : String(e)}`,
       error: e,
       severity: 'warning',
-      context: { action: 'late-complete', detail: 'failed', kind: via },
+      context: { action: 'late-complete', detail: 'failed', kind },
     });
   }
 
@@ -4342,7 +4563,12 @@ export const useSyncStore = defineStore('sync', () => {
       // this device, so a reload or a restart before then still completes it on the next
       // signed-in open (`finishPendingPodSetup`). Only on the creating device, and never for the
       // demo seed, which never completes. Never throws.
+      // The wizard's setup lock is requested FIRST, so no other tab can read the marker and win
+      // the lock before the wizard does (see `finishPendingPodSetup`); held until the wizard's
+      // `completePodSetup` returns or `ResumePodSetup` unmounts (`releasePodSetupLock`).
       if (!suppressRemote) {
+        releasePodSetupLock();
+        releaseSetupLockHold = holdPodSetupLock(familyId);
         markPodSetupPending(familyId, memberId, currentCreateAttempt()?.id ?? null);
       }
 
@@ -5948,6 +6174,7 @@ export const useSyncStore = defineStore('sync', () => {
     clearPodUnopenable();
     completedSetupFamilyId = null;
     pendingRegistryWrite = null;
+    releasePodSetupLock();
     if (autoSyncStopHandle) {
       autoSyncStopHandle();
       autoSyncStopHandle = null;
@@ -8319,6 +8546,7 @@ export const useSyncStore = defineStore('sync', () => {
     completePodSetup,
     finishPendingPodSetup,
     notePodSetupStep,
+    releasePodSetupLock,
     abandonSignupStart,
     clearSessionPassword,
     getExportedFamilyKey,

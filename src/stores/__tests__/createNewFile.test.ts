@@ -992,6 +992,53 @@ describe('pod creation: full end-to-end flow', () => {
       }
     });
 
+    // The wizard holds the family's setup Web Lock from the pod write until its completion
+    // returns, so a late completion in another tab skips while the wizard is on screen.
+    it('holds the setup lock from the pod write until the wizard completion returns', async () => {
+      const { podSetupPendingKey, podSetupLockName } = await import('@/utils/podSetupPending');
+      const fake = await import('@/test/fakeLocks');
+      const locks = fake.fakeLocks();
+      fake.installLocks(locks);
+      try {
+        const result = await createPod();
+        await new Promise((r) => setTimeout(r, 0));
+
+        expect(result.ok).toBe(true);
+        expect(locks.heldNames.has(podSetupLockName('fam-test-1'))).toBe(true);
+
+        await useSyncStore().completePodSetup({ survey: { kind: 'skipped' } });
+        await new Promise((r) => setTimeout(r, 0));
+
+        expect(locks.heldNames.has(podSetupLockName('fam-test-1'))).toBe(false);
+      } finally {
+        fake.restoreLocks();
+        localStorage.removeItem(podSetupPendingKey('fam-test-1'));
+      }
+    });
+
+    it('never holds the setup lock for the demo seed, and the wizard unmount releases it', async () => {
+      const { podSetupPendingKey, podSetupLockName } = await import('@/utils/podSetupPending');
+      const fake = await import('@/test/fakeLocks');
+      const locks = fake.fakeLocks();
+      fake.installLocks(locks);
+      try {
+        await createPod({ suppressRemoteSideEffects: true });
+        await new Promise((r) => setTimeout(r, 0));
+        expect(locks.requests).toEqual([]);
+
+        useSyncStore().resetState();
+        await createPod();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(locks.heldNames.has(podSetupLockName('fam-test-1'))).toBe(true);
+        useSyncStore().releasePodSetupLock(); // `ResumePodSetup`'s onBeforeUnmount
+        await new Promise((r) => setTimeout(r, 0));
+        expect(locks.heldNames.has(podSetupLockName('fam-test-1'))).toBe(false);
+      } finally {
+        fake.restoreLocks();
+        localStorage.removeItem(podSetupPendingKey('fam-test-1'));
+      }
+    });
+
     it('never marks a setup pending for the demo seed', async () => {
       const { podSetupPendingKey } = await import('@/utils/podSetupPending');
       localStorage.removeItem(podSetupPendingKey('fam-test-1'));

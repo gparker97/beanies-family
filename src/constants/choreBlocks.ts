@@ -3,12 +3,7 @@
 // tint, the ink and their dark partners). The block ORDER and every rule about blocks live in
 // `utils/chores.ts`; this file is display data only.
 import { choreDaysKind, type ChoreDayBlock } from '@/utils/chores';
-import {
-  emojiAfterRename,
-  emojiSuggester,
-  renameRepicks,
-  type EmojiKeywordEntry,
-} from '@/utils/emojiSuggest';
+import { emojiSuggester, pictureAfterRename, type EmojiKeywordEntry } from '@/utils/emojiSuggest';
 import { formatTime12 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { ChoreBlock, ChoreBlockStarts } from '@/types/models';
@@ -253,8 +248,8 @@ const CHORE_EMOJI_KEYWORDS: readonly EmojiKeywordEntry[] = [
  * The most specific word wins: an object word over a generic verb, then the longest keyword,
  * then the earlier table entry.
  */
-export const suggestChoreEmoji: (title: string) => string | undefined =
-  emojiSuggester(CHORE_EMOJI_KEYWORDS);
+const CHORE_SUGGESTER = emojiSuggester(CHORE_EMOJI_KEYWORDS);
+export const suggestChoreEmoji: (title: string) => string | undefined = CHORE_SUGGESTER.suggest;
 
 /** A chore's picture: its emoji, and card art (`illustration`) drawn instead when it has some. */
 export interface ChorePicture {
@@ -263,34 +258,29 @@ export interface ChorePicture {
 }
 
 /**
- * A chore's picture once its title has changed: the ONE rename rule rewards follow too
- * (`emojiAfterRename`), with the chore suggester for both titles and `DEFAULT_CHORE_EMOJI` as
- * the fallback. A rename whose suggestion CHANGES ("Make bed" to "Brush teeth") re-picks, even
- * over a picture picked by hand, and the new suggestion replaces card art too (`illustration`
- * cleared). A small edit that suggests the same picture ("Feed the dog" to "Feed the dog before
- * school"), or a title that suggests nothing, keeps the picture, art and all. A row not named
- * yet (`settledTitle` empty, the default picture) takes its first title's suggestion, else the
- * default.
+ * A chore's picture once its title has changed: THE rename rule rewards follow too
+ * (`pictureAfterRename`, `utils/emojiSuggest.ts`), with the chore suggester and
+ * `DEFAULT_CHORE_EMOJI` as the plain default. A re-pick replaces card art (`illustration`
+ * cleared); a kept picture keeps its art. A row not named yet (`settledTitle` empty) with the
+ * default picture takes its first title's suggestion; with nothing known it keeps the default.
  *
  * `settledTitle` is the title the picture was last settled against: the stored or committed
  * title (a pick by hand is made against it), never the previous keystroke. Every chore editor
- * calls this when a title is committed; nothing records how a picture was chosen. Pure.
+ * calls this when a title is committed, and a first title on its own (`useWallJobs.addChore`)
+ * passes `''`. Pure.
  */
 export function chorePictureAfterRename(
   settledTitle: string,
   newTitle: string,
   current: ChorePicture
 ): ChorePicture {
-  const before = suggestChoreEmoji(settledTitle);
-  const after = suggestChoreEmoji(newTitle);
-  if (renameRepicks(before, after)) return { emoji: after, illustration: undefined };
-  return {
-    emoji: emojiAfterRename({
-      before,
-      after,
-      current: current.emoji,
-      fallback: DEFAULT_CHORE_EMOJI,
-    }),
-    illustration: current.illustration,
-  };
+  const next = pictureAfterRename(CHORE_SUGGESTER, {
+    settledName: settledTitle,
+    newName: newTitle,
+    current: current.emoji,
+    hasArt: !!current.illustration,
+    plainDefault: DEFAULT_CHORE_EMOJI,
+  });
+  if (next !== undefined) return { emoji: next, illustration: undefined };
+  return { emoji: current.emoji || DEFAULT_CHORE_EMOJI, illustration: current.illustration };
 }

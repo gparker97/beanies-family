@@ -8,6 +8,9 @@
  * inside "education"; Chinese words match anywhere in the name. `weak` marks a generic word
  * ("feed", "trip"): any other word beats it. Within a tier the longest keyword wins, then the
  * earlier table entry.
+ *
+ * The rename rule both follow (`pictureAfterRename`) lives here too, so chores and rewards
+ * re-pick a picture for exactly the same reasons.
  */
 
 /** One keyword entry: never shown, only matched. */
@@ -43,14 +46,24 @@ function matcherFor(word: string): (text: string) => boolean {
   return (text) => forms.some((form) => hasWholeWord(text, form));
 }
 
-/**
- * A suggester over `table`: a name's picture, or `undefined` when nothing in it is known. Each
- * keyword is compiled once, here. The most specific word wins: a strong word over a weak one,
- * then the longest keyword, then the earlier table entry.
- */
-export function emojiSuggester(
-  table: readonly EmojiKeywordEntry[]
-): (name: string) => string | undefined {
+/** A suggester over one keyword table (`emojiSuggester`). */
+export interface EmojiSuggester {
+  /**
+   * A name's picture, or `undefined` when nothing in it is known. The most specific word wins:
+   * a strong word over a weak one, then the longest keyword, then the earlier table entry.
+   */
+  suggest: (name: string) => string | undefined;
+  /**
+   * Every picture the name matches, in its strongest tier: the strong words' pictures when any
+   * strong word is in the name, else the weak ones'. So a generic word ("brush", "feed") holds
+   * no picture once a specific word is there ("Brush hair" matches the comb, not the
+   * toothbrush). `suggest` is always one of these. Empty when nothing is known.
+   */
+  matches: (name: string) => ReadonlySet<string>;
+}
+
+/** A suggester over `table`. Each keyword is compiled once, here. */
+export function emojiSuggester(table: readonly EmojiKeywordEntry[]): EmojiSuggester {
   const matchers: Matcher[] = table.flatMap((entry, order) =>
     entry.words.map((word) => ({
       emoji: entry.emoji,
@@ -60,58 +73,67 @@ export function emojiSuggester(
       test: matcherFor(word),
     }))
   );
-  return (name) => {
+  const hits = (name: string): Matcher[] => {
     const text = name.trim().toLocaleLowerCase();
-    if (!text) return undefined;
-    let best: Matcher | undefined;
-    for (const m of matchers) {
-      if (!m.test(text)) continue;
-      if (
-        !best ||
-        (best.weak && !m.weak) ||
-        (best.weak === m.weak &&
-          (m.size > best.size || (m.size === best.size && m.order < best.order)))
-      ) {
-        best = m;
+    if (!text) return [];
+    const all = matchers.filter((m) => m.test(text));
+    // The strongest tier present: a weak word counts only when no strong word matched.
+    return all.some((m) => !m.weak) ? all.filter((m) => !m.weak) : all;
+  };
+  return {
+    suggest: (name) => {
+      let best: Matcher | undefined;
+      for (const m of hits(name)) {
+        if (!best || m.size > best.size || (m.size === best.size && m.order < best.order)) {
+          best = m;
+        }
       }
-    }
-    return best?.emoji;
+      return best?.emoji;
+    },
+    matches: (name) => new Set(hits(name).map((m) => m.emoji)),
   };
 }
 
 /**
- * Does a rename re-pick the picture? Only when the new name suggests something (`after`) and
- * that differs from what the old name suggested (`before`): the thing turned into something
- * else. The one condition `emojiAfterRename` and a caller with more than an emoji (a chore's card
- * art, `chorePictureAfterRename`) both read. Pure.
- */
-export function renameRepicks(
-  before: string | undefined,
-  after: string | undefined
-): after is string {
-  return after !== undefined && after !== before;
-}
-
-/**
- * A picture once its name has changed, from the suggestions for the old and the new name (any
- * suggester: it takes the two answers, not the names), shared by chores and rewards. Only a
- * CHANGE of suggestion re-picks (`renameRepicks`): the new name's suggestion wins, even over a
- * picture picked by hand. Otherwise (the same suggestion, as for "Allowance" to "Weekly
- * allowance", or none) `current` stays, picked by hand or not; only no picture at all gets
- * `after`, else `fallback`.
+ * THE rename rule for a picture, shared by chores and rewards: the NEW picture a rename gives,
+ * or `undefined` when the current picture stays as it is (and, for a chore, its card art too).
+ * A new picture replaces card art.
  *
- * `before` is the suggestion for the name the picture was last settled against (the stored or
- * opened name, or the name at a pick by hand), never the previous keystroke, so a small edit
- * cannot clobber a hand pick and opening something never changes its picture. Nothing records
- * how a picture was chosen. Pure.
+ *   1. The new name suggests nothing: keep.
+ *   2. No picture at all (`current` empty and no art): the new name's suggestion.
+ *   3. The settled name suggested a picture: re-pick ONLY when the name's meaning moved away
+ *      from it, i.e. the new name no longer matches that picture at all (`matches`). A longer
+ *      keyword appended to the same thing ("Take out the trash" to "Take out the trash after
+ *      dinner", "Take a bath" to "Take a bath before bedtime") changes the single best match
+ *      but still matches the old one, so it keeps a hand pick and card art.
+ *   4. The settled name suggested nothing: keep any real picture (a hand pick, card art, a
+ *      starter set's picture); only the plain default (`plainDefault`, no art) yields to the
+ *      new name's suggestion. So a new row named "Feed the dog" gets the dog, and "Clear your
+ *      plate" (art) renamed to "Clear your plate after dinner" keeps its art.
+ *
+ * `settledName` is the name the picture was last settled against: the stored or opened name, or
+ * the name at a pick by hand (which wins immediately: the caller simply stores it), never the
+ * previous keystroke. Opening something (the name unchanged) never changes a real picture.
+ * Nothing records how a picture was chosen. Pure.
  */
-export function emojiAfterRename(rename: {
-  before: string | undefined;
-  after: string | undefined;
-  current: string | undefined;
-  fallback: string;
-}): string {
-  const { before, after, current, fallback } = rename;
-  if (renameRepicks(before, after)) return after;
-  return current || (after ?? fallback);
+export function pictureAfterRename(
+  suggester: EmojiSuggester,
+  rename: {
+    settledName: string;
+    newName: string;
+    /** The picture now; empty or undefined is none. */
+    current: string | undefined;
+    /** Card art is drawn instead of the emoji (chores): a real picture whatever the emoji. */
+    hasArt: boolean;
+    /** The picture a row has when nothing was picked and nothing suggested. */
+    plainDefault: string;
+  }
+): string | undefined {
+  const { settledName, newName, current, hasArt, plainDefault } = rename;
+  const after = suggester.suggest(newName);
+  if (after === undefined) return undefined;
+  if (!current && !hasArt) return after;
+  const before = suggester.suggest(settledName);
+  if (before !== undefined) return suggester.matches(newName).has(before) ? undefined : after;
+  return !hasArt && current === plainDefault ? after : undefined;
 }

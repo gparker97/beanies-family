@@ -8,8 +8,8 @@
  * every setting optional (plan, requirement 12, with greg's 2026-11-16 changes: no take-back
  * setting, taking stars away is always open to a grown-up):
  *  - the on / off switch at the top;
- *  - the weekly reward: on / off, its name and emoji (a rename that changes the name's
- *    suggestion picks the new one as it is typed, even over one picked by hand;
+ *  - the weekly reward: on / off, its name and emoji (a rename whose meaning moved away from the
+ *    emoji picks the new name's suggestion as it is typed, even over one picked by hand;
  *    `rewardEmojiAfterRename`), and the bar (a share of a full week's stars, 50 to 100 in
  *    steps of 5) with each child's "N of M stars";
  *  - Extra Special Rewards (on top of the weekly reward): the list (with "For Max" when one is
@@ -121,7 +121,7 @@ watch(
 /**
  * The emoji a name gives, by the one rule (`rewardEmojiAfterRename`) against the stored name
  * and emoji (a pick by hand is saved at once, so the stored name is always the one the emoji was
- * settled against): it changes only when the name's suggestion changes. What the typed name
+ * settled against): it changes only when the name's meaning moved away from it. What the typed name
  * shows is exactly what its commit saves.
  */
 function emojiForName(name: string): string {

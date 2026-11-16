@@ -73,9 +73,17 @@ export function slackPost(
 
 /**
  * Convenience wrapper for the legacy general-purpose Slack channel
- * (`VITE_SLACK_WEBHOOK_URL`). Used by CreatePodView for pod-creation
- * telemetry.
+ * (`VITE_SLACK_WEBHOOK_URL`). Used for pod-creation telemetry.
  */
 export function slackNotify(text: string): void {
-  slackPost(import.meta.env.VITE_SLACK_WEBHOOK_URL, { text }, 'slackNotify');
+  void slackNotifyWithOutcome(text);
+}
+
+/**
+ * `slackNotify` for a caller that must know whether the post left the device (the late
+ * pod-setup completion, which retries on a later open when it did not). Never rejects; see
+ * `SlackPostOutcome` for how little `dispatched` promises.
+ */
+export function slackNotifyWithOutcome(text: string): Promise<SlackPostResult> {
+  return slackPost(import.meta.env.VITE_SLACK_WEBHOOK_URL, { text }, 'slackNotify');
 }

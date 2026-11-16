@@ -1669,8 +1669,10 @@ onMounted(async () => {
       // A restored session's open is a signed-in open too: a pod whose setup was left in the
       // wizard (a reload or a restart at the recovery kit) is completed now, in the background.
       // Same convergence point, same reason. Never throws, never awaited. A podless boot (the
-      // wizard's own page load) returned long before here, so this cannot race the wizard.
-      syncStore.finishPendingPodSetup(isNative() ? 'app-restarted' : 'page-reloaded');
+      // wizard's own page load) returned long before here, so this cannot race this page's
+      // wizard; a wizard on screen in ANOTHER tab holds the family's setup Web Lock, and this
+      // skips while it does.
+      syncStore.finishPendingPodSetup({ kind: 'restored', native: isNative() });
       // App booted successfully — reset the chunk-load retry counter so
       // the next deploy gap gets its own full budget. (This used to live
       // in router.afterEach, but firing-on-every-nav defeated the

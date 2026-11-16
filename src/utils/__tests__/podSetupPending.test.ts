@@ -11,14 +11,20 @@ import {
   POD_SETUP_PENDING_MAX_AGE_MS,
   clearPodSetupPending,
   heardViaSlackLine,
+  holdPodSetupLock,
+  markPodSetupDone,
   markPodSetupPending,
   notePodSetupStep,
+  podSetupLockName,
   podSetupPendingKey,
   readPodSetupPending,
+  setupReturnKind,
   setupSlackLine,
+  withPodSetupLockIfAvailable,
   type PodSetupStep,
   type SetupReturnVia,
 } from '@/utils/podSetupPending';
+import { fakeLocks, installLocks, restoreLocks } from '@/test/fakeLocks';
 
 const NOW = 1_800_000_000_000;
 
@@ -74,15 +80,49 @@ describe('the marker', () => {
     expect(localStorage.getItem(podSetupPendingKey('fam-1'))).toBeNull();
   });
 
-  it('is cleared, and a clear with none is silent', () => {
+  it('is cleared when the family is forgotten, and a clear with none is silent', () => {
     markPodSetupPending('fam-1', 'mem-1', null, NOW);
     h.logEvent.mockClear();
 
-    clearPodSetupPending('fam-1', 'completed');
+    clearPodSetupPending('fam-1', 'family-forgotten');
     clearPodSetupPending('fam-1', 'family-forgotten');
 
     expect(readPodSetupPending('fam-1', NOW)).toEqual({ kind: 'missing' });
-    expect(markerLines()).toEqual([{ level: 'info', action: 'cleared', detail: 'completed' }]);
+    expect(markerLines()).toEqual([
+      { level: 'info', action: 'cleared', detail: 'family-forgotten' },
+    ]);
+  });
+
+  it('is replaced by a done record once sent, which reads as done and takes no step', () => {
+    markPodSetupPending('fam-1', 'mem-1', 'att-1', NOW);
+    h.logEvent.mockClear();
+
+    markPodSetupDone('fam-1', NOW + 1000);
+    notePodSetupStep('fam-1', 'survey');
+
+    expect(JSON.parse(localStorage.getItem(podSetupPendingKey('fam-1'))!)).toEqual({
+      done: true,
+      doneAt: NOW + 1000,
+    });
+    expect(readPodSetupPending('fam-1', NOW + 2000)).toEqual({ kind: 'done' });
+    expect(markerLines()).toEqual([{ level: 'info', action: 'done' }]);
+  });
+
+  it('a done record expires like the marker, and then reads as missing', () => {
+    markPodSetupDone('fam-1', NOW - POD_SETUP_PENDING_MAX_AGE_MS - 1);
+    h.logEvent.mockClear();
+
+    expect(readPodSetupPending('fam-1', NOW)).toEqual({ kind: 'missing' });
+    expect(localStorage.getItem(podSetupPendingKey('fam-1'))).toBeNull();
+    expect(markerLines()).toEqual([{ level: 'info', action: 'cleared', detail: 'done-expired' }]);
+  });
+
+  it('the family being forgotten clears a done record too', () => {
+    markPodSetupDone('fam-1', NOW);
+
+    clearPodSetupPending('fam-1', 'family-forgotten');
+
+    expect(localStorage.getItem(podSetupPendingKey('fam-1'))).toBeNull();
   });
 
   it('is per family: another family neither reads nor clears it', () => {
@@ -151,7 +191,7 @@ describe('the marker with storage unavailable', () => {
 
     expect(readPodSetupPending('fam-1', NOW)).toEqual({ kind: 'missing' });
     expect(() => notePodSetupStep('fam-1', 'kit')).not.toThrow();
-    expect(() => clearPodSetupPending('fam-1', 'completed')).not.toThrow();
+    expect(() => clearPodSetupPending('fam-1', 'family-forgotten')).not.toThrow();
   });
 
   it('a refused clear never throws and is logged at warn', () => {
@@ -159,9 +199,9 @@ describe('the marker with storage unavailable', () => {
     h.logEvent.mockClear();
     refuse('removeItem');
 
-    expect(() => clearPodSetupPending('fam-1', 'completed')).not.toThrow();
+    expect(() => clearPodSetupPending('fam-1', 'family-forgotten')).not.toThrow();
     expect(markerLines()).toEqual([
-      { level: 'warn', action: 'storage-failed', stage: 'clear', detail: 'completed' },
+      { level: 'warn', action: 'storage-failed', stage: 'clear', detail: 'family-forgotten' },
     ]);
   });
 });
@@ -184,23 +224,45 @@ describe('the Slack lines', () => {
     ['members', 'add members'],
     ['survey', 'survey'],
   ])('Setup: left at %s', (leftAt, words) => {
-    expect(setupSlackLine({ leftAt, via: 'page-reloaded', attemptId: null })).toBe(
-      `\n*Setup:* left at the ${words} step, finished on next open (page reloaded)`
-    );
+    expect(
+      setupSlackLine({ leftAt, via: { kind: 'restored', native: false }, attemptId: null })
+    ).toBe(`\n*Setup:* left at the ${words} step, finished on next open (page reloaded)`);
   });
 
-  it.each<[SetupReturnVia, string]>([
-    ['app-restarted', 'app restarted'],
-    ['page-reloaded', 'page reloaded'],
-    ['signed-in', 'signed in'],
-    ['signed-in-pin', 'signed in with PIN'],
-    ['signed-in-biometric', 'signed in with biometrics'],
-    ['signed-in-tap-through', 'signed in with a tap on their name'],
-    ['signed-in-password', 'signed in with password'],
-    ['signed-in-passphrase', 'signed in with passphrase'],
-    ['signed-in-recovery-kit', 'signed in with recovery kit'],
-    ['signed-in-recovery-passphrase', 'signed in with recovery passphrase'],
-  ])('Setup: came back by %s', (via, words) => {
+  // The Slack words and the firehose `kind` come from one place, so they are pinned together.
+  it.each<[SetupReturnVia, string, string]>([
+    [{ kind: 'restored', native: true }, 'app-restarted', 'app restarted'],
+    [{ kind: 'restored', native: false }, 'page-reloaded', 'page reloaded'],
+    [{ kind: 'signed-in' }, 'signed-in', 'signed in'],
+    [{ kind: 'signed-in', method: 'pin' }, 'signed-in-pin', 'signed in with PIN'],
+    [
+      { kind: 'signed-in', method: 'biometric' },
+      'signed-in-biometric',
+      'signed in with biometrics',
+    ],
+    [
+      { kind: 'signed-in', method: 'tap-through' },
+      'signed-in-tap-through',
+      'signed in with a tap on their name',
+    ],
+    [{ kind: 'signed-in', method: 'password' }, 'signed-in-password', 'signed in with password'],
+    [
+      { kind: 'signed-in', method: 'passphrase' },
+      'signed-in-passphrase',
+      'signed in with passphrase',
+    ],
+    [
+      { kind: 'signed-in', method: 'recovery-kit' },
+      'signed-in-recovery-kit',
+      'signed in with recovery kit',
+    ],
+    [
+      { kind: 'signed-in', method: 'recovery-passphrase' },
+      'signed-in-recovery-passphrase',
+      'signed in with recovery passphrase',
+    ],
+  ])('Setup: came back by %o (%s)', (via, kind, words) => {
+    expect(setupReturnKind(via)).toBe(kind);
     expect(setupSlackLine({ leftAt: 'kit', via, attemptId: null })).toBe(
       `\n*Setup:* left at the recovery kit step, finished on next open (${words})`
     );
@@ -214,5 +276,81 @@ describe('the marker does not outlive the family on this device', () => {
   it('deleteLocalFamily clears it for the forgotten family', () => {
     const source = readFileSync('src/services/familyContext.ts', 'utf8');
     expect(source).toMatch(/clearPodSetupPending\(familyId, 'family-forgotten'\)/);
+  });
+});
+
+describe('the setup Web Lock', () => {
+  let locks: ReturnType<typeof fakeLocks>;
+  beforeEach(() => {
+    locks = fakeLocks();
+    installLocks(locks);
+  });
+  afterEach(() => restoreLocks());
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it('the wizard holds it until released; a late path asking meanwhile is not granted', async () => {
+    const release = holdPodSetupLock('fam-1');
+    await settle();
+    const fn = vi.fn(async () => 'sent');
+
+    await expect(withPodSetupLockIfAvailable('fam-1', fn)).resolves.toEqual({ granted: false });
+    expect(fn).not.toHaveBeenCalled();
+    // Another family's lock is its own.
+    await expect(withPodSetupLockIfAvailable('fam-2', fn)).resolves.toEqual({
+      granted: true,
+      value: 'sent',
+    });
+
+    release();
+    release(); // idempotent
+    await settle();
+    expect(locks.heldNames.has(podSetupLockName('fam-1'))).toBe(false);
+    await expect(withPodSetupLockIfAvailable('fam-1', fn)).resolves.toEqual({
+      granted: true,
+      value: 'sent',
+    });
+  });
+
+  it('two late paths cannot overlap: the second is not granted while the first sends', async () => {
+    let finish!: () => void;
+    const first = withPodSetupLockIfAvailable(
+      'fam-1',
+      () => new Promise<string>((r) => (finish = () => r('first')))
+    );
+    const second = vi.fn(async () => 'second');
+
+    await expect(withPodSetupLockIfAvailable('fam-1', second)).resolves.toEqual({
+      granted: false,
+    });
+    finish();
+    await expect(first).resolves.toEqual({ granted: true, value: 'first' });
+    expect(second).not.toHaveBeenCalled();
+  });
+
+  it('with no Web Locks, runs unlocked and the hold is a no-op (the pre-lock behaviour)', async () => {
+    installLocks(undefined);
+
+    expect(() => holdPodSetupLock('fam-1')()).not.toThrow();
+    await expect(withPodSetupLockIfAvailable('fam-1', async () => 1)).resolves.toEqual({
+      granted: true,
+      value: 1,
+    });
+  });
+
+  it('a refused lock request runs unlocked and is logged; a throw from the send passes through', async () => {
+    installLocks({ request: vi.fn(async () => Promise.reject(new Error('SecurityError'))) });
+
+    await expect(withPodSetupLockIfAvailable('fam-1', async () => 1)).resolves.toEqual({
+      granted: true,
+      value: 1,
+    });
+    expect(markerLines()).toEqual([{ level: 'warn', action: 'lock-failed', stage: 'request' }]);
+
+    installLocks(locks);
+    await expect(
+      withPodSetupLockIfAvailable('fam-1', async () => {
+        throw new Error('boom');
+      })
+    ).rejects.toThrow('boom');
   });
 });

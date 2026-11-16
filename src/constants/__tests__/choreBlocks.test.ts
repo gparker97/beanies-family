@@ -95,7 +95,20 @@ describe('suggestChoreEmoji', () => {
   });
 });
 
-describe('chorePictureAfterRename: only a change of suggestion re-picks', () => {
+describe('the small-edit examples really change the single best match', () => {
+  // So a rule keyed on "the best match changed" would re-pick them; the rule below keeps them.
+  it.each([
+    ['Take out the trash', '🗑️', 'Take out the trash after dinner', '🍽️'],
+    ['Take a bath', '🛁', 'Take a bath before bedtime', '🛌'],
+    ['Clear your plate', undefined, 'Clear your plate after dinner', '🍽️'],
+    ['洗澡', '🛁', '睡觉前洗澡', '🛌'],
+  ])('%s (%s) to %s (%s)', (from, fromEmoji, to, toEmoji) => {
+    expect(suggestChoreEmoji(from)).toBe(fromEmoji);
+    expect(suggestChoreEmoji(to)).toBe(toEmoji);
+  });
+});
+
+describe('chorePictureAfterRename: only a title whose meaning moved re-picks', () => {
   const art = (emoji: string, illustration: string): ChorePicture => ({ emoji, illustration });
   const emoji = (e: string): ChorePicture => ({ emoji: e, illustration: undefined });
   it.each([
@@ -171,10 +184,68 @@ describe('chorePictureAfterRename: only a change of suggestion re-picks', () => 
       emoji(DEFAULT_CHORE_EMOJI),
     ],
     [
-      'a hand pick on a blank row gives way to a first title that suggests something',
+      'a hand pick on a blank row stays when a first title suggests something',
       '',
       'Feed the dog',
       art('⭐', 'trash-night'),
+      art('⭐', 'trash-night'),
+    ],
+    // A small edit that appends a LONGER keyword changes the single best match, but the new
+    // title still matches the old picture: the meaning did not move.
+    [
+      '"Take out the trash" (card art) to "Take out the trash after dinner": the art stays',
+      'Take out the trash',
+      'Take out the trash after dinner',
+      art('🗑️', 'trash-night'),
+      art('🗑️', 'trash-night'),
+    ],
+    [
+      '"Take a bath" (a duck by hand) to "Take a bath before bedtime": the duck stays',
+      'Take a bath',
+      'Take a bath before bedtime',
+      emoji('🦆'),
+      emoji('🦆'),
+    ],
+    [
+      '"Clear your plate" (card art, suggests nothing) to "Clear your plate after dinner": the art stays',
+      'Clear your plate',
+      'Clear your plate after dinner',
+      art(DEFAULT_CHORE_EMOJI, 'dinner-plate'),
+      art(DEFAULT_CHORE_EMOJI, 'dinner-plate'),
+    ],
+    [
+      'a title that suggested nothing keeps a hand pick when renamed to one that does',
+      'Help Grandma',
+      'Feed the dog',
+      emoji('⭐'),
+      emoji('⭐'),
+    ],
+    [
+      'a title that suggested nothing, on the plain default: the new suggestion',
+      'Help Grandma',
+      'Feed the dog',
+      emoji(DEFAULT_CHORE_EMOJI),
+      emoji('🐕'),
+    ],
+    [
+      'a generic verb does not hold its picture: "Brush teeth" to "Brush hair" is the comb',
+      'Brush teeth',
+      'Brush hair',
+      emoji('🪥'),
+      emoji('💇'),
+    ],
+    [
+      'a Chinese small edit with a longer-matching word keeps a hand pick: 洗澡 to 睡觉前洗澡',
+      '洗澡',
+      '睡觉前洗澡',
+      emoji('🦆'),
+      emoji('🦆'),
+    ],
+    [
+      'a Chinese rename that moves the meaning re-picks over card art: 倒垃圾 to 喂狗',
+      '倒垃圾',
+      '喂狗',
+      art('🗑️', 'trash-night'),
       emoji('🐕'),
     ],
     [

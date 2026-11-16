@@ -837,12 +837,14 @@ async function handleLinkReady(payload: {
 function handleSignedIn(destination: string, via?: SignInVia) {
   // FIRST, before the attempt end and the login register below: a pod whose setup was left
   // unfinished in the wizard (a reload at the recovery kit) is completed now, in the background.
-  // It starts its registry write synchronously, so `ensureRegistered(true)` queues behind it, and
+  // It gates the registry queue synchronously, so `ensureRegistered(true)` queues behind its
+  // completion write, and
   // it reports whether it took over the open create attempt (to end it as `done`). A no-op on
   // the wizard's own entry, which completed already. Never throws, never delays the route.
-  const lateCompletionOwnsAttempt = syncStore.finishPendingPodSetup(
-    via ? `signed-in-${via}` : 'signed-in'
-  );
+  const lateCompletionOwnsAttempt = syncStore.finishPendingPodSetup({
+    kind: 'signed-in',
+    method: via,
+  });
   // Any other sign-in that lands here closes an open create attempt (#128): a no-op on the
   // create path, which has already ended it in `completePodSetup`, but a create abandoned earlier
   // in this browser must not tag a loaded or joined pod's events for up to 24 h.

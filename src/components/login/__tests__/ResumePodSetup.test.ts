@@ -64,6 +64,7 @@ const h = vi.hoisted(() => {
       membersStepActive: false,
       completePodSetup: vi.fn(async () => {}),
       notePodSetupStep: vi.fn(),
+      releasePodSetupLock: vi.fn(),
     },
   };
 });

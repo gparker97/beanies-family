@@ -19,9 +19,10 @@
  *    empty is dropped. A title still being typed already counts (`typing`): the button names it
  *    and Add sends it, so nothing typed is lost to a tap that did not blur the field first.
  *  - A picture comes from the title: each committed title follows the one rename rule
- *    (`renameRow`, `chorePictureAfterRename`). A title whose suggestion changes picks a fresh
- *    picture, even over a set's picture or card art or one picked by hand; a small edit, or a
- *    title that suggests nothing, keeps the picture. A pick by hand shows at once.
+ *    (`renameRow`, `chorePictureAfterRename`). A title whose meaning moved away from its picture
+ *    (it no longer matches the old title's suggestion at all) picks a fresh picture, even over a
+ *    set's picture or card art or one picked by hand; a small edit (even one adding a longer
+ *    keyword), or a title that suggests nothing, keeps the picture. A pick by hand shows at once.
  *  - Every chooser closes when the sheet closes (the drawer unmounts its body) or its row
  *    leaves the list; the pieces own their Escape tokens, above the drawer's own, so Escape
  *    closes a row edit, chooser or preview first and the drawer after.

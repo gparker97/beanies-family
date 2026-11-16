@@ -43,6 +43,8 @@ const h = vi.hoisted(() => ({
   },
   registerFamily: vi.fn(),
   slackNotify: vi.fn(),
+  slackNotifyWithOutcome: vi.fn(),
+  slackOutcome: { value: { outcome: 'dispatched' } as { outcome: string } },
   logEvent: vi.fn(),
   reportError: vi.fn(),
   clearAttribution: vi.fn(),
@@ -123,7 +125,10 @@ vi.mock('@/services/recurring/recurringProcessor', () => ({
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: h.reportError }));
 vi.mock('@/config/features', () => ({ features: h.features }));
-vi.mock('@/utils/slackNotify', () => ({ slackNotify: h.slackNotify }));
+vi.mock('@/utils/slackNotify', () => ({
+  slackNotify: h.slackNotify,
+  slackNotifyWithOutcome: h.slackNotifyWithOutcome,
+}));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: h.logEvent }));
 vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
 vi.mock('@/services/analytics/plausible', () => ({
@@ -214,6 +219,10 @@ beforeEach(async () => {
   h.attribution.value = { utm_source: 'chatgpt', utm_campaign: 'sg-pilot' };
   h.providerType.value = 'google_drive';
   h.registerFamily.mockResolvedValue({ pointerAccepted: true, deviceCountry: 'SG' });
+  h.slackOutcome.value = { outcome: 'dispatched' };
+  h.slackNotifyWithOutcome.mockImplementation(async () => h.slackOutcome.value);
+  // The device marker / done record is real localStorage: every test starts without one.
+  localStorage.clear();
   setActivePinia(createPinia());
   vi.resetModules();
   ({ useSyncStore } = await import('@/stores/syncStore'));
@@ -572,22 +581,43 @@ describe('completePodSetup: funnel and idempotency', () => {
     await store.completePodSetup({ survey: SKIPPED });
     store.resetState();
     vi.clearAllMocks();
+    h.ctx.activeFamilyId = 'fam-2';
 
     await store.completePodSetup({ survey: SKIPPED });
 
     expect(h.registerFamily).toHaveBeenCalledTimes(1);
+    expect(h.registerFamily.mock.calls[0]![0]).toBe('fam-2');
     expect(h.slackNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it('the same family after a reset is not sent again: the done record outlives the latch', async () => {
+    const store = useSyncStore();
+    await store.completePodSetup({ survey: SKIPPED });
+    store.resetState();
+    vi.clearAllMocks();
+
+    await store.completePodSetup({ survey: SKIPPED });
+
+    expect(h.registerFamily).not.toHaveBeenCalled();
+    expect(h.slackNotify).not.toHaveBeenCalled();
+    expect(h.track).not.toHaveBeenCalled();
   });
 });
 
 /**
  * 2026-11-16: a setup left in the wizard after the pod write (a reload at the recovery kit) is
- * completed on the next signed-in open, by the SAME `completePodSetup`, through the device marker
- * `podSetupPending`. The marker module and the create-attempt holder are the real ones.
+ * completed on the next signed-in open through the device marker `podSetupPending`. The marker
+ * module and the create-attempt holder are the real ones. The late post goes through
+ * `slackNotifyWithOutcome` (awaited), the wizard's through `slackNotify` (fire-and-forget).
  */
 describe('finishPendingPodSetup: the late completion', () => {
   let attempt: typeof import('@/utils/createAttemptState');
   let marker: typeof import('@/utils/podSetupPending');
+
+  const RELOADED = { kind: 'restored', native: false } as const;
+  const RESTARTED = { kind: 'restored', native: true } as const;
+  const signedIn = (method?: 'pin' | 'recovery-kit') =>
+    ({ kind: 'signed-in', ...(method ? { method } : {}) }) as const;
 
   beforeEach(async () => {
     localStorage.clear();
@@ -595,6 +625,10 @@ describe('finishPendingPodSetup: the late completion', () => {
     attempt = await import('@/utils/createAttemptState');
     marker = await import('@/utils/podSetupPending');
     attempt.__resetCreateAttemptForTesting();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
 
   /** Let the un-awaited completion run to its end (the registry write resolves at once). */
@@ -612,14 +646,28 @@ describe('finishPendingPodSetup: the late completion', () => {
       .filter((e) => e.message === 'late-complete' && e.context?.action === action);
   }
 
-  it('the wizard path is unchanged, has no Setup line, and clears the marker', async () => {
+  function lastLateSlack(): string {
+    return h.slackNotifyWithOutcome.mock.calls.at(-1)![0] as string;
+  }
+
+  /** Every Slack post, either path. */
+  function slackPosts(): number {
+    return h.slackNotify.mock.calls.length + h.slackNotifyWithOutcome.mock.calls.length;
+  }
+
+  function setOnline(value: boolean) {
+    Object.defineProperty(navigator, 'onLine', { value, configurable: true });
+  }
+
+  it('the wizard path is unchanged, has no Setup line, and leaves a done record', async () => {
     marker.markPodSetupPending('fam-1', 'mem-1', null);
 
     await useSyncStore().completePodSetup({ survey: ANSWERED });
 
     expect(lastSlack()).toContain('\n*Heard via:* ChatGPT ad');
     expect(lastSlack()).not.toContain('Setup');
-    expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'missing' });
+    expect(h.slackNotifyWithOutcome).not.toHaveBeenCalled();
+    expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
     expect(h.logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'complete-setup',
@@ -628,13 +676,23 @@ describe('finishPendingPodSetup: the late completion', () => {
     );
   });
 
+  it('the wizard entering the app afterwards logs nothing on the late path', async () => {
+    marker.markPodSetupPending('fam-1', 'mem-1', null);
+    const store = useSyncStore();
+    await store.completePodSetup({ survey: SKIPPED });
+
+    expect(store.finishPendingPodSetup(signedIn())).toBe(false);
+
+    expect(h.logEvent.mock.calls.filter(([e]) => e.message === 'late-complete')).toEqual([]);
+  });
+
   it('a signed-in open with a marker sends the completion once, "not seen", with the Setup line', async () => {
     openAttempt('att-1');
     marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
     marker.notePodSetupStep('fam-1', 'members');
     const store = useSyncStore();
 
-    const owns = store.finishPendingPodSetup('page-reloaded');
+    const owns = store.finishPendingPodSetup(RELOADED);
     await settle();
 
     expect(owns).toBe(true);
@@ -642,20 +700,23 @@ describe('finishPendingPodSetup: the late completion', () => {
     expect(h.registerFamily.mock.calls[0]![1]).toEqual(
       expect.objectContaining({ isLoginEvent: false, heardVia: null, setupComplete: true })
     );
-    expect(h.slackNotify).toHaveBeenCalledTimes(1);
-    expect(lastSlack()).toBe(
+    expect(h.slackNotify).not.toHaveBeenCalled();
+    expect(h.slackNotifyWithOutcome).toHaveBeenCalledTimes(1);
+    // No "Came from" although the stash holds a tag: days later it is the RETURN visit's.
+    expect(lastLateSlack()).toBe(
       '🎉 *Family pod created!*\n*Family:* The Brambleworths\n*Owner:* Hazel\n*Storage:* Google Drive' +
         '\n*Heard via:* (not seen)' +
         '\n*Setup:* left at the add members step, finished on next open (page reloaded)' +
-        '\n*Came from:* `chatgpt / sg-pilot`' +
         '\n*Members added:* 2' +
         '\n*Country:* SG\n*Platform:* Web\n*Device:* Chrome on macOS'
     );
-    expect(h.clearAttribution).toHaveBeenCalledWith('consumed');
+    // The stash is neither read into the post nor consumed.
+    expect(h.clearAttribution).not.toHaveBeenCalled();
+    expect(h.track).toHaveBeenCalledTimes(1);
     expect(h.track).toHaveBeenCalledWith('pod_created');
     expect(h.trackOnboardingStep).toHaveBeenCalledWith('done', 'submitted');
     expect(h.endCreateAttempt).toHaveBeenCalledWith('done');
-    expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'missing' });
+    expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
     expect(lateLines('started')).toEqual([
       expect.objectContaining({
         context: {
@@ -684,47 +745,59 @@ describe('finishPendingPodSetup: the late completion', () => {
     );
   });
 
+  it('keeps the inferred line from the registry response', async () => {
+    marker.markPodSetupPending('fam-1', 'mem-1', null);
+    h.registerFamily.mockResolvedValue({
+      pointerAccepted: true,
+      attributionInferred: { band: 'high', fields: { utm_source: 'chatgpt' } },
+    });
+
+    useSyncStore().finishPendingPodSetup(RESTARTED);
+    await settle();
+
+    expect(lastLateSlack()).toContain('\n*Came from (inferred, high):* `chatgpt`');
+    expect(lastLateSlack()).not.toContain('\n*Came from:*');
+  });
+
   it('names the sign-in method when the open was a fresh sign-in', async () => {
     marker.markPodSetupPending('fam-1', 'mem-1', null);
 
-    useSyncStore().finishPendingPodSetup('signed-in-recovery-kit');
+    useSyncStore().finishPendingPodSetup(signedIn('recovery-kit'));
     await settle();
 
-    expect(lastSlack()).toContain(
+    expect(lastLateSlack()).toContain(
       '\n*Setup:* left at the recovery kit step, finished on next open (signed in with recovery kit)'
     );
   });
 
-  it('a second open after a sent late completion does nothing', async () => {
+  it('a second open after a sent late completion does nothing, and says nothing', async () => {
     marker.markPodSetupPending('fam-1', 'mem-1', null);
     const store = useSyncStore();
-    store.finishPendingPodSetup('page-reloaded');
+    store.finishPendingPodSetup(RELOADED);
     await settle();
 
     // Same session: the latch.
-    expect(store.finishPendingPodSetup('page-reloaded')).toBe(false);
-    // A reload (the latch is gone with the page): the marker is gone too.
+    expect(store.finishPendingPodSetup(RELOADED)).toBe(false);
+    // A reload (the latch is gone with the page): the done record.
     store.resetState();
-    expect(store.finishPendingPodSetup('page-reloaded')).toBe(false);
+    expect(store.finishPendingPodSetup(RELOADED)).toBe(false);
     await settle();
 
     expect(h.registerFamily).toHaveBeenCalledTimes(1);
-    expect(h.slackNotify).toHaveBeenCalledTimes(1);
-    expect(lateLines('skipped').map((l) => l.context.detail)).toEqual([
-      'already-done',
-      'no-marker',
-    ]);
+    expect(slackPosts()).toBe(1);
+    expect(h.track).toHaveBeenCalledTimes(1);
+    expect(lateLines('skipped')).toEqual([]);
   });
 
-  it('a marker for another family sends nothing', async () => {
+  it('a marker for another family sends nothing, and an ordinary open logs nothing', async () => {
     marker.markPodSetupPending('fam-2', 'mem-1', null);
 
-    expect(useSyncStore().finishPendingPodSetup('app-restarted')).toBe(false);
+    expect(useSyncStore().finishPendingPodSetup(RESTARTED)).toBe(false);
     await settle();
 
     expect(h.registerFamily).not.toHaveBeenCalled();
-    expect(h.slackNotify).not.toHaveBeenCalled();
-    expect(lateLines('skipped').map((l) => l.context.detail)).toEqual(['no-marker']);
+    expect(slackPosts()).toBe(0);
+    expect(h.logEvent.mock.calls.filter(([e]) => e.message === 'late-complete')).toEqual([]);
     // Left for its own family.
     expect(marker.readPodSetupPending('fam-2').kind).toBe('ok');
   });
@@ -732,52 +805,67 @@ describe('finishPendingPodSetup: the late completion', () => {
   it('another member of the family signing in on this device sends nothing', async () => {
     marker.markPodSetupPending('fam-1', 'mem-9', null);
 
-    expect(useSyncStore().finishPendingPodSetup('signed-in-pin')).toBe(false);
+    expect(useSyncStore().finishPendingPodSetup(signedIn('pin'))).toBe(false);
     await settle();
 
-    expect(h.slackNotify).not.toHaveBeenCalled();
-    expect(lateLines('skipped').map((l) => l.context.detail)).toEqual(['other-member']);
+    expect(slackPosts()).toBe(0);
+    expect(lateLines('skipped').map((l) => l.context)).toEqual([
+      { action: 'skipped', detail: 'other-member', kind: 'signed-in-pin' },
+    ]);
     expect(marker.readPodSetupPending('fam-1').kind).toBe('ok');
   });
 
-  it('does not fire while the wizard is still on screen for the family', async () => {
+  it('does not fire while the wizard is still on screen for the family in this tab', async () => {
     marker.markPodSetupPending('fam-1', 'mem-1', null);
     const store = useSyncStore();
     store.membersStepActive = true;
 
-    expect(store.finishPendingPodSetup('signed-in')).toBe(false);
+    expect(store.finishPendingPodSetup(signedIn())).toBe(false);
     await settle();
 
     expect(h.registerFamily).not.toHaveBeenCalled();
-    expect(h.slackNotify).not.toHaveBeenCalled();
+    expect(slackPosts()).toBe(0);
     expect(lateLines('skipped').map((l) => l.context.detail)).toEqual(['wizard-active']);
     expect(marker.readPodSetupPending('fam-1').kind).toBe('ok');
   });
 
-  it('a failed registry write on the late path still posts, ends the attempt and clears', async () => {
+  it('a failed registry write on the late path still posts, ends the attempt and is done', async () => {
     openAttempt('att-1');
     marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
     h.registerFamily.mockResolvedValue(null);
 
-    useSyncStore().finishPendingPodSetup('app-restarted');
+    useSyncStore().finishPendingPodSetup(RESTARTED);
     await settle();
 
-    expect(h.slackNotify).toHaveBeenCalledTimes(1);
-    expect(lastSlack()).toContain(
+    expect(h.slackNotifyWithOutcome).toHaveBeenCalledTimes(1);
+    expect(lastLateSlack()).toContain(
       '\n*Setup:* left at the recovery kit step, finished on next open (app restarted)'
     );
     expect(h.endCreateAttempt).toHaveBeenCalledWith('done');
-    expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'missing' });
+    expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+    // The failure is logged by the write itself.
+    expect(registryLines().map((l) => l.context.detail)).toEqual(['failed']);
+  });
+
+  it('with no webhook configured (the dev case) it counts as sent', async () => {
+    marker.markPodSetupPending('fam-1', 'mem-1', null);
+    h.slackOutcome.value = { outcome: 'skipped_no_url' };
+
+    useSyncStore().finishPendingPodSetup(RELOADED);
+    await settle();
+
+    expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+    expect(h.track).toHaveBeenCalledTimes(1);
   });
 
   it('never ends a create attempt other than the one that made this pod', async () => {
     openAttempt('att-other');
     marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
 
-    expect(useSyncStore().finishPendingPodSetup('signed-in-pin')).toBe(false);
+    expect(useSyncStore().finishPendingPodSetup(signedIn('pin'))).toBe(false);
     await settle();
 
-    expect(h.slackNotify).toHaveBeenCalledTimes(1);
+    expect(h.slackNotifyWithOutcome).toHaveBeenCalledTimes(1);
     expect(h.track).toHaveBeenCalledWith('pod_created');
     expect(h.trackOnboardingStep).not.toHaveBeenCalledWith('done', 'submitted');
     expect(h.endCreateAttempt).not.toHaveBeenCalled();
@@ -786,7 +874,7 @@ describe('finishPendingPodSetup: the late completion', () => {
   it('an expired marker is removed, not acted on', async () => {
     marker.markPodSetupPending('fam-1', 'mem-1', null, Date.now() - 31 * 24 * 60 * 60 * 1000);
 
-    expect(useSyncStore().finishPendingPodSetup('page-reloaded')).toBe(false);
+    expect(useSyncStore().finishPendingPodSetup(RELOADED)).toBe(false);
 
     expect(h.registerFamily).not.toHaveBeenCalled();
     expect(lateLines('skipped').map((l) => l.context.detail)).toEqual(['expired']);
@@ -801,7 +889,7 @@ describe('finishPendingPodSetup: the late completion', () => {
     const store = useSyncStore();
 
     // `handleSignedIn`'s order: the late completion, then the login register.
-    store.finishPendingPodSetup('signed-in-pin');
+    store.finishPendingPodSetup(signedIn('pin'));
     store.ensureRegistered(true);
     await vi.advanceTimersByTimeAsync(5000);
     expect(h.registerFamily).toHaveBeenCalledTimes(1); // only the completion write so far
@@ -816,5 +904,238 @@ describe('finishPendingPodSetup: the late completion', () => {
       expect.objectContaining({ isLoginEvent: true })
     );
     expect(h.registerFamily.mock.calls[1]![1]).not.toHaveProperty('setupComplete');
+  });
+
+  describe('delivery: sent only when the post left an online device', () => {
+    it('offline: nothing is sent or counted, the marker is kept, and the next open sends once', async () => {
+      openAttempt('att-1');
+      marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
+      const store = useSyncStore();
+      setOnline(false);
+
+      store.finishPendingPodSetup(RESTARTED);
+      await settle();
+
+      expect(h.registerFamily).not.toHaveBeenCalled();
+      expect(slackPosts()).toBe(0);
+      expect(h.track).not.toHaveBeenCalled();
+      expect(h.endCreateAttempt).not.toHaveBeenCalled();
+      expect(marker.readPodSetupPending('fam-1').kind).toBe('ok');
+      expect(lateLines('deferred').map((l) => l.context)).toEqual([
+        { action: 'deferred', detail: 'offline', kind: 'app-restarted' },
+      ]);
+      expect(lateLines('sent')).toEqual([]);
+
+      // Back online: the next signed-in open sends it, and the conversion counts once.
+      setOnline(true);
+      store.finishPendingPodSetup(signedIn('pin'));
+      await settle();
+
+      expect(h.slackNotifyWithOutcome).toHaveBeenCalledTimes(1);
+      expect(lastLateSlack()).toContain('finished on next open (signed in with PIN)');
+      expect(h.track).toHaveBeenCalledTimes(1);
+      expect(h.trackOnboardingStep).toHaveBeenCalledTimes(1);
+      expect(h.endCreateAttempt).toHaveBeenCalledTimes(1);
+      expect(h.endCreateAttempt).toHaveBeenCalledWith('done');
+      expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+    });
+
+    it('a Slack network error defers; the retry counts the conversion once', async () => {
+      marker.markPodSetupPending('fam-1', 'mem-1', null);
+      const store = useSyncStore();
+      h.slackOutcome.value = { outcome: 'network_error' };
+
+      store.finishPendingPodSetup(RELOADED);
+      await settle();
+
+      expect(h.track).not.toHaveBeenCalled();
+      expect(marker.readPodSetupPending('fam-1').kind).toBe('ok');
+      expect(lateLines('deferred').map((l) => l.context.detail)).toEqual(['slack-network-error']);
+
+      h.slackOutcome.value = { outcome: 'dispatched' };
+      store.resetState();
+      store.finishPendingPodSetup(RELOADED);
+      await settle();
+
+      expect(h.slackNotifyWithOutcome).toHaveBeenCalledTimes(2);
+      expect(h.track).toHaveBeenCalledTimes(1);
+      expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+    });
+
+    it('a throw before the post counts nothing and keeps the marker for the next open', async () => {
+      openAttempt('att-1');
+      marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
+      const store = useSyncStore();
+      h.registerFamily.mockImplementationOnce(() => {
+        throw new Error('boom');
+      });
+
+      store.finishPendingPodSetup(RESTARTED);
+      await settle();
+
+      expect(slackPosts()).toBe(0);
+      expect(h.track).not.toHaveBeenCalled();
+      expect(h.trackOnboardingStep).not.toHaveBeenCalled();
+      expect(h.endCreateAttempt).not.toHaveBeenCalled();
+      expect(marker.readPodSetupPending('fam-1').kind).toBe('ok');
+      expect(h.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: { action: 'late-complete', detail: 'failed', kind: 'app-restarted' },
+        })
+      );
+
+      store.finishPendingPodSetup(RESTARTED);
+      await settle();
+      expect(h.track).toHaveBeenCalledTimes(1);
+      expect(h.endCreateAttempt).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('a family switch during the wait still sends for the captured family, and only it', async () => {
+    vi.useFakeTimers();
+    marker.markPodSetupPending('fam-1', 'mem-1', null);
+    marker.markPodSetupPending('fam-2', 'mem-7', null);
+    h.registerFamily.mockReturnValueOnce(new Promise(() => {})); // hangs: the 5 s wait runs out
+    const store = useSyncStore();
+    const savedMembers = h.members.splice(0);
+
+    try {
+      h.members.push(...savedMembers);
+      store.finishPendingPodSetup(signedIn('pin'));
+      // Sign-out and sign-in as another family while the completion waits.
+      store.resetState();
+      h.ctx.activeFamilyId = 'fam-2';
+      h.ctx.activeFamilyName = 'The Quillfeathers';
+      h.members.splice(0, h.members.length, { id: 'mem-7', role: 'owner', name: 'Rowan' });
+      h.providerType.value = 'local';
+      await vi.advanceTimersByTimeAsync(5000);
+    } finally {
+      h.members.splice(0, h.members.length, ...savedMembers);
+    }
+
+    expect(h.registerFamily.mock.calls[0]![0]).toBe('fam-1');
+    expect(lastLateSlack()).toContain(
+      '*Family:* The Brambleworths\n*Owner:* Hazel\n*Storage:* Google Drive'
+    );
+    expect(lastLateSlack()).toContain('\n*Members added:* 2');
+    expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+    expect(marker.readPodSetupPending('fam-2').kind).toBe('ok');
+  });
+
+  /**
+   * Two tabs of one browser profile: two store instances (each its own pinia, so its own latch),
+   * ONE localStorage and ONE fake lock manager, as two real tabs share the origin's.
+   */
+  describe('two tabs', () => {
+    let locks: ReturnType<typeof import('@/test/fakeLocks').fakeLocks>;
+    let fake: typeof import('@/test/fakeLocks');
+
+    beforeEach(async () => {
+      fake = await import('@/test/fakeLocks');
+      locks = fake.fakeLocks();
+      fake.installLocks(locks);
+    });
+    afterEach(() => fake.restoreLocks());
+
+    const tab = () => useSyncStore(createPinia());
+
+    it('a tab opened while the wizard is on screen in another sends nothing; the wizard sends once', async () => {
+      openAttempt('att-1');
+      marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
+      // Tab A's wizard took the lock at the pod write (`createNewFile`).
+      const releaseWizardHold = marker.holdPodSetupLock('fam-1');
+      await settle();
+      const tabA = tab();
+      const tabB = tab();
+
+      tabB.finishPendingPodSetup(RELOADED);
+      await settle();
+
+      expect(slackPosts()).toBe(0);
+      expect(h.track).not.toHaveBeenCalled();
+      expect(lateLines('skipped').map((l) => l.context.detail)).toEqual(['wizard-active']);
+      expect(marker.readPodSetupPending('fam-1').kind).toBe('ok');
+
+      // Tab A's wizard completes.
+      await tabA.completePodSetup({ survey: ANSWERED });
+      releaseWizardHold();
+      await settle();
+      expect(h.slackNotify).toHaveBeenCalledTimes(1);
+
+      // Tab B's next open (a reload) finds the done record and stays quiet.
+      tabB.resetState();
+      tabB.finishPendingPodSetup(RELOADED);
+      await settle();
+
+      expect(slackPosts()).toBe(1);
+      expect(h.track).toHaveBeenCalledTimes(1);
+      expect(h.endCreateAttempt).toHaveBeenCalledTimes(1);
+    });
+
+    it('the wizard really holds the lock from the pod write until its completion returns', async () => {
+      // The lock the store's `createNewFile` takes is the one the late path asks for: release it
+      // through the store, as `completePodSetup` and `ResumePodSetup`'s unmount do.
+      marker.markPodSetupPending('fam-1', 'mem-1', null);
+      const tabA = tab();
+      const hold = marker.holdPodSetupLock('fam-1');
+      await settle();
+      expect(locks.heldNames.has(marker.podSetupLockName('fam-1'))).toBe(true);
+      hold();
+      tabA.releasePodSetupLock(); // safe with none held by the store
+      await settle();
+      expect(locks.heldNames.has(marker.podSetupLockName('fam-1'))).toBe(false);
+    });
+
+    it('two restored tabs reading the marker at once send it once', async () => {
+      openAttempt('att-1');
+      marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
+      const tab1 = tab();
+      const tab2 = tab();
+
+      // A browser restart: both boots read the marker before either has sent.
+      tab1.finishPendingPodSetup(RELOADED);
+      tab2.finishPendingPodSetup(RELOADED);
+      await settle();
+
+      expect(h.registerFamily).toHaveBeenCalledTimes(1);
+      expect(h.slackNotifyWithOutcome).toHaveBeenCalledTimes(1);
+      expect(h.track).toHaveBeenCalledTimes(1);
+      expect(lateLines('sent')).toHaveLength(1);
+      expect(lateLines('skipped').map((l) => l.context.detail)).toEqual(['wizard-active']);
+      expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+    });
+
+    it('a late send that started before another tab finished re-reads under the lock', async () => {
+      fake.installLocks(fake.fakeLocks({ deferGrant: true }));
+      marker.markPodSetupPending('fam-1', 'mem-1', null);
+      const tab1 = tab();
+      // Another tab sent it between this tab's first read and its lock grant.
+      tab1.finishPendingPodSetup(RELOADED);
+      marker.markPodSetupDone('fam-1');
+      await settle();
+
+      expect(slackPosts()).toBe(0);
+      expect(lateLines('skipped').map((l) => l.context.detail)).toEqual(['done-elsewhere']);
+    });
+
+    it('without Web Locks, a wizard completing after a late send in another tab skips (done-elsewhere)', async () => {
+      fake.installLocks(undefined);
+      marker.markPodSetupPending('fam-1', 'mem-1', null);
+      const tabA = tab();
+      const tabB = tab();
+
+      tabB.finishPendingPodSetup(RELOADED);
+      await settle();
+      await tabA.completePodSetup({ survey: ANSWERED });
+
+      expect(slackPosts()).toBe(1);
+      expect(h.track).toHaveBeenCalledTimes(1);
+      expect(h.logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'complete-setup',
+          context: { action: 'skipped', stage: 'wizard', detail: 'done-elsewhere' },
+        })
+      );
+    });
   });
 });
