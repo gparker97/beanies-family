@@ -40,6 +40,11 @@ const choreReset = vi.hoisted(() => ({ fn: null as null | (() => void) }));
 vi.doMock('@/stores/choreStore', () => ({
   useChoreStore: () => ({ resetState: () => choreReset.fn?.() }),
 }));
+// The star store (#148) too: a family switch must not carry one family's stars into the next.
+const starReset = vi.hoisted(() => ({ fn: null as null | (() => void) }));
+vi.doMock('@/stores/starStore', () => ({
+  useStarStore: () => ({ resetState: () => starReset.fn?.() }),
+}));
 vi.mock('@/stores/calendarSyncStore', () => ({ useCalendarSyncStore: () => ({ stop: vi.fn() }) }));
 vi.mock('@/stores/calendarClashStore', () => ({
   useCalendarClashStore: () => ({ stop: vi.fn() }),
@@ -66,6 +71,14 @@ describe('resetAllAppStores', () => {
   it('resets the chore store (#146), so a family switch cannot show the last family its chores', async () => {
     const spy = vi.fn();
     choreReset.fn = spy;
+    const { resetAllAppStores } = await import('@/utils/resetStores');
+    resetAllAppStores();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets the star store (#148), so a family switch cannot show the last family its stars', async () => {
+    const spy = vi.fn();
+    starReset.fn = spy;
     const { resetAllAppStores } = await import('@/utils/resetStores');
     resetAllAppStores();
     expect(spy).toHaveBeenCalledTimes(1);

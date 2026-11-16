@@ -33,6 +33,10 @@ vi.mock(
   async () => (await import('@/components/chores/__tests__/choreTestKit')).choreStoreModule
 );
 vi.mock(
+  '@/stores/starStore',
+  async () => (await import('@/components/chores/__tests__/choreTestKit')).starStoreModule
+);
+vi.mock(
   '@/composables/usePermissions',
   async () => (await import('@/components/chores/__tests__/choreTestKit')).permissionsModule
 );
@@ -44,6 +48,7 @@ vi.mock(
   'vue-router',
   async () => (await import('@/components/chores/__tests__/choreTestKit')).routerModule
 );
+vi.mock('@/stores/settingsStore', () => ({ useSettingsStore: () => ({ weekStartDay: 1 }) }));
 const logEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent }));
 vi.mock('@/composables/useBreakpoint', async () => {
@@ -75,18 +80,36 @@ import {
   resetKit,
   route,
   routerFns,
+  starActions,
+  stars,
 } from '@/components/chores/__tests__/choreTestKit';
+import { celebrateReward, resetChoreCelebrationForTest } from '@/composables/useCelebration';
 
 const modalStub = (name: string, props: string[]) =>
   defineComponent({ name, props, template: '<div />' });
 const StarterStub = modalStub('ChoreAddSheet', ['open', 'presetKey', 'presetMemberIds', 'carried']);
 const EditorStub = modalStub('ChoreBeanEditor', ['open', 'memberId']);
+const GiftStub = modalStub('StarGiftModal', ['open', 'memberId']);
+const AwardStub = modalStub('ChoreAwardModal', ['open', 'award']);
 
 const stubs = {
   ChoreAddSheet: StarterStub,
   ChoreBeanEditor: EditorStub,
   ChoreCopyModal: modalStub('ChoreCopyModal', ['open', 'sourceMemberId']),
   ChoreHoursModal: modalStub('ChoreHoursModal', ['open']),
+  ChoreRewardsView: defineComponent({
+    name: 'ChoreRewardsView',
+    emits: ['open-award'],
+    template: '<div data-testid="chore-rewards-view-stub" />',
+  }),
+  StarReportView: defineComponent({
+    name: 'StarReportView',
+    props: ['weeks', 'week'],
+    emits: ['update:week', 'open-rewards', 'open-award'],
+    template: '<div data-testid="star-report-view-stub" />',
+  }),
+  StarGiftModal: GiftStub,
+  ChoreAwardModal: AwardStub,
   CardArt: true,
   BeanieAvatar: true,
 };
@@ -239,6 +262,21 @@ describe('a child viewer', () => {
 });
 
 describe('a grown-up viewer', () => {
+  it('the reward banner is claimed only by a surface that draws it: a day says yes, the home cards say no', async () => {
+    const day = await mountPage({ bean: 'kid' });
+    await day.get('[data-chore-id="k1"] [data-testid="chore-tick"]').trigger('click');
+    await flushPromises();
+    expect(starActions.afterTick).toHaveBeenLastCalledWith(
+      expect.objectContaining({ memberId: 'kid', surface: 'app', showsBanner: true })
+    );
+    const home = await mountPage();
+    await home.get('[data-chore-id="k1"] [data-testid="chore-tick"]').trigger('click');
+    await flushPromises();
+    expect(starActions.afterTick).toHaveBeenLastCalledWith(
+      expect.objectContaining({ memberId: 'kid', surface: 'app', showsBanner: false })
+    );
+  });
+
   it('home: one card per living person (never a pet), and the manage controls', async () => {
     const w = await mountPage();
     expect(routerFns.replace).not.toHaveBeenCalled();
@@ -310,15 +348,16 @@ describe('a grown-up viewer', () => {
 
   it('the layout switch at the three widths (the page grid rules)', () => {
     // happy-dom does not lay out media queries, so the rules themselves are pinned: a phone
-    // stacks (one column), 768px spans both columns for each, 1280px puts the board across
-    // columns 1-2 and This Week in column 3.
+    // stacks (one column), 768px spans both columns for each, and from 1280px as many columns
+    // as fit (three to five, about 20rem each), This Week in the last and the board across
+    // the rest.
     const css = repoFile('src/pages/ChoreboardPage.vue').replace(/\s+/g, ' ');
     expect(css).toContain('.chore-home-grid { grid-template-columns: minmax(0, 1fr); }');
     expect(css).toMatch(
       /@media \(width >= 48rem\) \{ .chore-home-grid \{ grid-template-columns: repeat\(2, [^}]*\} .*?\.chore-home-lower > \.chore-home-summary \{ grid-column: 1 \/ -1; \}/
     );
     expect(css).toMatch(
-      /@media \(width >= 80rem\) \{ .chore-home-grid \{ grid-template-columns: repeat\(3, [^}]*\} \.chore-home-lower > \.chore-home-board \{ grid-column: 1 \/ span 2; \} \.chore-home-lower > \.chore-home-summary \{ grid-column: 3; \}/
+      /@media \(width >= 80rem\) \{ .chore-home-grid \{ --chore-home-gap: 0\.875rem; grid-template-columns: repeat\( auto-fill, minmax\( clamp\( calc\(\(100% - 4 \* var\(--chore-home-gap\)\) \/ 5\), 20rem, calc\(\(100% - 2 \* var\(--chore-home-gap\)\) \/ 3 - 1px\) \), 1fr \) \); \} \.chore-home-lower > \.chore-home-board \{ grid-column: 1 \/ -2; \} \.chore-home-lower > \.chore-home-summary \{ grid-column: -2 \/ -1; \}/
     );
   });
 
@@ -542,5 +581,444 @@ describe('a grown-up viewer', () => {
     expect(orphans.find('[data-testid="chore-edit"]').exists()).toBe(false);
     await orphans.get('[data-testid="chore-row-remove"]').trigger('click');
     expect(choreActions.deleteChore).toHaveBeenCalledWith('o1', 'mom');
+  });
+});
+
+/**
+ * Stars and rewards (#148). A grown-up's home has a view switch (Chores, the default, Star
+ * Report while the feature is on, and Rewards, always), never remembered, with `?view=` honoured once and stripped; a kid never sees it
+ * and their `?view=` is stripped and logged. Off means absent everywhere else. On: a kid's day
+ * head gets the arc (with the badge once achieved) and the count, every kid's chore shows its
+ * value, the achieved banner shows under the head while it is up, and "Give Stars" (a step-4
+ * stub) sits at the right of the switch on Stars and Rewards and on a kid's day for a grown-up.
+ */
+describe('stars and rewards', () => {
+  const STAR_IDS = [
+    'star-count',
+    'chore-day-ring',
+    'chore-day-stars',
+    'chore-day-badge',
+    'chore-give-stars',
+    'chore-day-give-stars',
+    'chore-day-reward-banner',
+  ];
+
+  it("off: no star element anywhere, on a kid's day or a grown-up's home", async () => {
+    family.currentMemberId = 'kid';
+    const day = await mountPage({ bean: 'kid' });
+    for (const id of STAR_IDS) expect(day.find(`[data-testid="${id}"]`).exists(), id).toBe(false);
+    family.currentMemberId = 'mom';
+    const home = await mountPage();
+    for (const id of STAR_IDS) expect(home.find(`[data-testid="${id}"]`).exists(), id).toBe(false);
+  });
+
+  it("a grown-up's home: the switch above the home, on Chores, the home as it always was", async () => {
+    const w = await mountPage();
+    const sw = w.get('[data-testid="chore-home-views"]');
+    expect(sw.text()).toContain('choreStars.view.chores');
+    expect(sw.text()).toContain('choreStars.view.rewards');
+    expect(w.find('[data-testid="chore-card-grid"]').exists()).toBe(true);
+    expect(w.find('[data-testid="chore-open-hours"]').exists()).toBe(true);
+    expect(w.find('[data-testid="chore-rewards-view-stub"]').exists()).toBe(false);
+    // The switch is the first thing on the home, above the welcome row.
+    const order = [...w.element.querySelectorAll('[data-testid]')].map((e) =>
+      e.getAttribute('data-testid')
+    );
+    expect(order.indexOf('chore-home-views')).toBeLessThan(order.indexOf('chore-now-pill'));
+  });
+
+  it('the switch opens Stars and Rewards (feature off or on) and back to Chores', async () => {
+    const w = await mountPage();
+    await w.get('[data-testid="chore-home-views"] button:nth-child(2)').trigger('click');
+    expect(w.find('[data-testid="chore-rewards-view-stub"]').exists()).toBe(true);
+    expect(w.find('[data-testid="chore-card-grid"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-open-hours"]').exists()).toBe(false);
+    // Off: no Give Stars.
+    expect(w.find('[data-testid="chore-give-stars"]').exists()).toBe(false);
+    await w.get('[data-testid="chore-home-views"] button:nth-child(1)').trigger('click');
+    expect(w.find('[data-testid="chore-card-grid"]').exists()).toBe(true);
+  });
+
+  it('?view=rewards opens Stars and Rewards once, then is stripped', async () => {
+    const w = await mountPage({ view: 'rewards' });
+    expect(w.find('[data-testid="chore-rewards-view-stub"]').exists()).toBe(true);
+    expect(routerFns.replace).toHaveBeenCalledWith({ query: {} });
+    expect(guarded()).toEqual([]);
+  });
+
+  it('an unknown ?view= stays on Chores, is stripped and logged', async () => {
+    const w = await mountPage({ view: 'nope' });
+    expect(w.find('[data-testid="chore-card-grid"]').exists()).toBe(true);
+    expect(routerFns.replace).toHaveBeenCalledWith({ query: {} });
+    expect(guarded()).toContain('view-unknown');
+  });
+
+  it('a kid never sees the switch; their ?view= is ignored, stripped and logged', async () => {
+    family.currentMemberId = 'kid';
+    const w = await mountPage({ view: 'rewards' });
+    expect(w.find('[data-testid="chore-home-views"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-rewards-view-stub"]').exists()).toBe(false);
+    expect(routerFns.replace).toHaveBeenCalledWith({ query: { bean: 'kid' } });
+    expect(guarded()).toContain('view-not-adult');
+  });
+
+  it("a bean's day has no switch, even for a grown-up", async () => {
+    const w = await mountPage({ bean: 'kid' });
+    expect(w.find('[data-testid="chore-home-views"]').exists()).toBe(false);
+  });
+
+  it('on: Give Stars at the right of the switch on Stars and Rewards and Star Report, opening the gift modal for no one', async () => {
+    stars.on = true;
+    const w = await mountPage();
+    expect(propsOf(w, GiftStub)).toMatchObject({ open: false });
+    expect(w.find('[data-testid="chore-give-stars"]').exists()).toBe(false);
+    // On: Chores, Star Report, Rewards.
+    await w.get('[data-testid="chore-home-views"] button:nth-child(3)').trigger('click');
+    expect(w.find('[data-testid="chore-rewards-view-stub"]').exists()).toBe(true);
+    await w.get('[data-testid="chore-give-stars"]').trigger('click');
+    expect(propsOf(w, GiftStub)).toMatchObject({ open: true, memberId: null });
+    w.findComponent(GiftStub).vm.$emit('close');
+    await flushPromises();
+    expect(propsOf(w, GiftStub).open).toBe(false);
+    await w.get('[data-testid="chore-home-views"] button:nth-child(2)').trigger('click');
+    expect(w.find('[data-testid="star-report-view-stub"]').exists()).toBe(true);
+    expect(w.find('[data-testid="chore-give-stars"]').exists()).toBe(true);
+  });
+
+  it("on: a grown-up on a kid's day gets a small Give Stars, opening the modal for that kid; a kid does not", async () => {
+    stars.on = true;
+    stars.earners = ['kid', 'sib'];
+    const grownUp = await mountPage({ bean: 'kid' });
+    await grownUp.get('[data-testid="chore-day-give-stars"]').trigger('click');
+    expect(propsOf(grownUp, GiftStub)).toMatchObject({ open: true, memberId: 'kid' });
+    family.currentMemberId = 'kid';
+    const kid = await mountPage({ bean: 'kid' });
+    expect(kid.find('[data-testid="chore-day-give-stars"]').exists()).toBe(false);
+    // Nor on a grown-up's day.
+    family.currentMemberId = 'mom';
+    chores.list = [...chores.list, chore('m1', { assigneeIds: ['dad'], title: 'Mow' })];
+    const dad = await mountPage({ bean: 'dad' });
+    expect(dad.find('[data-testid="chore-day-give-stars"]').exists()).toBe(false);
+  });
+
+  it('ONE special reward drawer, owned by the page, opened by either view’s open-award intent', async () => {
+    stars.on = true;
+    const w = await mountPage();
+    expect(w.findAllComponents(AwardStub)).toHaveLength(1);
+    expect(propsOf(w, AwardStub)).toMatchObject({ open: false });
+    await w.get('[data-testid="chore-home-views"] button:nth-child(3)').trigger('click');
+    w.findComponent({ name: 'ChoreRewardsView' }).vm.$emit('open-award', null);
+    await flushPromises();
+    expect(propsOf(w, AwardStub)).toMatchObject({ open: true, award: null });
+    w.findComponent(AwardStub).vm.$emit('close');
+    await flushPromises();
+    expect(propsOf(w, AwardStub).open).toBe(false);
+    await w.get('[data-testid="chore-home-views"] button:nth-child(2)').trigger('click');
+    const award = { id: 'a1', title: 'Zoo' };
+    w.findComponent({ name: 'StarReportView' }).vm.$emit('open-award', award);
+    await flushPromises();
+    expect(propsOf(w, AwardStub)).toMatchObject({ open: true, award });
+    expect(w.findAllComponents(AwardStub)).toHaveLength(1);
+  });
+
+  it('the switch reads Chores, Star Report, Rewards; Star Report only while the feature is on', async () => {
+    const off = await mountPage();
+    expect(off.findAll('[data-testid="chore-home-views"] button').map((b) => b.text())).toEqual([
+      'choreStars.view.chores',
+      'choreStars.view.rewards',
+    ]);
+    stars.on = true;
+    const on = await mountPage();
+    expect(on.findAll('[data-testid="chore-home-views"] button').map((b) => b.text())).toEqual([
+      'choreStars.view.chores',
+      'choreStars.view.report',
+      'choreStars.view.rewards',
+    ]);
+  });
+
+  it('?view=report opens Star Report once while on; off, it is stripped and logged', async () => {
+    stars.on = true;
+    const on = await mountPage({ view: 'report' });
+    expect(on.find('[data-testid="star-report-view-stub"]').exists()).toBe(true);
+    expect(guarded()).toEqual([]);
+    stars.on = false;
+    logEvent.mockReset();
+    const off = await mountPage({ view: 'report' });
+    expect(off.find('[data-testid="star-report-view-stub"]').exists()).toBe(false);
+    expect(off.find('[data-testid="chore-card-grid"]').exists()).toBe(true);
+    expect(routerFns.replace).toHaveBeenCalledWith({ query: {} });
+    expect(guarded()).toContain('view-feature-off');
+  });
+
+  it("the report's Rewards Settings intent switches the page to the Rewards view", async () => {
+    stars.on = true;
+    const w = await mountPage({ view: 'report' });
+    w.findComponent({ name: 'StarReportView' }).vm.$emit('open-rewards');
+    await flushPromises();
+    expect(w.find('[data-testid="star-report-view-stub"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-rewards-view-stub"]').exists()).toBe(true);
+    expect(w.findComponent({ name: 'TogglePillGroup' }).props('modelValue')).toBe('rewards');
+  });
+
+  it('turning the feature off while the report shows falls back to Chores', async () => {
+    stars.on = true;
+    const w = await mountPage({ view: 'report' });
+    expect(w.find('[data-testid="star-report-view-stub"]').exists()).toBe(true);
+    stars.on = false;
+    await flushPromises();
+    expect(w.find('[data-testid="star-report-view-stub"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-card-grid"]').exists()).toBe(true);
+  });
+
+  it('a kid never reaches the report: ?view=report is ignored, stripped and logged', async () => {
+    stars.on = true;
+    family.currentMemberId = 'kid';
+    const w = await mountPage({ view: 'report' });
+    expect(w.find('[data-testid="star-report-view-stub"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-week-stepper"]').exists()).toBe(false);
+    expect(guarded()).toContain('view-not-adult');
+  });
+
+  it("a kid's own day: today's and yesterday's notes under the head, as the store hands them", async () => {
+    stars.on = true;
+    stars.earners = ['kid'];
+    const gift = (id: string, n: number, date: string, note?: string) => ({
+      id,
+      memberId: 'kid',
+      date,
+      stars: n,
+      by: 'dad',
+      note,
+      createdAt: `${date}T09:00:00.000Z`,
+      updatedAt: `${date}T09:00:00.000Z`,
+    });
+    stars.notes = {
+      kid: [gift('g2', -1, '2026-11-13', 'Bike left out'), gift('g1', 2, '2026-11-12', 'Helped')],
+    };
+    family.currentMemberId = 'kid';
+    const w = await mountPage({ bean: 'kid' });
+    const notes = w.findAll('[data-testid="star-note"]');
+    expect(notes.map((n) => n.attributes('data-kind'))).toEqual(['take', 'bonus']);
+    expect(notes[0]!.text()).toContain('choreStars.takeBack.note.title.one');
+    // Off: no notes.
+    stars.on = false;
+    await flushPromises();
+    expect(w.find('[data-testid="chore-day-notes"]').exists()).toBe(false);
+  });
+
+  it("a grown-up's home: a kid's card carries the path strip; a grown-up's card does not; off, none", async () => {
+    stars.on = true;
+    stars.earners = ['kid', 'sib'];
+    stars.strips = {
+      kid: {
+        week: { total: 9, full: 20, bar: 16 },
+        path: {
+          stepSize: 1,
+          steps: 20,
+          earned: 9,
+          next: 1,
+          thinFrom: 20,
+          barAt: 15,
+          awardAt: null,
+          toBar: 7,
+          reached: false,
+          reachable: true,
+        },
+        nearest: null,
+        thisWeek: null,
+      },
+    };
+    chores.list = [...chores.list, chore('m1', { assigneeIds: ['dad'], title: 'Mow' })];
+    const w = await mountPage();
+    const card = (id: string) => w.get(`[data-testid="chore-bean-card"][data-member-id="${id}"]`);
+    expect(card('kid').find('[data-testid="star-path-strip"]').exists()).toBe(true);
+    expect(card('sib').find('[data-testid="chore-bean-strip"]').exists()).toBe(false);
+    expect(card('dad').find('[data-testid="chore-bean-strip"]').exists()).toBe(false);
+    stars.on = false;
+    await flushPromises();
+    expect(w.find('[data-testid="chore-bean-strip"]').exists()).toBe(false);
+  });
+
+  describe('looking back: the stepper on the Chores Done board', () => {
+    const WEEKS = ['2026-11-09', '2026-11-02', '2026-10-26', '2026-10-19', '2026-10-12'];
+    const board = (w: VueWrapper) => w.get('[data-testid="chore-week-panel"]');
+    const boardDays = (w: VueWrapper) => [
+      ...new Set(
+        board(w)
+          .findAll('[data-testid="chore-day-cell"]')
+          .map((c) => c.attributes('data-ymd'))
+      ),
+    ];
+    const stepBack = async (w: VueWrapper) => {
+      await board(w).get('[aria-label="planner.prevPeriod"]').trigger('click');
+      await flushPromises();
+    };
+
+    it('feature off: the stepper is on the board, over this week and the four before it', async () => {
+      const w = await mountPage();
+      const stepper = board(w).get('[data-testid="chore-week-stepper"]');
+      expect(stepper.attributes('data-week')).toBe(WEEKS[0]);
+      // Not in the page's controls row any more: it belongs to the board.
+      expect(w.findAll('[data-testid="chore-week-stepper"]')).toHaveLength(1);
+      for (let i = 0; i < 6; i++) await stepBack(w);
+      expect(board(w).attributes('data-week')).toBe(WEEKS[4]);
+      expect(
+        board(w).get('[aria-label="planner.prevPeriod"]').attributes('disabled')
+      ).toBeDefined();
+    });
+
+    it("feature on: the stars' frozen-aware weeks; with nothing to step back to, no stepper", async () => {
+      stars.on = true;
+      stars.lookback = ['2026-11-09'];
+      const one = await mountPage();
+      expect(one.find('[data-testid="chore-week-stepper"]').exists()).toBe(false);
+      stars.lookback = WEEKS;
+      const w = await mountPage();
+      expect(board(w).find('[data-testid="chore-week-stepper"]').exists()).toBe(true);
+    });
+
+    it("stepped back: only the board changes; today's cards stay live and This Week stays this week", async () => {
+      const w = await mountPage();
+      const ticks = w.findAll('[data-testid="chore-tick"]').length;
+      expect(ticks).toBeGreaterThan(0);
+      const summaryBefore = w.get('[data-testid="chore-week-summary"]').html();
+      await stepBack(w);
+      expect(board(w).attributes('data-week')).toBe('2026-11-02');
+      expect(board(w).attributes('data-looking-back')).toBe('true');
+      expect(board(w).find('[data-testid="chore-lookback-notice"]').exists()).toBe(true);
+      expect(boardDays(w)).toEqual([
+        '2026-11-02',
+        '2026-11-03',
+        '2026-11-04',
+        '2026-11-05',
+        '2026-11-06',
+        '2026-11-07',
+        '2026-11-08',
+      ]);
+      // The cards are all still there and tickable; This Week is unchanged.
+      expect(w.find('[data-testid="chore-card-grid"]').exists()).toBe(true);
+      expect(w.findAll('[data-testid="chore-tick"]')).toHaveLength(ticks);
+      expect(w.get('[data-testid="chore-week-summary"]').html()).toBe(summaryBefore);
+      // A tick on a card still ticks today.
+      await w.findAll('[data-testid="chore-tick"]')[0]!.trigger('click');
+      expect(choreActions.toggleChore).toHaveBeenCalled();
+      // The board has nothing to tick, and no day of the past week opens the bean's day.
+      expect(board(w).find('[data-testid="chore-tick"]').exists()).toBe(false);
+      // The URL never carries the week.
+      expect(route.query.week).toBeUndefined();
+      await board(w).findAll('[data-testid="calendar-today"]')[0]!.trigger('click');
+      await flushPromises();
+      expect(board(w).attributes('data-looking-back')).toBeUndefined();
+      expect(board(w).attributes('data-week')).toBe(WEEKS[0]);
+    });
+
+    it('a past day on the board opens its read-only summary, with no Open Day action', async () => {
+      // Chores that were already there that week, so its days had something due.
+      chores.list = chores.list.map((c) => ({ ...c, createdAt: '2026-10-01T12:00:00.000Z' }));
+      const w = await mountPage();
+      await stepBack(w);
+      const cell = board(w)
+        .findAll('[data-testid="chore-day-cell"]')
+        .find((c) => c.element.tagName === 'BUTTON');
+      expect(cell).toBeDefined();
+      await cell!.trigger('click');
+      await flushPromises();
+      const pop = document.body.querySelector('[data-testid="chore-day-popover"]');
+      expect(pop?.textContent ?? '').toContain('choreboard.pop.readOnly');
+      expect(document.body.querySelector('[data-testid="chore-day-popover-open-day"]')).toBeNull();
+    });
+
+    it('the Star Report gets the same weeks and the same week', async () => {
+      stars.on = true;
+      stars.lookback = WEEKS;
+      const w = await mountPage();
+      await stepBack(w);
+      await w.get('[data-testid="chore-home-views"] button:nth-child(2)').trigger('click');
+      const report = w.findComponent({ name: 'StarReportView' });
+      expect(report.props()).toMatchObject({ weeks: WEEKS, week: '2026-11-02' });
+      report.vm.$emit('update:week', '2026-10-26');
+      await flushPromises();
+      expect(report.props('week')).toBe('2026-10-26');
+    });
+
+    it('a kid never sees the stepper', async () => {
+      family.currentMemberId = 'kid';
+      const w = await mountPage();
+      expect(w.find('[data-testid="chore-week-stepper"]').exists()).toBe(false);
+    });
+  });
+
+  it("a kid's own day: the arc and the count, a value on every chore, nothing new to tap", async () => {
+    stars.on = true;
+    stars.earners = ['kid', 'sib'];
+    stars.arcs = { kid: { percent: 69, count: 22 } };
+    chores.list = chores.list.map((c) => (c.id === 'k1' ? { ...c, stars: 2 } : c));
+    family.currentMemberId = 'kid';
+    const w = await mountPage({ bean: 'kid' });
+    const ring = w.get('[data-testid="chore-day-ring"]');
+    expect(ring.attributes('data-percent')).toBe('69');
+    expect(w.get('[data-testid="chore-day-stars"]').text()).toBe('22');
+    expect(w.find('[data-testid="chore-day-badge"]').exists()).toBe(false);
+    const values = w
+      .findAll('[data-testid="chore-row"]')
+      .map((r) => [r.attributes('data-chore-id'), r.find('[data-testid="star-count"]').text()]);
+    expect(values).toEqual(
+      expect.arrayContaining([
+        ['k1', '2'],
+        ['k2', '1'],
+      ])
+    );
+    expect(w.find('[data-testid="chore-day-give-stars"]').exists()).toBe(false);
+    expect(starActions.setRewards).not.toHaveBeenCalled();
+  });
+
+  it('achieved: the badge on the avatar', async () => {
+    stars.on = true;
+    stars.earners = ['kid'];
+    stars.arcs = { kid: { percent: 100, count: 33, badgeEmoji: '🍦' } };
+    family.currentMemberId = 'kid';
+    const w = await mountPage({ bean: 'kid' });
+    expect(w.get('[data-testid="chore-day-badge"]').text()).toBe('🍦');
+    expect(w.get('[data-testid="chore-day-ring"]').attributes('data-percent')).toBe('100');
+  });
+
+  it("a grown-up's day (no arc) draws the head as before, and no values", async () => {
+    stars.on = true;
+    stars.earners = ['kid'];
+    chores.list = [...chores.list, chore('m1', { assigneeIds: ['dad'], title: 'Mow' })];
+    const w = await mountPage({ bean: 'dad' });
+    expect(w.find('[data-testid="chore-day-ring"]').exists()).toBe(false);
+    expect(w.find('[data-testid="star-count"]').exists()).toBe(false);
+  });
+
+  it("the achieved moment: the banner under the kid's head while it is up, nothing to press", async () => {
+    vi.useFakeTimers();
+    try {
+      resetChoreCelebrationForTest();
+      stars.on = true;
+      stars.earners = ['kid'];
+      stars.arcs = { kid: { percent: 100, count: 33, badgeEmoji: '🍦' } };
+      family.currentMemberId = 'kid';
+      const w = await mountPage({ bean: 'kid' });
+      expect(w.find('[data-testid="chore-day-reward-banner"]').exists()).toBe(false);
+      await celebrateReward({
+        memberId: 'kid',
+        beanName: 'Pip',
+        title: 'Ice cream',
+        emoji: '🍦',
+        stillAchieved: () => true,
+        claim: async () => true,
+      });
+      await flushPromises();
+      const banner = w.get('[data-testid="chore-day-reward-banner"]');
+      expect(banner.text()).toContain('choreStars.banner.title');
+      expect(banner.find('button').exists()).toBe(false);
+      vi.runAllTimers();
+      await flushPromises();
+      expect(w.find('[data-testid="chore-day-reward-banner"]').exists()).toBe(false);
+    } finally {
+      resetChoreCelebrationForTest();
+      vi.useRealTimers();
+    }
   });
 });

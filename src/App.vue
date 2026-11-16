@@ -148,6 +148,7 @@ import { useRecipesStore } from '@/stores/recipesStore';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useChoreStore } from '@/stores/choreStore';
+import { useStarStore } from '@/stores/starStore';
 import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -201,6 +202,7 @@ const recipesStore = useRecipesStore();
 const mealPlanStore = useMealPlanStore();
 const responsibilityStore = useResponsibilityStore();
 const choreStore = useChoreStore();
+const starStore = useStarStore();
 const emergencyContactsStore = useEmergencyContactsStore();
 const settingsStore = useSettingsStore();
 // Seed the family's unset home time zone (calendar sync + import resolve through it).
@@ -1169,6 +1171,8 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
           responsibilityStore.load(),
           // The choreboard (#146): loads whatever the flag says (the gate hides surfaces, not data).
           choreStore.loadChores(),
+          // Stars and rewards (#148): beside the chores it reads, as `reloadAllStores` does.
+          starStore.loadStars(),
           emergencyContactsStore.loadEmergencyContacts(),
         ]);
       }

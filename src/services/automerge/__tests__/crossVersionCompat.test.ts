@@ -202,14 +202,21 @@ describe('cross-version .beanpod compatibility (current engine <-> automerge-leg
 //      edits, so `touchedBetween` does not answer `null` and its offline work is replayed.
 
 const CHORE_ROOTS = ['chores', 'choreMarks'];
+/** Collections added after the choreboard (#148 stars and rewards). */
+const STAR_ROOTS = ['choreWeeks', 'choreAwards', 'choreStarGifts'];
 type OldDocOps = typeof import('../worker/docOps');
 
 /** `docOps` as the build before the choreboard had it. See the block comment above. */
 async function loadPreChoreboardDocOps(): Promise<OldDocOps> {
+  return loadDocOpsWithout([...CHORE_ROOTS, ...STAR_ROOTS]);
+}
+
+/** `docOps` as a build that did not yet know `roots` had it (same source, fewer collections). */
+async function loadDocOpsWithout(roots: readonly string[]): Promise<OldDocOps> {
   vi.resetModules();
   vi.doMock('@/types/automerge', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/types/automerge')>();
-    const COLLECTION_NAMES = actual.COLLECTION_NAMES.filter((n) => !CHORE_ROOTS.includes(n));
+    const COLLECTION_NAMES = actual.COLLECTION_NAMES.filter((n) => !roots.includes(n));
     return {
       ...actual,
       COLLECTION_NAMES,
@@ -270,7 +277,9 @@ describe('a build that does not know chores / choreMarks (#146 rollout)', () => 
   }
 
   const withoutChoreRoots = (deltas: ProjectionDelta[]) =>
-    deltas.filter((x) => !(x.kind === 'bulk' && CHORE_ROOTS.includes(x.collection)));
+    deltas.filter(
+      (x) => !(x.kind === 'bulk' && [...CHORE_ROOTS, ...STAR_ROOTS].includes(x.collection))
+    );
 
   it('the simulated older build really does not know the two collections', () => {
     const projected = oldOps.buildFullProjection(newerDeviceWrites(olderPodBytes()));
@@ -410,5 +419,238 @@ describe('a build that does not know chores / choreMarks (#146 rollout)', () => 
     expect(
       buildRebaseOpsCurrent(AmNew.load<FamilyDocument>(saveDoc(onOld)), staleBaseline, target)
     ).not.toBeNull();
+  });
+});
+
+// ─── A build that does not know `choreWeeks` (#148 stars and rewards rollout) ──
+//
+// The 1.5 build knows `chores` / `choreMarks` but not `choreWeeks`. A newer device freezes a
+// closed week into the family file; the older build must project everything it knows exactly as
+// before, fall back to a full rebuild on a merge carrying the record, keep writing, and save the
+// record back WHOLE for the newer devices.
+
+describe('a build that does not know the star collections (#148 rollout)', () => {
+  let oldOps: OldDocOps;
+  beforeAll(async () => {
+    oldOps = await loadDocOpsWithout(STAR_ROOTS);
+  });
+
+  const WEEK = {
+    id: 'kid:2026-11-09',
+    memberId: 'kid',
+    weekStart: '2026-11-09',
+    done: 5,
+    due: 7,
+    stars: 6,
+    bonus: 1,
+    full: 8,
+    bar: 8,
+    days: [1, 2, 0, 1, 2, 0, 0],
+    marks: 5,
+    createdAt: '2026-11-16T08:00:00.000Z',
+    updatedAt: '2026-11-16T08:00:00.000Z',
+  };
+
+  /** A pod written by the 1.5 build: chores and marks, no `choreWeeks` map. */
+  function olderPodBytes(): Uint8Array {
+    let d = oldOps.migrateDoc(AmNew.init<FamilyDocument>()) as AnyDoc;
+    d = oldOps.applyMutation(d, {
+      op: 'set',
+      collection: 'chores',
+      id: 'c1',
+      entity: { id: 'c1', title: 'Make bed', assigneeIds: ['kid'] },
+    }).doc as AnyDoc;
+    expect(d.choreWeeks).toBeUndefined();
+    return saveDoc(d);
+  }
+
+  const withoutStarRoots = (deltas: ProjectionDelta[]) =>
+    deltas.filter((x) => !(x.kind === 'bulk' && STAR_ROOTS.includes(x.collection)));
+
+  it('projects a merged doc holding a frozen week, rebuilds on it, keeps writing, and saves it whole', () => {
+    const podBytes = olderPodBytes();
+    let onOld = AmNew.load<FamilyDocument>(podBytes) as AnyDoc;
+    const beforeMerge = AmNew.getHeads(onOld);
+
+    const newer = set(
+      migrateDoc(AmNew.load<FamilyDocument>(podBytes)),
+      'choreWeeks',
+      WEEK.id,
+      WEEK
+    );
+    onOld = oldOps.mergeDocs(onOld, AmNew.load<FamilyDocument>(saveDoc(newer))).doc as AnyDoc;
+    expect(normalize(oldOps.buildFullProjection(onOld))).toEqual(
+      withoutStarRoots(projectDoc(onOld))
+    );
+    expect(oldOps.projectionDeltasBetween(onOld, beforeMerge, AmNew.getHeads(onOld))).toBeNull();
+
+    // Its own chore tick still takes the delta path, and the write lands.
+    const ownEditFrom = AmNew.getHeads(onOld);
+    onOld = oldOps.applyMutation(onOld, {
+      op: 'set',
+      collection: 'choreMarks',
+      id: 'done:kid:2026-11-16:c1',
+      entity: choreMark('kid', '2026-11-16', 'c1'),
+    }).doc as AnyDoc;
+    expect(
+      oldOps.projectionDeltasBetween(onOld, ownEditFrom, AmNew.getHeads(onOld))
+    ).not.toBeNull();
+
+    const saved = AmNew.load<FamilyDocument>(oldOps.saveDoc(onOld));
+    expect(JSON.parse(JSON.stringify(saved.choreWeeks?.[WEEK.id]))).toEqual(WEEK);
+    expect(Object.keys(saved.choreMarks ?? {})).toEqual(['done:kid:2026-11-16:c1']);
+  });
+
+  it('projects merged awards and gifts, rebuilds on them, and saves them back whole', () => {
+    const podBytes = olderPodBytes();
+    let onOld = AmNew.load<FamilyDocument>(podBytes) as AnyDoc;
+    const beforeMerge = AmNew.getHeads(onOld);
+    const award = {
+      id: 'a1',
+      title: 'Disneyland',
+      emoji: '🏰',
+      kind: 'saved',
+      unit: 'weeks',
+      price: 4,
+      // A special reward for chosen kids (an `*Ids` array): kept whole by the older build.
+      memberIds: ['kid'],
+      weekStart: '2026-11-09',
+      createdBy: 'mom',
+      createdAt: '2026-11-16T08:00:00.000Z',
+      updatedAt: '2026-11-16T08:00:00.000Z',
+    };
+    const gift = {
+      id: 'g1',
+      memberId: 'kid',
+      date: '2026-11-16',
+      stars: 2,
+      by: 'mom',
+      note: 'Helped',
+      createdAt: '2026-11-16T08:00:00.000Z',
+      updatedAt: '2026-11-16T08:00:00.000Z',
+    };
+    let newer = migrateDoc(AmNew.load<FamilyDocument>(podBytes));
+    newer = set(newer, 'choreAwards', award.id, award);
+    newer = set(newer, 'choreStarGifts', gift.id, gift);
+    onOld = oldOps.mergeDocs(onOld, AmNew.load<FamilyDocument>(saveDoc(newer))).doc as AnyDoc;
+    expect(normalize(oldOps.buildFullProjection(onOld))).toEqual(
+      withoutStarRoots(projectDoc(onOld))
+    );
+    expect(oldOps.projectionDeltasBetween(onOld, beforeMerge, AmNew.getHeads(onOld))).toBeNull();
+    const saved = AmNew.load<FamilyDocument>(oldOps.saveDoc(onOld));
+    expect(JSON.parse(JSON.stringify(saved.choreAwards?.a1))).toEqual(award);
+    expect(JSON.parse(JSON.stringify(saved.choreStarGifts?.g1))).toEqual(gift);
+  });
+
+  it('an older build’s chore edit keeps `stars`, and its settings save keeps `choreRewards`', () => {
+    const podBytes = olderPodBytes();
+    // A newer device sets a chore's value and turns stars on.
+    let newer = migrateDoc(AmNew.load<FamilyDocument>(podBytes));
+    newer = set(newer, 'chores', 'c1', {
+      id: 'c1',
+      title: 'Make bed',
+      assigneeIds: ['kid'],
+      stars: 3,
+    });
+    const rewards = { on: true, startedOn: '2026-11-09', weeklyOn: true, title: 'Ice cream' };
+    newer = applyMutation(newer, {
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { id: 'app_settings', choreRewards: rewards }, base: {} },
+    }).doc;
+    let onOld = AmNew.load<FamilyDocument>(saveDoc(newer)) as AnyDoc;
+    // The older build renames the chore (a based patch of the one key it changed)...
+    onOld = oldOps.applyMutation(onOld, {
+      op: 'patch',
+      collection: 'chores',
+      id: 'c1',
+      patch: { title: 'Make your bed' },
+      base: { title: 'Make bed' },
+    }).doc as AnyDoc;
+    // ...and saves one setting of its own.
+    onOld = oldOps.applyMutation(onOld, {
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { id: 'app_settings', theme: 'dark' }, base: { theme: 'system' } },
+    }).doc as AnyDoc;
+    const back = JSON.parse(JSON.stringify(AmNew.load<FamilyDocument>(oldOps.saveDoc(onOld))));
+    expect(back.chores.c1).toMatchObject({ title: 'Make your bed', stars: 3 });
+    expect(back.settings).toMatchObject({ theme: 'dark', choreRewards: rewards });
+  });
+
+  it('a build before chosen kids edits a special reward with a based patch and keeps `memberIds`', () => {
+    const podBytes = olderPodBytes();
+    let doc = migrateDoc(AmNew.load<FamilyDocument>(podBytes));
+    const award = {
+      id: 'a2',
+      title: 'Zoo',
+      emoji: '🦁',
+      kind: 'saved',
+      unit: 'weeks',
+      price: 2,
+      memberIds: ['kid'],
+      weekStart: '2026-11-09',
+      createdBy: 'mom',
+      createdAt: '2026-11-16T08:00:00.000Z',
+      updatedAt: '2026-11-16T08:00:00.000Z',
+    };
+    doc = set(doc, 'choreAwards', award.id, award);
+    // That build knows nothing of `memberIds`: its edit is a based patch of the key it changed.
+    doc = applyMutation(doc, {
+      op: 'patch',
+      collection: 'choreAwards',
+      id: 'a2',
+      patch: { title: 'Zoo trip' },
+      base: { title: 'Zoo' },
+    }).doc;
+    const back = JSON.parse(JSON.stringify(AmNew.load<FamilyDocument>(saveDoc(doc))));
+    expect(back.choreAwards.a2).toMatchObject({ title: 'Zoo trip', memberIds: ['kid'] });
+  });
+
+  it('a `reward` celebrated mark does not disturb an older build’s chore day', async () => {
+    const { beanChoreDay, indexMarks, DEFAULT_CHORE_BLOCK_STARTS } = await import('@/utils/chores');
+    const day = '2026-11-16';
+    const chores = [
+      {
+        id: 'c1',
+        title: 'Make bed',
+        emoji: '🛏️',
+        assigneeIds: ['kid'],
+        block: 'morning' as const,
+        sortOrder: 0,
+        createdBy: 'mom',
+        createdAt: '2026-11-01T08:00:00.000Z',
+        updatedAt: '2026-11-01T08:00:00.000Z',
+      },
+    ];
+    const reward = {
+      id: `celebrated:kid:${day}:reward`,
+      kind: 'celebrated' as const,
+      memberId: 'kid',
+      date: day,
+      ref: 'reward',
+      by: 'kid',
+      createdAt: `${day}T08:00:00.000Z`,
+      updatedAt: `${day}T08:00:00.000Z`,
+    };
+    const clock = { ymd: day, hhmm: '09:00' };
+    const living = new Set(['kid']);
+    const plainDay = beanChoreDay(
+      chores,
+      indexMarks([]),
+      'kid',
+      clock,
+      DEFAULT_CHORE_BLOCK_STARTS,
+      living
+    );
+    const withReward = beanChoreDay(
+      chores,
+      indexMarks([reward]),
+      'kid',
+      clock,
+      DEFAULT_CHORE_BLOCK_STARTS,
+      living
+    );
+    expect(withReward).toEqual(plainDay);
   });
 });

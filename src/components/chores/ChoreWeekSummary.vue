@@ -15,10 +15,12 @@
  * decides).
  *
  * Dark mode: the card is `surface-raised` with a `line` edge; names `ink`, counts `ink-soft`; the
- * bar is the Heritage Orange gradient on `--tint-slate-10`, which switches with the theme.
+ * bar is `ProgressBar` (the Heritage Orange gradient on `--tint-slate-10`, which switches with the
+ * theme).
  */
 import { computed } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import ProgressBar from '@/components/ui/ProgressBar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
 import { choreWeekPercent, choreWeekTallies, type ChoreWeekRecord } from '@/utils/chores';
@@ -117,16 +119,7 @@ const hasFreeDay = computed(() =>
               >{{ b.count }}</span
             >
           </span>
-          <span
-            class="mt-1 block h-1.5 overflow-hidden rounded-full bg-[var(--tint-slate-10)]"
-            aria-hidden="true"
-          >
-            <span
-              class="from-primary-500 to-terracotta-400 block h-full rounded-full bg-gradient-to-r transition-[width] duration-300 motion-reduce:transition-none"
-              :style="{ width: `${b.pct}%` }"
-              data-testid="chore-week-summary-bar"
-            />
-          </span>
+          <ProgressBar class="mt-1" :percent="b.pct" fill-testid="chore-week-summary-bar" />
         </button>
       </li>
     </ul>

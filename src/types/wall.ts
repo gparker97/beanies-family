@@ -4,7 +4,7 @@
  * Declared here rather than inferred from a composable's return type so a view
  * can be built (and tested) without importing the composable that produces it.
  */
-import type { ChoreBlock, FamilyList, TodoItem } from '@/types/models';
+import type { Chore, ChoreBlock, FamilyList, TodoItem } from '@/types/models';
 import type { BeanChoreDay } from '@/utils/chores';
 import type { PlateClock, ShownPlate } from '@/utils/todoPlate';
 
@@ -64,6 +64,11 @@ export interface WallJob {
    * still works: ticking a repeating to-do rolls it to its next date.
    */
   locked?: boolean;
+  /**
+   * Stars (#148), chore rows only: the chore's star value, set only when it is worth more than
+   * 1 (a row shows its value only then). Absent while stars are off or for a grown-up's lane.
+   */
+  stars?: number;
   /**
    * Every owner of a to-do row that stands for several assignees. Set only by
    * `uniqueTodoJobs`, for the combined views (the drawer and the summary card);
@@ -145,6 +150,28 @@ export interface WallChoreLane {
   blocks: WallChoreBlock[];
   done: number;
   total: number;
+  /**
+   * Stars (#148): the lane header's thin arc and quiet count. ABSENT while stars are off, for a
+   * grown-up or a pet, and when there is nothing to draw: the header renders exactly as before.
+   */
+  stars?: WallLaneStars;
+}
+
+/**
+ * A child's lane-header arc (`starStore.arcFor`): 0..100, the count, what the count is (the
+ * week's stars or the stars saved toward the nearest saved-up award), the badge once achieved.
+ */
+export interface WallLaneStars {
+  percent: number;
+  count: number;
+  kind: 'week' | 'saved';
+  badgeEmoji?: string;
+}
+
+/** What the wall's job build reads for one child's stars (`starStore.wallStarsFor`). */
+export interface WallStarsInput {
+  lane: WallLaneStars | null;
+  valueOf: (chore: Pick<Chore, 'stars'>) => number;
 }
 
 /**
@@ -195,6 +222,11 @@ export interface WallJobsInput {
    * while the `choreboard` gate is off: the rule itself never reads the flag.
    */
   choreDays?: Readonly<Record<string, BeanChoreDay>>;
+  /**
+   * Stars (#148): each child's lane stars, or `null` (a grown-up, a pet, stars off). Omitted =
+   * no stars anywhere, exactly the board before stars.
+   */
+  starsFor?: (memberId: string) => WallStarsInput | null;
 }
 
 /**

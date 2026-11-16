@@ -53,6 +53,7 @@ import type {
   WallJobsResult,
   WallListGroup,
   WallPeripheralData,
+  WallStarsInput,
   WallTodoBucket,
 } from '@/types/wall';
 import { listAssignees, normalizeAssignees } from '@/utils/assignees';
@@ -207,7 +208,7 @@ function listJob(list: FamilyList, item: FamilyListItem, ownerId: string): WallJ
  * wall's one chore edit is adding one), and the tick still works. The owner is part of the key
  * because a shared chore is ticked separately per bean (one `done` mark each).
  */
-function choreJob(chore: Chore, done: boolean, ownerId: string): WallJob {
+function choreJob(chore: Chore, done: boolean, ownerId: string, stars?: number): WallJob {
   return {
     key: `chore:${chore.id}:${ownerId}`,
     title: chore.title,
@@ -216,6 +217,8 @@ function choreJob(chore: Chore, done: boolean, ownerId: string): WallJob {
     source: 'chore',
     choreId: chore.id,
     ...(chore.emoji ? { listEmoji: chore.emoji } : {}),
+    // Stars (#148): a value is carried only above 1, the only time a row shows it.
+    ...(stars !== undefined && stars > 1 ? { stars } : {}),
     locked: true,
   };
 }
@@ -248,13 +251,19 @@ export function jobWriteKey(job: WallJob): string {
  * One bean's chore day as a wall lane. Empty blocks are dropped; the order is the choreboard's
  * one display order (`blocksInDisplayOrder`): now, Anytime, still to come, passed.
  */
-function choreLane(memberId: string, day: BeanChoreDay): WallChoreLane {
+function choreLane(
+  memberId: string,
+  day: BeanChoreDay,
+  stars: WallStarsInput | null = null
+): WallChoreLane {
   const blocks = day.blocks;
   const current: ChoreBlock = blocks.find((b) => b.isNow)?.block ?? 'morning';
   const laneBlocks: WallChoreBlock[] = blocksInDisplayOrder(blocks.filter((b) => b.total > 0)).map(
     (b) => ({
       block: b.block,
-      jobs: b.chores.map((item) => choreJob(item.chore, item.done, memberId)),
+      jobs: b.chores.map((item) =>
+        choreJob(item.chore, item.done, memberId, stars?.valueOf(item.chore))
+      ),
       done: b.done,
       total: b.total,
       allDone: b.allDone,
@@ -268,6 +277,7 @@ function choreLane(memberId: string, day: BeanChoreDay): WallChoreLane {
     blocks: laneBlocks,
     done: laneBlocks.reduce((n, b) => n + b.done, 0),
     total: laneBlocks.reduce((n, b) => n + b.total, 0),
+    ...(stars?.lane ? { stars: { ...stars.lane } } : {}),
   };
 }
 
@@ -279,7 +289,7 @@ function choreLane(memberId: string, day: BeanChoreDay): WallChoreLane {
  * nothing is ever written to either store here.
  */
 export function buildWallJobs(input: WallJobsInput): WallJobsResult {
-  const { todos, lists, memberIds, clock, choreDays = {} } = input;
+  const { todos, lists, memberIds, clock, choreDays = {}, starsFor } = input;
   const todayYmd = clock.ymd;
 
   const listsByMember: Record<string, WallListGroup[]> = {};
@@ -369,7 +379,7 @@ export function buildWallJobs(input: WallJobsInput): WallJobsResult {
   const choreLanesByMember: Record<string, WallChoreLane> = {};
   for (const id of memberIds) {
     const day = choreDays[id];
-    if (day) choreLanesByMember[id] = choreLane(id, day);
+    if (day) choreLanesByMember[id] = choreLane(id, day, starsFor?.(id) ?? null);
   }
 
   return { listsByMember, orphanLists, todos: built, choreLanesByMember };

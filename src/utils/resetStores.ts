@@ -12,6 +12,7 @@ import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useChoreStore } from '@/stores/choreStore';
+import { useStarStore } from '@/stores/starStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useCalendarClashStore } from '@/stores/calendarClashStore';
@@ -40,6 +41,7 @@ export function resetAllAppStores(): void {
   useActivityStore().resetState();
   useResponsibilityStore().resetState();
   useChoreStore().resetState();
+  useStarStore().resetState();
   // The Add Chores sheet's list (memory only, never in the family file) holds this family's
   // chore names: it must not follow the session into another pod.
   clearChoreAddDraft();

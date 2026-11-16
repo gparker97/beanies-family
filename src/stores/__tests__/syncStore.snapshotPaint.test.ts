@@ -100,7 +100,7 @@ import type {
   DispatchReply,
 } from '@/services/automerge/worker/protocol';
 import { shiftChoreDay } from '@/utils/chores';
-import { seedEntities, today } from './loadTimeWriterFixtures';
+import { seedEntities, STAR_SETTINGS, today } from './loadTimeWriterFixtures';
 import { CHORE_MARK_SWEEP_KEY } from '@/utils/cycleSweepClock';
 import { useSyncStore } from '../syncStore';
 import { useListStore } from '../listStore';
@@ -169,6 +169,7 @@ async function arm(
   for (const [collection, entity] of seedEntities('auth')) {
     await mutate({ op: 'set', collection, id: entity.id as string, entity });
   }
+  await mutate({ op: 'named', name: 'patchSettings', args: { patch: { ...STAR_SETTINGS } } });
   const authEntities = COLLECTION_NAMES.flatMap((c) =>
     projectionList(c).map(
       (e) => [c, e as Record<string, unknown>] as [CollectionName, Record<string, unknown>]
@@ -264,6 +265,7 @@ describe('snapshot paint never waits on a write', () => {
         expect(ids).toContain('c-auth');
         expect(ids).toContain('admin-auth');
         expect(ids).toContain('asset-auth');
+        expect(ids).toContain('kid-auth:'); // the stars week close (#148)
       },
       { timeout: 3000 }
     );
@@ -278,6 +280,7 @@ describe('snapshot paint never waits on a write', () => {
     expect(count('c-auth')).toBe(1);
     expect(count('admin-auth')).toBe(1);
     expect(count('asset-auth')).toBe(1);
+    expect(count('kid-auth:')).toBe(1);
 
     // The stores now show the authoritative, maintained data.
     expect(useListStore().lists.find((l) => l.id === 'list-auth')?.items[0]?.completed).toBe(false);

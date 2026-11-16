@@ -8,6 +8,17 @@ const TS = '2020-01-01T00:00:00.000Z';
 export const today = localToday();
 const yesterday = addDaysYmd(today, -1);
 const longAgo = addDaysYmd(today, -120);
+const lastWeek = addDaysYmd(today, -7);
+
+/**
+ * Stars and rewards (#148) ON since long ago: with the kid, the chore and the tick below, the
+ * stars week close wants to freeze every closable week. Seed it with
+ * `mutate({ op: 'named', name: 'patchSettings', args: { patch: STAR_SETTINGS } })`.
+ */
+export const STAR_SETTINGS = {
+  id: 'app_settings',
+  choreRewards: { on: true, startedOn: '2020-01-01', weeklyOn: true, barPct: 100 },
+} as const;
 
 /** Everything a load-time writer wants to act on, with ids tagged by source. */
 export function seedEntities(
@@ -98,6 +109,47 @@ export function seedEntities(
         by: 'owner',
         createdAt: TS,
         updatedAt: TS,
+      },
+    ],
+    // A kid with a daily chore ticked last week: with `STAR_SETTINGS`, the stars week close is due.
+    [
+      'familyMembers',
+      {
+        id: `kid-${tag}`,
+        name: 'Kid',
+        email: `k-${tag}@x`,
+        role: 'member',
+        ageGroup: 'child',
+        color: '#222',
+        createdAt: TS,
+        updatedAt: TS,
+      },
+    ],
+    [
+      'chores',
+      {
+        id: `chore-${tag}`,
+        title: 'Make bed',
+        emoji: '🛏️',
+        assigneeIds: [`kid-${tag}`],
+        block: 'morning',
+        sortOrder: 0,
+        createdBy: 'owner',
+        createdAt: TS,
+        updatedAt: TS,
+      },
+    ],
+    [
+      'choreMarks',
+      {
+        id: choreMarkId('done', `kid-${tag}`, lastWeek, `chore-${tag}`),
+        kind: 'done',
+        memberId: `kid-${tag}`,
+        date: lastWeek,
+        ref: `chore-${tag}`,
+        by: `kid-${tag}`,
+        createdAt: `${lastWeek}T08:00:00.000Z`,
+        updatedAt: `${lastWeek}T08:00:00.000Z`,
       },
     ],
     // An asset with a loan and no linked account: the linked-loan migration is due.

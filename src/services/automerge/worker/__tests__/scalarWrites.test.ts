@@ -187,9 +187,15 @@ function leaves(node: unknown, path = '', out = new Map<string, boolean>()): Map
  * +2 on 2026-11-13 (#146, 910 → 912 and 80 → 82): the migrated starting document gained the two
  * choreboard root maps (`chores`, `choreMarks`), one `makeMap` op each from their stored
  * migration changes. The scripted writes themselves are unchanged.
+ *
+ * +1 on 2026-11-16 (#148, 912 → 913 and 82 → 83): the `choreWeeks` root map, one `makeMap` op
+ * from its stored migration change. The scripted writes themselves are unchanged.
+ *
+ * +2 on 2026-11-16 (#148, 913 → 915 and 83 → 85): the `choreAwards` and `choreStarGifts` root
+ * maps, one `makeMap` op each. The scripted writes themselves are unchanged.
  */
-const OFF_NUM_OPS = 912;
-const OFF_SET_SETTINGS_NUM_OPS = 82;
+const OFF_NUM_OPS = 915;
+const OFF_SET_SETTINGS_NUM_OPS = 85;
 
 describe('scalar writer OFF: the shipped write path, unchanged (#124 acceptance 2)', () => {
   it('the scripted sequence lands on the recorded op count, with no ImmutableString anywhere', () => {

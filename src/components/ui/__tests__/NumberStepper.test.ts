@@ -99,3 +99,29 @@ describe('NumberStepper', () => {
     expect((w.get('input').element as HTMLInputElement).value).toBe('8');
   });
 });
+
+describe('NumberStepper step (#148)', () => {
+  it('−/+ move by the step and every emitted value sits on the grid', async () => {
+    const w = factory(80, { min: 50, max: 100, step: 5 });
+    await w.get('[data-testid="stepper-increase"]').trigger('click');
+    await w.get('[data-testid="stepper-increase"]').trigger('click');
+    await w.get('[data-testid="stepper-decrease"]').trigger('click');
+    expect(emitted(w)).toEqual([85, 90, 85]);
+  });
+
+  it('a typed value rounds to the nearest grid point, then clamps to the range', async () => {
+    const w = factory(80, { min: 50, max: 100, step: 5 });
+    const input = w.get('input');
+    for (const typed of ['73', '72', '7', '120']) {
+      (input.element as HTMLInputElement).value = typed;
+      await input.trigger('input');
+    }
+    expect(emitted(w)).toEqual([75, 70, 50, 100]);
+  });
+
+  it('without a step it is every whole number, as before', async () => {
+    const w = factory(4);
+    await w.get('[data-testid="stepper-increase"]').trigger('click');
+    expect(emitted(w)).toEqual([5]);
+  });
+});

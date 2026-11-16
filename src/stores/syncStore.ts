@@ -34,6 +34,7 @@ import { useRecipesStore } from './recipesStore';
 import { useMealPlanStore } from './mealPlanStore';
 import { useResponsibilityStore } from './responsibilityStore';
 import { useChoreStore } from './choreStore';
+import { useStarStore } from './starStore';
 import { useEmergencyContactsStore } from './emergencyContactsStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
@@ -4786,6 +4787,9 @@ export const useSyncStore = defineStore('sync', () => {
       const mealPlanStoreInst = useMealPlanStore();
       const responsibilityStoreInst = useResponsibilityStore();
       const choreStoreInst = useChoreStore();
+      // Created here on every device (#148): creating it registers the stars week close as load
+      // maintenance, so a week is frozen even on a device that never opened a star page.
+      const starStoreInst = useStarStore();
       const emergencyContactsStoreInst = useEmergencyContactsStore();
 
       // Snapshot permission state before reload for diagnostics
@@ -4823,6 +4827,7 @@ export const useSyncStore = defineStore('sync', () => {
           mealPlanStoreInst.loadMealPlans(),
           responsibilityStoreInst.load(),
           choreStoreInst.loadChores(),
+          starStoreInst.loadStars(),
           emergencyContactsStoreInst.loadEmergencyContacts(),
         ])
       ).finally(endLoadPhase);

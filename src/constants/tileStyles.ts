@@ -1,6 +1,6 @@
 /**
- * Shared tile and calendar-day class vocabularies: the magic-beans tile look and the calendar
- * "today" marker.
+ * Shared tile and calendar-day class vocabularies: the magic-beans tile look, the calendar
+ * "today" marker, and the Choreboard's summary popovers.
  *
  * The magic-beans tile vocabulary, shared by the capture drawer's kind tiles (#108) and the
  * quick-add tiles (#119), so the app has one "selected" look.
@@ -61,3 +61,15 @@ export function calendarDayBackground(
   if (tint) return CALENDAR_DAY_TINT[tint];
   return isToday ? CALENDAR_TODAY.wash : resting;
 }
+
+/**
+ * The Choreboard's "tap a number to see it" summaries (`ChoreDayPopover`, `StarBonusPopover`),
+ * drawn in `AnchoredSurface`: one look, so a day's summary and a child's bonus summary read as
+ * the same kind of thing. On dark both are `surface-overlay` (a popover over a raised card) with
+ * a `line-strong` edge.
+ */
+export const CHORE_POPOVER_SHEET =
+  'dark:bg-surface-overlay dark:border-line-strong max-h-[75dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-[var(--tint-slate-10)] bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(44,62,80,0.16)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.5)]';
+
+export const CHORE_POPOVER_CARD =
+  'dark:bg-surface-overlay dark:border-line-strong max-h-[min(36rem,calc(100dvh-1rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-[1.25rem] border border-[var(--tint-slate-10)] bg-white shadow-[0_14px_44px_rgba(44,62,80,0.2)] dark:shadow-[0_14px_44px_rgba(0,0,0,0.45)]';

@@ -11,6 +11,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useListStore } from '@/stores/listStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useChoreStore } from '@/stores/choreStore';
+import { useStarStore } from '@/stores/starStore';
 import { useToday } from '@/composables/useToday';
 import { useChoreClock } from '@/composables/useChoreClock';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -152,6 +153,7 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
   const listStore = useListStore();
   const todoStore = useTodoStore();
   const choreStore = useChoreStore();
+  const starStore = useStarStore();
   const authStore = useAuthStore();
   const { today } = useToday();
   const { choreClock } = useChoreClock();
@@ -180,6 +182,9 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
       // the minute a timed to-do turns overdue at.
       clock: { ...plateClock(), ymd: today.value },
       choreDays,
+      // Stars (#148): the lane's arc and count and each chore's value, from the star store's one
+      // bundle. Null for a grown-up, a pet, or while stars are off: the lane draws as before.
+      ...(choresOn ? { starsFor: (id: string) => starStore.wallStarsFor(id) } : {}),
     });
   });
 
@@ -247,6 +252,8 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
    * A chore is ticked FOR the lane's bean (`ownerId`: a shared chore is one mark per bean) and
    * credited to `actor`, the same crediting rule as the other two. The store passes
    * `errorToast: false` for the wall, because `write()` below reports a failed toggle.
+   * Stars (#148): once the tick resolves, `starStore.afterTick` gets the outcome, not awaited.
+   * A chore ticked here is always on its bean's lane, which draws the reward banner.
    */
   const writers: Record<
     WallJob['source'],
@@ -254,12 +261,21 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
   > = {
     todo: (job, actor) => todoStore.toggleComplete(job.todoId as string, actor),
     list: (job, actor) => listStore.toggleItem(job.listId as string, job.itemId as string, actor),
-    chore: (job, actor, anchor) =>
-      choreStore.toggleChore(job.choreId as string, job.ownerId, {
+    chore: async (job, actor, anchor) => {
+      const choreId = job.choreId as string;
+      const outcome = await choreStore.toggleChore(choreId, job.ownerId, {
         surface: 'wall',
         by: actor,
         ...(anchor ? { anchor } : {}),
-      }),
+      });
+      void starStore.afterTick({
+        memberId: job.ownerId,
+        outcome,
+        surface: 'wall',
+        showsBanner: true,
+      });
+      return outcome;
+    },
   };
 
   /** `anchor`: a chore lane's block and tick, where an all-done celebration plays (#146). */

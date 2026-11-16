@@ -17,7 +17,13 @@ import {
   sortChores,
   choreWeekRecord,
 } from '@/utils/chores';
-import type { Chore, ChoreBlockStarts, ChoreMark, FamilyMember } from '@/types/models';
+import type {
+  Chore,
+  ChoreBlockStarts,
+  ChoreMark,
+  ChoreStarGift,
+  FamilyMember,
+} from '@/types/models';
 
 export const NOW = '2026-11-13T07:42:00.000Z';
 /** Friday 2026-11-13, 7:42: Morning is the block happening now. */
@@ -105,6 +111,14 @@ const familyStoreFake = {
 
 export const familyStoreModule = { useFamilyStore: () => familyStoreFake };
 
+/** `starStore.earnerMembers` for a star fake: the given kids as members, in family order. */
+export const earnerMembersOf = (ids: readonly string[]): FamilyMember[] =>
+  familyStoreFake.sortedHumans.filter((m) => ids.includes(m.id));
+
+/** `starStore.sortedAwards` for a star fake: the order the awards were made. */
+export const sortedAwardsOf = <A extends { createdAt?: string }>(awards: readonly A[]): A[] =>
+  [...awards].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+
 // ── choreStore ───────────────────────────────────────────────────────────────
 
 export const chores = reactive({
@@ -160,12 +174,82 @@ const choreStoreFake = {
   get todayYmd() {
     return clock.ymd;
   },
-  weekFor: (memberId: string) =>
-    choreWeekRecord(chores.list, markIndex.value, memberId, clock.ymd, 1, livingIds.value),
+  weekFor: (memberId: string, weekOfYmd: string = clock.ymd, weekStartDay = 1) =>
+    choreWeekRecord(
+      chores.list,
+      markIndex.value,
+      memberId,
+      weekOfYmd,
+      weekStartDay,
+      livingIds.value
+    ),
   ...choreActions,
 };
 
 export const choreStoreModule = { useChoreStore: () => choreStoreFake };
+
+// ── starStore (#148): the tick paths hand every outcome to `afterTick` ───────
+
+/**
+ * The star store's surface the chore views read, OFF by default (so every pre-stars test sees the
+ * board exactly as before). A test turns it on with `stars.on` and seeds what the getters answer.
+ */
+export const stars = reactive({
+  on: false,
+  /** The kids (living, non-adult): who `valueFor` answers for. */
+  earners: [] as string[],
+  arcs: {} as Record<
+    string,
+    { percent: number; count: number; kind?: 'week' | 'saved'; badgeEmoji?: string }
+  >,
+  /** What `notesFor` answers per kid (already today's and yesterday's, newest first). */
+  notes: {} as Record<string, ChoreStarGift[]>,
+  /** What `stripFor` answers per kid. */
+  strips: {} as Record<string, unknown>,
+  /** The weeks the stepper offers, newest first (empty while off). */
+  lookback: [] as string[],
+});
+export const starActions = {
+  afterTick: vi.fn(async () => {}),
+  setRewards: vi.fn(async (): Promise<true | null> => true),
+  giveStars: vi.fn(async (): Promise<unknown> => ({})),
+};
+const starStoreFake = {
+  get isOn() {
+    return stars.on;
+  },
+  get earners() {
+    return stars.earners;
+  },
+  /** The earners as members, in family order (the real getter's shape). */
+  get earnerMembers() {
+    return earnerMembersOf(stars.earners);
+  },
+  get sortedAwards() {
+    return [];
+  },
+  get rewards() {
+    return { on: stars.on, weeklyOn: true, title: 'Ice cream', emoji: '🍦', barPct: 80 };
+  },
+  get lookbackWeeks() {
+    return stars.on ? stars.lookback : [];
+  },
+  get awards() {
+    return [];
+  },
+  get gifts() {
+    return [];
+  },
+  weekFor: () => null,
+  awardsFor: () => [],
+  arcFor: (memberId: string) => (stars.on ? (stars.arcs[memberId] ?? null) : null),
+  notesFor: (memberId: string) => (stars.on ? (stars.notes[memberId] ?? []) : []),
+  stripFor: (memberId: string) => (stars.on ? (stars.strips[memberId] ?? null) : null),
+  valueFor: (memberId: string) =>
+    stars.on && stars.earners.includes(memberId) ? (c: { stars?: number }) => c.stars ?? 1 : null,
+  ...starActions,
+};
+export const starStoreModule = { useStarStore: () => starStoreFake };
 
 // ── usePermissions ───────────────────────────────────────────────────────────
 
@@ -213,5 +297,16 @@ export function resetKit(): void {
   routerFns.replace.mockClear();
   routerFns.push.mockClear();
   for (const fn of Object.values(choreActions)) fn.mockReset();
+  starActions.afterTick.mockClear();
+  starActions.setRewards.mockReset();
+  starActions.setRewards.mockResolvedValue(true);
+  stars.on = false;
+  stars.earners = [];
+  stars.arcs = {};
+  stars.notes = {};
+  stars.strips = {};
+  stars.lookback = [];
+  starActions.giveStars.mockReset();
+  starActions.giveStars.mockResolvedValue({});
   choreActions.loadChores.mockResolvedValue(undefined);
 }

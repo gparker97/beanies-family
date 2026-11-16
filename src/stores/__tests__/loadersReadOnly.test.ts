@@ -40,7 +40,7 @@ import {
 } from '@/services/automerge/loadMaintenance';
 import { CHORE_MARK_SWEEP_KEY } from '@/utils/cycleSweepClock';
 import { shiftChoreDay } from '@/utils/chores';
-import { seedEntities } from './loadTimeWriterFixtures';
+import { seedEntities, STAR_SETTINGS } from './loadTimeWriterFixtures';
 import { useSyncStore } from '../syncStore';
 import { useFamilyStore } from '../familyStore';
 import { useAccountsStore } from '../accountsStore';
@@ -64,6 +64,7 @@ import { useRecipesStore } from '../recipesStore';
 import { useMealPlanStore } from '../mealPlanStore';
 import { useResponsibilityStore } from '../responsibilityStore';
 import { useChoreStore } from '../choreStore';
+import { useStarStore } from '../starStore';
 import { useEmergencyContactsStore } from '../emergencyContactsStore';
 
 /** Every loader `reloadAllStores` and App.vue's direct-loader path call. */
@@ -90,6 +91,7 @@ const LOADERS: Array<[string, () => Promise<unknown>]> = [
   ['mealPlanStore.loadMealPlans', () => useMealPlanStore().loadMealPlans()],
   ['responsibilityStore.load', () => useResponsibilityStore().load()],
   ['choreStore.loadChores', () => useChoreStore().loadChores()],
+  ['starStore.loadStars', () => useStarStore().loadStars()],
   [
     'emergencyContactsStore.loadEmergencyContacts',
     () => useEmergencyContactsStore().loadEmergencyContacts(),
@@ -101,6 +103,7 @@ async function seedWriteProvokingDocument(): Promise<void> {
   for (const [collection, entity] of seedEntities('auth')) {
     await mutate({ op: 'set', collection, id: entity.id as string, entity });
   }
+  await mutate({ op: 'named', name: 'patchSettings', args: { patch: { ...STAR_SETTINGS } } });
   localStorage.setItem(CHORE_MARK_SWEEP_KEY, shiftChoreDay(useChoreStore().todayYmd, -1));
 }
 
@@ -137,6 +140,7 @@ describe('store loaders are read-only', () => {
     expect(takeLoadPhaseViolations()).toEqual([]);
     // The writers did run, after the phase: the data was provably write-provoking.
     expect(useListStore().lists[0]?.items[0]?.completed).toBe(false);
+    expect(useStarStore().weeks.some((w) => w.memberId === 'kid-auth')).toBe(true);
   });
 
   it('control: a write inside the phase IS caught through the real client', async () => {

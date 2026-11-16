@@ -16,6 +16,9 @@ import { WALL_EDIT, type WallEditContext } from '../wallEditKey';
 import { WALL_BURST } from '../wallBurstKey';
 import type { ChoreBlock, FamilyMember } from '@/types/models';
 import type { WallChoreBlock, WallChoreLane, WallJob, WallPeripheralData } from '@/types/wall';
+import ProgressRing from '@/components/ui/ProgressRing.vue';
+import { celebrateReward, resetChoreCelebrationForTest } from '@/composables/useCelebration';
+import { repoFile } from '@/test/repoFile';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -393,5 +396,120 @@ describe('WallChoreLanes', () => {
     await later.find('[data-testid="wall-chore-quiet"]').trigger('click');
     await nextTick();
     expect(scrollBy).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Stars (#148), drawn only from the lane's own `stars` (the bundle leaves it out while stars are
+ * off, for a grown-up and when there is nothing to draw): the arc in the face button, the count at
+ * the end of the name row, the badge once achieved, the count dropping out on a narrow lane, and
+ * the achieved banner at the top of the lane body.
+ */
+describe('WallChoreLanes: stars', () => {
+  const withStars = (stars: WallChoreLane['stars']) => ({ ...pipMorning(), stars });
+  const header = (w: ReturnType<typeof mountLanes>, id: string) =>
+    w.find(
+      `[data-testid="wall-chore-lane"][data-member="${id}"] [data-testid="wall-chore-lane-header"]`
+    );
+
+  it("a kid's lane: the arc around the avatar, toward the bar, and the count in the name row", () => {
+    const w = mountLanes({ pip: withStars({ percent: 69, count: 22, kind: 'week' }) });
+    const head = header(w, 'pip');
+    const ring = head.findComponent(ProgressRing);
+    expect(ring.exists()).toBe(true);
+    expect(ring.props('segments')).toEqual([{ value: 0.69, tone: 'fill' }]);
+    const count = head.find('[data-testid="wall-chore-lane-stars"]');
+    expect(count.text()).toBe('22');
+    expect(count.attributes('aria-label')).toBe('choreStars.count.other');
+    expect(head.find('[data-testid="wall-chore-lane-badge"]').exists()).toBe(false);
+    expect(head.classes()).toContain('has-stars');
+  });
+
+  it("achieved: the arc closes and the reward's emoji sits on the avatar", () => {
+    const w = mountLanes({
+      pip: withStars({ percent: 100, count: 33, kind: 'week', badgeEmoji: '🍦' }),
+    });
+    const head = header(w, 'pip');
+    expect(head.findComponent(ProgressRing).props('segments')).toEqual([
+      { value: 1, tone: 'fill' },
+    ]);
+    expect(head.find('[data-testid="wall-chore-lane-badge"]').text()).toBe('🍦');
+  });
+
+  it('a lane without stars (a grown-up, or stars off) is the header exactly as before', () => {
+    const plain = mountLanes({
+      pip: pipMorning(),
+      juno: withStars({ percent: 10, count: 2, kind: 'week' }),
+    });
+    const head = header(plain, 'pip');
+    expect(head.findComponent(ProgressRing).exists()).toBe(false);
+    expect(head.find('[data-testid="star-count"]').exists()).toBe(false);
+    expect(head.classes()).not.toContain('has-stars');
+    // Same markup as a board that has never heard of stars.
+    const before = mountLanes({ pip: pipMorning() });
+    expect(head.html()).toBe(header(before, 'pip').html());
+  });
+
+  it('with no weekly reward the count is the stars saved up, and spoken that way', () => {
+    const w = mountLanes({ pip: withStars({ percent: 40, count: 64, kind: 'saved' }) });
+    const count = header(w, 'pip').get('[data-testid="wall-chore-lane-stars"]');
+    expect(count.attributes('data-kind')).toBe('saved');
+    expect(count.attributes('aria-label')).toBe('choreStars.count.saved.other');
+  });
+
+  it('the ring is drawn in the avatar’s own footprint (the header never grows with stars)', () => {
+    const css = repoFile('src/components/wall/WallChoreLanes.vue');
+    // 3.6rem pulled in by 0.3rem on every side: exactly the 3rem avatar in the layout.
+    expect(css).toMatch(
+      /\.wall-star-ring \{\s*height: 3\.6rem;\s*margin: -0\.3rem;\s*width: 3\.6rem;/
+    );
+    const w = mountLanes({ pip: withStars({ percent: 0, count: 0, kind: 'week' }) });
+    // The avatar inside is the same size as a lane without stars.
+    expect(header(w, 'pip').findComponent(ProgressRing).html()).toMatch(
+      /beanie-avatar-stub[^>]*size="lg"/
+    );
+  });
+
+  it('the count is the first thing to go on a narrow lane (a container query on the header)', () => {
+    const css = repoFile('src/components/wall/WallChoreLanes.vue');
+    expect(css).toMatch(/\.wall-chore-lane-head\.has-stars \{\s*container-type: inline-size;/);
+    expect(css).toMatch(/@container \(width < 12rem\) \{\s*\.wall-star-count \{\s*display: none;/);
+    const w = mountLanes({ pip: withStars({ percent: 50, count: 9, kind: 'week' }) });
+    expect(w.find('[data-testid="wall-chore-lane-stars"]').classes()).toContain('wall-star-count');
+  });
+
+  it("the achieved moment: the banner at the top of that child's lane, nothing to press", async () => {
+    vi.useFakeTimers();
+    try {
+      resetChoreCelebrationForTest();
+      const w = mountLanes({
+        pip: withStars({ percent: 100, count: 33, kind: 'week', badgeEmoji: '🍦' }),
+        juno: withStars({ percent: 40, count: 8, kind: 'week' }),
+      });
+      expect(w.find('[data-testid="wall-chore-reward-banner"]').exists()).toBe(false);
+      await celebrateReward({
+        memberId: 'pip',
+        beanName: 'Pip',
+        title: 'Ice cream',
+        emoji: '🍦',
+        stillAchieved: () => true,
+        claim: async () => true,
+      });
+      await nextTick();
+      const banners = w.findAll('[data-testid="wall-chore-reward-banner"]');
+      expect(banners).toHaveLength(1);
+      const pipLane = w.find('[data-testid="wall-chore-lane"][data-member="pip"]');
+      const banner = pipLane.findComponent(CelebrationBanner);
+      expect(banner.props('title')).toBe('choreStars.banner.title');
+      expect(banner.props('body')).toBe('choreStars.banner.body.other');
+      expect(banner.props('compact')).toBe(true);
+      expect(banner.props('actionLabel')).toBe('');
+      vi.runAllTimers();
+      await nextTick();
+      expect(w.find('[data-testid="wall-chore-reward-banner"]').exists()).toBe(false);
+    } finally {
+      resetChoreCelebrationForTest();
+      vi.useRealTimers();
+    }
   });
 });

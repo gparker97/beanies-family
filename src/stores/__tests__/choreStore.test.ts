@@ -210,7 +210,12 @@ import {
   runLoadMaintenance,
 } from '@/services/automerge/loadMaintenance';
 import { markAuthoritative, resetProjection } from '@/services/automerge/projection';
-import { choreMarkId, shiftChoreDay, MAX_MARK_SWEEP_DELETES } from '@/utils/chores';
+import {
+  choreMarkId,
+  shiftChoreDay,
+  MAX_MARK_SWEEP_DELETES,
+  REWARD_MARK_REF,
+} from '@/utils/chores';
 import { CHORE_MARK_SWEEP_KEY, LIST_CYCLE_SWEEP_KEY } from '@/utils/cycleSweepClock';
 import * as clockModule from '@/composables/useChoreClock';
 import * as Automerge from '@automerge/automerge';
@@ -1534,5 +1539,97 @@ describe('removeChoresForMember (Delete on a bean’s day)', () => {
     expect(rows).toEqual(['keep']);
     expect(day.left).toBe(1);
     expect(() => store.weekFor('kid')).not.toThrow();
+  });
+});
+
+// ─── Stars and rewards (#148), step 1: what the chore store gives the star store ────────
+describe('stars and rewards hooks (#148)', () => {
+  it('updateChore({ stars }) writes a whole number 1 to 5 and logs via rewards', async () => {
+    await setup([chore('c1')]);
+    const updated = await store.updateChore('c1', { stars: 3 }, 'mom', { via: 'rewards' });
+    expect(updated?.stars).toBe(3);
+    expect(writes.updateChore).toHaveBeenCalledWith('c1', { stars: 3 });
+    expect(logged('chore-saved')[0]!.context).toMatchObject({ action: 'update', kind: 'rewards' });
+  });
+
+  it.each([0, 6, 2.5, Number.NaN, '3' as never])(
+    'updateChore({ stars: %s }) is the invalid refusal and writes nothing',
+    async (stars) => {
+      await setup([chore('c1')]);
+      expect(await store.updateChore('c1', { stars }, 'mom', { via: 'rewards' })).toBeNull();
+      expect(writes.updateChore).not.toHaveBeenCalled();
+      expect(logged('edit-refused')[0]!.context).toEqual({
+        action: 'updateChore',
+        detail: 'invalid',
+      });
+    }
+  );
+
+  it('a child cannot change a star value', async () => {
+    await setup([chore('c1')]);
+    expect(await store.updateChore('c1', { stars: 2 }, 'kid', { via: 'rewards' })).toBeNull();
+    expect(writes.updateChore).not.toHaveBeenCalled();
+  });
+
+  it('Copy carries a chore’s star value, and leaves an absent one absent', async () => {
+    await setup([chore('a', { stars: 4 }), chore('b', { sortOrder: 1, title: 'Other' })]);
+    await store.copyChores('kid', ['sib'], ['morning'], 'mom');
+    const copies = (writes.createChores.mock.calls[0]![0] as { input: Partial<Chore> }[]).map(
+      (i) => i.input
+    );
+    expect(copies.map((c) => [c.title, c.stars])).toEqual([
+      ['Title a', 4],
+      ['Other', undefined],
+    ]);
+  });
+
+  it('writeCelebratedMark with REWARD_MARK_REF writes the once-only reward mark on the week start', async () => {
+    await setup([chore('c1')]);
+    const weekStart = '2026-11-09';
+    expect(await store.writeCelebratedMark('kid', weekStart, REWARD_MARK_REF, 'kid')).toBe(
+      'created'
+    );
+    const id = choreMarkId('celebrated', 'kid', weekStart, REWARD_MARK_REF);
+    expect(db.marks.get(id)).toMatchObject({ kind: 'celebrated', ref: 'reward', date: weekStart });
+    expect(store.markIndex.get('kid')?.get(weekStart)?.celebrated.has('reward')).toBe(true);
+    expect(await store.writeCelebratedMark('kid', weekStart, REWARD_MARK_REF, 'kid')).toBe(
+      'exists'
+    );
+    // It does not disturb that day's blocks.
+    setClock(weekStart, '09:00');
+    expect(store.choreDayFor('kid').blocks.every((b) => !b.celebrated)).toBe(true);
+  });
+
+  it('a failed reward mark is reported with slot reward, never toasted', async () => {
+    await setup([chore('c1')]);
+    db.failNext = new Error('disk');
+    expect(await store.writeCelebratedMark('kid', '2026-11-09', REWARD_MARK_REF, 'kid')).toBe(
+      'failed'
+    );
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'the celebrated mark could not be written; the ticks landed',
+        context: { action: 'celebrate-mark-failed', slot: 'reward' },
+      })
+    );
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('weekFor: the family week start by default, or the week start passed', async () => {
+    await setup([chore('c1')]);
+    // Friday 11-13; the family starts weeks on Monday.
+    expect(store.weekFor('kid').days[0]!.ymd).toBe('2026-11-09');
+    expect(store.weekFor('kid', FRI).days.map((d) => d.ymd)).toHaveLength(7);
+    // A week frozen as a Sunday week before a week-start change: its own seven days.
+    const sundayWeek = store.weekFor('kid', '2026-11-08', 0);
+    expect(sundayWeek.days.map((d) => d.ymd)).toEqual([
+      '2026-11-08',
+      '2026-11-09',
+      '2026-11-10',
+      '2026-11-11',
+      '2026-11-12',
+      '2026-11-13',
+      '2026-11-14',
+    ]);
   });
 });

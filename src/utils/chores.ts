@@ -20,6 +20,7 @@ import type {
   Settings,
 } from '@/types/models';
 import { localYmdOf } from '@/utils/localYmd';
+import { CHORE_STARS_MAX, CHORE_STARS_MIN } from '@/constants/choreStars';
 
 /** The four blocks, in the order every surface lists them. */
 export const CHORE_BLOCKS: readonly ChoreBlock[] = ['morning', 'afternoon', 'evening', 'anytime'];
@@ -32,8 +33,28 @@ export const DEFAULT_CHORE_BLOCK_STARTS: Readonly<ChoreBlockStarts> = Object.fre
 });
 
 /**
- * How long a mark is kept. Nothing in this feature reads past the current week; #148 (stars
- * and rewards) raises this when it has a reader.
+ * The `ref` of the weekly reward's once-only `celebrated` mark (#148): `date` is the week's
+ * first day, so its id is `celebrated:<member>:<weekStart>:reward`. Not a block, so an older
+ * build's `beanChoreDay` (which asks `celebrated.has(block)`) never sees it. Written only by
+ * `choreStore.writeCelebratedMark`, read through `marksOn`.
+ *
+ * Accepted residual (greg, 2026-11-16): because the key is the week's first day, changing the
+ * family's week start in the middle of a week gives that week a new first day with no mark, so
+ * a child already past the bar can see the banner once more. Left as it is on purpose.
+ */
+export const REWARD_MARK_REF = 'reward' as const;
+
+/** Is `v` a chore star value a grown-up may store: a whole number 1 to 5 (#148)? */
+export function isChoreStarValue(v: unknown): v is number {
+  return (
+    Number.isInteger(v) && (v as number) >= CHORE_STARS_MIN && (v as number) <= CHORE_STARS_MAX
+  );
+}
+
+/**
+ * How long a mark is kept. Read through `markCutoffYmd` by the retention sweep and by the stars
+ * week close (#148), which freezes a closed week before its marks age out; the four-week look-back
+ * there needs at least 35.
  */
 export const CHORE_MARK_KEEP_DAYS = 35;
 
@@ -240,7 +261,7 @@ export function choreMarkId(
 export interface ChoreDayMarks {
   /** Chore ids with a `done` mark. May include chores since deleted. */
   done: ReadonlySet<string>;
-  /** Blocks whose celebration has played. */
+  /** Blocks whose celebration has played, and `REWARD_MARK_REF` on a week's first day. */
   celebrated: ReadonlySet<string>;
 }
 
@@ -516,6 +537,17 @@ export function choreDayRecord(
   return { ymd, blocks, done, total };
 }
 
+/**
+ * The first day of the week holding `ymd` (`weekStartDay`: 0 = Sunday, 1 = Monday), or `null`
+ * when `ymd` is not a date. THE week-start rule: the Chores Done board and the stars week close
+ * both read it.
+ */
+export function choreWeekStart(ymd: string, weekStartDay: number = 1): string | null {
+  const dow = choreDayOfWeek(ymd);
+  if (dow < 0) return null;
+  return shiftChoreDay(ymd, -((dow - weekStartDay + 7) % 7));
+}
+
 /** A bean's week: seven day records from the week's first day, and the chores done in all. */
 export interface ChoreWeekRecord {
   days: ChoreDayRecord[];
@@ -534,9 +566,8 @@ export function choreWeekRecord(
   weekStartDay: number = 1,
   living?: ReadonlySet<string>
 ): ChoreWeekRecord {
-  const dow = choreDayOfWeek(weekOfYmd);
-  if (dow < 0) return { days: [], total: 0 };
-  const first = shiftChoreDay(weekOfYmd, -((dow - weekStartDay + 7) % 7));
+  const first = choreWeekStart(weekOfYmd, weekStartDay);
+  if (first === null) return { days: [], total: 0 };
   const days = Array.from({ length: 7 }, (_, i) =>
     choreDayRecord(chores, index, memberId, shiftChoreDay(first, i), living)
   );
@@ -590,6 +621,19 @@ function isExpiredDate(value: string | undefined, cutoff: string, todayYmd: stri
 }
 
 /**
+ * THE mark retention cutoff: a mark dated before it has expired. `null` when `todayYmd` is not a
+ * date or `keepDays` is not positive (nothing expires). The retention sweep and the stars week
+ * close (#148) both read it, so on one device they always agree on which days still have marks.
+ */
+export function markCutoffYmd(
+  todayYmd: string,
+  keepDays: number = CHORE_MARK_KEEP_DAYS
+): string | null {
+  if (!YMD.test(todayYmd) || !(keepDays > 0)) return null;
+  return shiftChoreDay(todayYmd, -keepDays);
+}
+
+/**
  * Which marks have expired, oldest first, capped at `max`. KEEP ON DOUBT: a mark expires only
  * when BOTH its `date` and its `createdAt` are usable and older than `keepDays` before today,
  * so a malformed, truncated or future date keeps the mark. The only inputs are the marks and
@@ -601,8 +645,8 @@ export function expiredMarkIds(
   keepDays: number = CHORE_MARK_KEEP_DAYS,
   max: number = MAX_MARK_SWEEP_DELETES
 ): string[] {
-  if (!YMD.test(todayYmd) || !(keepDays > 0)) return [];
-  const cutoff = shiftChoreDay(todayYmd, -keepDays);
+  const cutoff = markCutoffYmd(todayYmd, keepDays);
+  if (cutoff === null) return [];
   return marks
     .filter(
       (m) => isExpiredDate(m.date, cutoff, todayYmd) && isExpiredDate(m.createdAt, cutoff, todayYmd)

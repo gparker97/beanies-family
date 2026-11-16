@@ -2273,7 +2273,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Give each child their own chores for the morning, afternoon and evening, let them tick them off, and celebrate when a time of day is done. Nothing to reset, ever.',
     icon: '\u{1F9F9}',
     readTime: 9,
-    updatedDate: '2026-11-14',
+    updatedDate: '2026-11-16',
     sections: [
       {
         type: 'paragraph',
@@ -2431,7 +2431,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'When a child ticks the last chore in a time of day, stars burst out of that tick, the beanies do a little dance (a different one for each day of the week), a cheer pops up (“High five, Pip! Morning is all done.”) and a happy sound plays. After about three seconds it settles into an all-done banner, like <strong>Morning, all done!</strong> with a star for every chore. Tap <strong>Show Chores</strong> on the banner to see the chores again, for example to untick one ticked by mistake.',
+          'When a child ticks the last chore in a time of day, stars burst out of that tick, the beanies do a little dance (a different one for each day of the week), a cheer pops up (“High five, Pip! Morning is all done.”) and a happy sound plays. After about three seconds it settles into an all-done banner, like <strong>Morning, all done!</strong> with a star for every chore. Tap <strong>Show Chores</strong> on the banner to see the chores again, for example to untick one ticked by mistake. If your family has turned on <a href="/help/features/stars-and-rewards">Stars and Rewards</a>, each chore a child ticks also earns a star toward the week.',
       },
       {
         type: 'callout',
@@ -2472,7 +2472,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Below the cards, grown-ups see <strong>Chores Done</strong>: a square for each person, for each day of this week, and each person’s total for the week. The week starts on the day set under <strong>Week Starts On</strong> in Settings (Monday unless you’ve changed it). A child sees their own week on their day.',
+          'Below the cards, grown-ups see <strong>Chores Done</strong>: a square for each person, for each day of this week, and each person’s total for the week. The week starts on the day set under <strong>Week Starts On</strong> in Settings (Monday unless you’ve changed it). A child sees their own week on their day. Grown-ups can step back up to four weeks with the week stepper in the board’s header, whether or not <a href="/help/features/stars-and-rewards">Stars and Rewards</a> is on; the earlier weeks are the same board, read only.',
       },
       {
         type: 'list',
@@ -2529,6 +2529,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'Each person with chores today gets a lane, with the time of day happening now open first and big ticks for small fingers. Anytime is open too. Later times of day, and ones that have passed, are a single line with a count; tap one to open it.',
           'Anyone can tick on the wall, even while it is locked. Finishing a time of day plays the same celebration, once, and leaves the all-done banner in that lane.',
           'Adding chores needs a grown-up. Tap the padlock, choose <strong>Unlock editing</strong> and enter a grown-up’s PIN, and each lane gets an add row (for example <strong>Add a morning chore</strong>). While the wall is unlocked, everyone gets a lane, so you can add someone’s first chore. A chore added there goes in the time of day happening now, every day. To rename, remove, change days or pictures, use the app.',
+          'With <a href="/help/features/stars-and-rewards">Stars and Rewards</a> on, each child’s lane also shows a thin arc around their picture and a star count for the week.',
         ],
       },
 
@@ -2577,6 +2578,201 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '<a href="/help/features/beanie-lists">Beanie Lists</a>: for groceries, packing and every other checklist',
           '<a href="/help/getting-started/set-up-the-beanie-wall">Set up the beanie wall on a tablet</a>: put the chores on the kitchen wall',
           '<a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>: where chore lines come to find you',
+          '<a href="/help/features/stars-and-rewards">Stars and rewards for chores</a>: a star for every chore, an optional weekly reward and special rewards',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'stars-and-rewards',
+    category: 'features',
+    title: 'Stars and rewards for chores',
+    excerpt:
+      'Turn every ticked chore into a star, pick an optional weekly reward and bigger special rewards, and see how each child’s week is going. Stars are never money.',
+    icon: '\u{2B50}',
+    readTime: 8,
+    updatedDate: '2026-11-16',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'Kids love seeing their effort add up. <strong>Stars and Rewards</strong> turns each chore a child ticks on <a href="/help/features/the-choreboard">The Choreboard</a> into a star, so a week of chores becomes a path toward something to look forward to, like ice cream on Friday or a sleepover next month. There is no points system to run and nothing to spend. It is off until a grown-up turns it on.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'By the end of this guide you will have Stars and Rewards switched on, a weekly reward and special rewards set up if you want them, and you will know how to give bonus stars, take stars away, and read the Star Report.',
+      },
+
+      { type: 'heading', content: 'Turning it on', level: 2, id: 'turning-it-on' },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>The Choreboard</strong> as a grown-up. Children don’t see the view switch.',
+          'At the top, tap <strong>Rewards</strong>, the last pill in the view switch. The view is headed <strong>Stars and Rewards</strong>.',
+          'Tap <strong>Turn On Stars and Rewards</strong>.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once it is on, the same view shows the <strong>Enable Rewards</strong> switch at the top with everything you can set up. Every setting is optional. Only chores belonging to children earn stars, and a grown-up’s chores never do.',
+      },
+
+      { type: 'heading', content: 'What kids see', level: 2, id: 'what-kids-see' },
+      {
+        type: 'paragraph',
+        content:
+          'Children keep doing exactly what they did before: tick their chores. On their day they see a thin arc around their picture, a star count like <strong>4 stars this week</strong>, and what each chore is worth, like <strong>Worth 2 stars</strong>. There is nothing to tap and nothing to set up. If a weekly reward is on, the arc fills toward it, and when it is reached a banner says so, like <strong>Pip earned Ice Cream this week</strong>. The same arc and count appear in each child’s lane on the <a href="/help/getting-started/set-up-the-beanie-wall">beanie wall</a>.',
+      },
+
+      { type: 'heading', content: 'Setting a weekly reward', level: 2, id: 'weekly-reward' },
+      {
+        type: 'paragraph',
+        content:
+          'The <strong>Weekly Reward</strong> is one reward for each child who reaches the bar this week, such as ice cream or a movie night. It starts fresh at the start of every week, on the day set under <strong>Week Starts On</strong> in Settings.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Tap <strong>Rewards</strong> in the view switch, then switch on <strong>Weekly Reward</strong>.',
+          'Type a <strong>Reward Name</strong> and, if you like, tap the emoji to <strong>Pick an Emoji</strong>.',
+          'Under <strong>The Bar</strong>, choose how much of a full week’s stars a child needs, from 50% to 100% in steps of 5. Each child’s own “N of M stars” is listed below it, so you can see what the bar means for them.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Changes save as you make them, and there is no Save button. When a child reaches the bar, the reward shows <strong>Achieved</strong>. Nothing is spent and nothing is marked off: it is a way to celebrate, and handing over the ice cream is up to you.',
+      },
+
+      { type: 'heading', content: 'What chores are worth', level: 2, id: 'chore-worth' },
+      {
+        type: 'paragraph',
+        content:
+          'Every chore starts at 1 star. If some chores deserve more, set them under <strong>What Chores Are Worth</strong>.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Under <strong>Whose Chores</strong>, pick a child.',
+          'Use the stepper beside a chore to give it 1 to 5 stars.',
+          'Watch <strong>Pip’s Week So Far</strong> to see the change at once. The line <strong>A full week for Pip</strong> shows the most stars that child can earn from chores.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A chore shared by two children has one value for both. If a child has no chores yet, you will see a note to add some first.',
+      },
+
+      {
+        type: 'heading',
+        content: 'Extra special rewards',
+        level: 2,
+        id: 'extra-special-rewards',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A special reward comes on top of the weekly reward, which is what makes it special. The weekly reward might be an allowance; a special reward is something bigger, like ice cream, a day at the park, a sleepover or a trip. Special rewards are optional, and you can have as many as you like.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Under <strong>Extra Special Rewards</strong>, tap <strong>Add Special Reward</strong>.',
+          'Type the <strong>Special reward name</strong>.',
+          'Choose the <strong>Kind</strong>. <strong>This Week</strong> counts this week’s stars only and starts again every week. <strong>Saved Up</strong> keeps counting across weeks until it is reached, and nothing is spent along the way.',
+          'For a Saved Up special reward, choose <strong>One Time or Repeats</strong>. <strong>One Time</strong> stays achieved once a child reaches it. <strong>Repeats</strong> starts again from zero the week after a child reaches it.',
+          'Set the <strong>Price</strong>, either in full weeks or in stars (type in either box), then tap <strong>Add Special Reward</strong>.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To change or delete a special reward, tap it in the list. Deleting takes it off the list for every child, and stars already earned stay where they are. Under <strong>Who Is It For</strong>, a special reward can be for <strong>All Kids</strong> or only the children you pick. For the weekly reward and special rewards alike, the icon is picked from the name as you type, you can choose your own, and renaming a reward to something different that it recognizes picks a fresh one.',
+      },
+      {
+        type: 'callout',
+        content:
+          'A child with big chores can earn far more stars in a week than a child with small ones, so the same star price can take one child a month and another a whole season. Pricing in <strong>full weeks</strong> asks the same effort of each child. The special reward form shows <strong>What That Means for Each Child</strong>, and if the difference is large it suggests a price in full weeks instead. A price above one full week means bonus stars are needed to reach it.',
+        title: 'Price in full weeks to keep it fair',
+        icon: '\u{2696}\u{FE0F}',
+      },
+
+      {
+        type: 'heading',
+        content: 'Bonus stars and taking stars away',
+        level: 2,
+        id: 'bonus-and-take-away',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Sometimes a child deserves a little extra, and sometimes a day goes sideways. A grown-up can always do either.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Tap <strong>Give Stars</strong>. It sits at the top of the <strong>Star Report</strong> and <strong>Rewards</strong> views, and on a child’s day (<strong>Give Pip Stars</strong>).',
+          'Pick <strong>Who</strong>, then choose <strong>Give Bonus</strong> or <strong>Take Away</strong>.',
+          'Pick <strong>How Many</strong>, from 1 to 20.',
+          'For a bonus, <strong>What For (Optional)</strong> is a short note the child will see. For taking stars away, <strong>A Short Reason</strong> is required, because the child reads it. Say it the way you would say it to them.',
+          'Check <strong>Pip Will See</strong>, which shows exactly what the child will be shown, then tap <strong>Give 3 Stars</strong> or <strong>Take Away 2 Stars</strong>.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A child sees a bonus as a friendly note, like “Mom gave you 3 bonus stars!”. Taking stars away is shown gently, like “Dad took away 1 star.”, with the reason in quotes and a reminder that the next chore wins it right back. You can only take away as many stars as the child has this week. If you made a mistake, tap the child’s <strong>Bonus</strong> number in the Star Report to see that week’s bonus stars, and remove one from this week there.',
+      },
+
+      { type: 'heading', content: 'The Star Report', level: 2, id: 'star-report' },
+      {
+        type: 'paragraph',
+        content:
+          'Tap <strong>Star Report</strong> in the view switch (it appears between <strong>Chores</strong> and <strong>Rewards</strong> once Stars and Rewards is on) to see how each child’s week went. At the top is the <strong>Chores Done</strong> board, with <strong>Stars</strong>, <strong>Bonus</strong> and weekly reward columns beside each child: the stars earned from chores, the bonus (like “+2” for bonus stars or “-1” when a star was taken away), and the total against the bar (like “12 of 15”) or the day the weekly reward was <strong>Achieved</strong>. When a child has any bonus stars that week, tap their <strong>Bonus</strong> number to see who gave or took away how many, on which day, and why. Below the board, <strong>Stars by Week</strong> charts each child’s weeks with their total, and <strong>Special Rewards Progress</strong> shows a progress bar for each child toward each special reward, or the day it was <strong>Achieved</strong>. Tap <strong>Add Special Reward</strong> there to add one, or tap a special reward to change it. Each child is shown against their own weeks, never ranked against a sibling. Tap a week’s bar in <strong>Stars by Week</strong> to see what made up that week: each day’s chores and stars, the bonus stars, and the total.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Use the week stepper in the <strong>Chores Done</strong> board’s header to go back up to four weeks, then <strong>Back to This Week</strong> to return. The Chores view has the same stepper on its <strong>Chores Done</strong> board, with a note that you are looking back, and today’s cards above it stay live. Earlier weeks are read only: nothing in them can be ticked or changed.',
+      },
+
+      { type: 'heading', content: 'Things to know', level: 2, id: 'things-to-know' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Stars are not money.</strong> They have nothing to do with the accounts or budgets in beanies.family, and nothing is ever spent or taken from a balance. A reached reward just says <strong>Achieved</strong>.',
+          '<strong>Saved Up special rewards priced in full weeks show progress in stars, and those numbers can shift.</strong> A full week is worked out from a child’s chores, so adding, removing or re-valuing a chore changes the number of stars the special reward needs.',
+          '<strong>An achieved special reward can stop showing as achieved.</strong> If a grown-up raises a special reward’s price later, a child who had reached the old price may need more stars again.',
+          '<strong>A finished week is recorded when a device opens the family.</strong> That has to happen within about four weeks of the week ending. Otherwise the Star Report says <strong>No record for this week</strong>.',
+          '<strong>Changing a chore’s value applies to the whole current week.</strong> Stars already earned from that chore this week change with it, so a change on Thursday also changes Monday’s tick.',
+          '<strong>A past week cannot be changed.</strong> Once a week is finished, its stars, special rewards and bonus stars are fixed.',
+          '<strong>Only grown-ups can set this up.</strong> Children tick chores and see their stars, and nothing else changes for them.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'To stop, tap <strong>Rewards</strong> in the view switch and switch off <strong>Enable Rewards</strong>. Stars and rewards pause, the stars each child earned so far that week are kept, and chores carry on exactly as before.',
+        title: 'Changed your mind?',
+        icon: '\u{1F44D}',
+      },
+
+      { type: 'heading', content: 'What’s next?', level: 2, id: 'whats-next' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<a href="/help/features/the-choreboard">The Choreboard: chores by time of day</a>: add and tick the chores that earn the stars',
+          '<a href="/help/getting-started/set-up-the-beanie-wall">Set up the beanie wall on a tablet</a>: put the stars on the kitchen wall',
         ],
       },
     ],

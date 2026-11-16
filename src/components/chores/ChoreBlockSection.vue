@@ -48,7 +48,7 @@ import {
   type ChoreCelebrationAnchor,
 } from '@/utils/choreCelebration';
 import type { ChoreDayBlock } from '@/utils/chores';
-import type { ChoreBlockStarts } from '@/types/models';
+import type { Chore, ChoreBlockStarts } from '@/types/models';
 
 const props = withDefaults(
   defineProps<{
@@ -64,6 +64,8 @@ const props = withDefaults(
     canTick?: boolean;
     canEdit?: boolean;
     isPending?: (choreId: string) => boolean;
+    /** Stars (#148): what this child's chores are worth (`starStore.valueFor`), or null (off). */
+    starValue?: ((chore: Chore) => number) | null;
   }>(),
   {
     open: true,
@@ -71,6 +73,7 @@ const props = withDefaults(
     canTick: true,
     canEdit: false,
     isPending: () => false,
+    starValue: null,
   }
 );
 
@@ -303,6 +306,7 @@ defineExpose({ reveal });
         :can-tick="canTick"
         :can-edit="canEdit"
         :pending="isPending(item.chore.id)"
+        :stars="starValue ? starValue(item.chore) : null"
         @toggle="onToggle(item.chore.id)"
         @edit="emit('edit', item.chore.id)"
       />

@@ -45,6 +45,7 @@ import {
   reportTodoAddFailed,
 } from '@/utils/actionFailure';
 import { useChoreStore } from '@/stores/choreStore';
+import { useStarStore } from '@/stores/starStore';
 import { showToast } from '@/composables/useToast';
 import type { WallJob } from '@/types/wall';
 import type { Chore, FamilyList, TodoItem } from '@/types/models';
@@ -740,5 +741,55 @@ describe('useWallJobs chores (#146)', () => {
     const create = vi.spyOn(useChoreStore(), 'createChore');
     await expect(useWallJobs({ chores: true }).addChore('pip', '   ', 'mama')).resolves.toBe(false);
     expect(create).not.toHaveBeenCalled();
+  });
+
+  // ─── Stars (#148) ────────────────────────────────────────────────────────────
+  it('the chore writer hands its outcome to starStore.afterTick once, with surface wall, unawaited', async () => {
+    const landed = { action: 'tick' as const, completed: null, celebrated: false };
+    vi.spyOn(useChoreStore(), 'toggleChore').mockResolvedValue(landed);
+    const after = vi.spyOn(useStarStore(), 'afterTick').mockReturnValue(new Promise(() => {}));
+    const wall = useWallJobs({ chores: true });
+    const job = jobOf(wall, 'juno', 'dog');
+    await wall.toggle(job);
+    expect(wall.isPending(job)).toBe(false);
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(after).toHaveBeenCalledWith({
+      memberId: 'juno',
+      outcome: landed,
+      surface: 'wall',
+      showsBanner: true,
+    });
+  });
+
+  it('stars off: no lane or row carries stars (the board is exactly as before)', () => {
+    const wall = useWallJobs({ chores: true });
+    const lane = wall.choreLaneFor('pip')!;
+    expect(lane).not.toHaveProperty('stars');
+    expect(lane.blocks.flatMap((b) => b.jobs).some((j) => 'stars' in j)).toBe(false);
+  });
+
+  it('stars on: the lane carries the arc, and a row its value only above 1', () => {
+    useChoreStore().chores = [chore('bed', { stars: 3 }), chore('teeth', { sortOrder: 1 })];
+    const arc = { percent: 40, count: 4, kind: 'week' as const };
+    vi.spyOn(useStarStore(), 'wallStarsFor').mockImplementation((id: string) =>
+      id === 'pip' ? { lane: arc, valueOf: (c) => c.stars ?? 1 } : null
+    );
+    const wall = useWallJobs({ chores: true });
+    expect(wall.choreLaneFor('pip')!.stars).toEqual(arc);
+    expect(jobOf(wall, 'pip', 'bed').stars).toBe(3);
+    expect(jobOf(wall, 'pip', 'teeth')).not.toHaveProperty('stars');
+    // A grown-up's lane (null bundle) is unchanged.
+    expect(wall.choreLaneFor('mama')).not.toHaveProperty('stars');
+  });
+
+  it('stars on with nothing to draw: values on rows, no arc on the lane', () => {
+    useChoreStore().chores = [chore('bed', { stars: 2 })];
+    vi.spyOn(useStarStore(), 'wallStarsFor').mockReturnValue({
+      lane: null,
+      valueOf: (c) => c.stars ?? 1,
+    });
+    const wall = useWallJobs({ chores: true });
+    expect(wall.choreLaneFor('pip')).not.toHaveProperty('stars');
+    expect(jobOf(wall, 'pip', 'bed').stars).toBe(2);
   });
 });

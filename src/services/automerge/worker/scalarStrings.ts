@@ -129,6 +129,8 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'occurredOn',
   'cookedOn',
   'showFrom', // a to-do's "Show from" date (`YYYY-MM-DD`)
+  'weekStart', // a frozen chore week's first day (`YYYY-MM-DD`, #148)
+  'hitOn', // the day a frozen chore week reached its weekly reward (`YYYY-MM-DD`, #148)
   // other dates and times of day (`HH:mm` from a time input, the same class as a date)
   'anchor',
   'deadline',
@@ -240,7 +242,7 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'hintKey',
   'cardPartKey',
   'key', // a responsibility card part's key ('main' | child id | 'label-<uuid>')
-  'ref', // a chore mark's referent: the chore id ('done') or the block ('celebrated')
+  'ref', // a chore mark's referent: the chore id ('done'), or the block or 'reward' ('celebrated')
   'starterKey', // which choreboard starter set seeded a chore
   'illustration', // a card-art key under public/brand/cards/, picked, never typed
   // dynamic-keyed maps of strings (their VALUES classify by the container)

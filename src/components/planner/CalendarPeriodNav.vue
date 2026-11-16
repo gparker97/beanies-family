@@ -30,18 +30,43 @@
  * about 40px of the identity row for the period title; desktop keeps the text button.
  */
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 
-defineProps<{ compact?: boolean }>();
+const props = defineProps<{
+  compact?: boolean;
+  /**
+   * Optional (#148 chore week stepper); absent keeps the calendar's navigator exactly as it is.
+   * A disabled arrow is a real `disabled` button (it cannot be tapped or focused), drawn
+   * `text-secondary-400 dark:text-ink-faint` with no hover and the default cursor.
+   */
+  prevDisabled?: boolean;
+  nextDisabled?: boolean;
+  /**
+   * A string replaces the middle button's text (and, in the `compact` icon form, its
+   * `aria-label` and `title`); `null` hides the middle button; absent is "Today".
+   */
+  todayLabel?: string | null;
+}>();
 defineEmits<{ prev: []; today: []; next: [] }>();
 const { t } = useTranslation();
+
+const ARROW = 'flex h-8 w-8 items-center justify-center rounded-lg transition-colors';
+const ARROW_ON =
+  'text-secondary-500/50 dark:text-ink-soft dark:hover:bg-surface-hover cursor-pointer hover:bg-gray-100';
+const ARROW_OFF = 'text-secondary-400 dark:text-ink-faint cursor-default';
+const arrowClass = (disabled: boolean) => [ARROW, disabled ? ARROW_OFF : ARROW_ON];
+
+const showToday = computed(() => props.todayLabel !== null);
+const todayText = computed(() => props.todayLabel ?? t('planner.today'));
 </script>
 
 <template>
   <div class="flex flex-shrink-0 items-center gap-0.5">
     <button
       type="button"
-      class="text-secondary-500/50 dark:text-ink-soft dark:hover:bg-surface-hover flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
+      :class="arrowClass(!!prevDisabled)"
+      :disabled="prevDisabled || undefined"
       :aria-label="t('planner.prevPeriod')"
       @click="$emit('prev')"
     >
@@ -50,28 +75,29 @@ const { t } = useTranslation();
       </svg>
     </button>
     <button
-      v-if="compact"
+      v-if="showToday && compact"
       type="button"
       class="text-primary-500 dark:text-accent-lift hover:bg-primary-500/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
-      :aria-label="t('planner.today')"
-      :title="t('planner.today')"
+      :aria-label="todayText"
+      :title="todayText"
       data-testid="calendar-today"
       @click="$emit('today')"
     >
       <BeanieIcon name="calendar" size="sm" />
     </button>
     <button
-      v-else
+      v-else-if="showToday"
       type="button"
       class="font-outfit text-primary-500 dark:text-accent-lift hover:bg-primary-500/10 cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
       data-testid="calendar-today"
       @click="$emit('today')"
     >
-      {{ t('planner.today') }}
+      {{ todayText }}
     </button>
     <button
       type="button"
-      class="text-secondary-500/50 dark:text-ink-soft dark:hover:bg-surface-hover flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
+      :class="arrowClass(!!nextDisabled)"
+      :disabled="nextDisabled || undefined"
       :aria-label="t('planner.nextPeriod')"
       @click="$emit('next')"
     >

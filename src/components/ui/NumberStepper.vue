@@ -7,6 +7,10 @@
  * inside [min, max] (or `undefined`), even mid-typing, so a form saved without the field
  * ever losing focus can never persist an out-of-range count; the TEXT on screen is only
  * snapped to that value on blur, so typing "12" is not interrupted at "1".
+ *
+ * `step` (default 1; the stars bar uses 5, #148): −/+ move by it, and every emitted value sits on
+ * the grid `min + k * step` (a typed value is rounded to the nearest grid point, then clamped).
+ * With a step of 1 the grid is every whole number, which is the behaviour without the prop.
  */
 import { ref, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -23,8 +27,10 @@ const props = withDefaults(
     /** Accessible name of the number input. Already translated. */
     label: string;
     id?: string;
+    /** A whole number above 0. */
+    step?: number;
   }>(),
-  { min: 1, unit: '', id: undefined }
+  { min: 1, unit: '', id: undefined, step: 1 }
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: number | undefined] }>();
@@ -38,7 +44,11 @@ function toText(n: number | undefined): string {
 }
 
 function clamp(n: number): number {
-  return Math.min(props.max, Math.max(props.min, n));
+  const step = Number.isInteger(props.step) && props.step > 0 ? props.step : 1;
+  const onGrid = props.min + Math.round((n - props.min) / step) * step;
+  // The top of the grid, so rounding up past `max` lands on the last grid point under it.
+  const top = props.min + Math.floor((props.max - props.min) / step) * step;
+  return Math.min(top, Math.max(props.min, onGrid));
 }
 
 /**
@@ -73,8 +83,9 @@ function onBlur(): void {
   text.value = toText(props.modelValue);
 }
 
-function step(delta: 1 | -1): void {
-  const next = props.modelValue === undefined ? props.min : clamp(props.modelValue + delta);
+function stepBy(delta: 1 | -1): void {
+  const next =
+    props.modelValue === undefined ? props.min : clamp(props.modelValue + delta * props.step);
   typed = null;
   text.value = toText(next);
   emit('update:modelValue', next);
@@ -95,7 +106,7 @@ const buttonClass =
         :aria-label="t('common.stepper.fewer')"
         :disabled="modelValue !== undefined && modelValue <= min"
         data-testid="stepper-decrease"
-        @click="step(-1)"
+        @click="stepBy(-1)"
       >
         −
       </button>
@@ -118,7 +129,7 @@ const buttonClass =
         :aria-label="t('common.stepper.more')"
         :disabled="modelValue !== undefined && modelValue >= max"
         data-testid="stepper-increase"
-        @click="step(1)"
+        @click="stepBy(1)"
       >
         +
       </button>

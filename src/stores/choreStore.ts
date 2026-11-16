@@ -28,7 +28,7 @@
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
-import { showToast } from '@/composables/useToast';
+import { createGuardedWrites } from '@/composables/useGuardedWrites';
 import { celebrateChore, holdChoreBlock, releaseChoreBlock } from '@/composables/useCelebration';
 import { useChoreClock } from '@/composables/useChoreClock';
 import { isAdultMember } from '@/composables/useMemberInfo';
@@ -36,7 +36,6 @@ import { isDocLoaded } from '@/services/automerge/docService';
 import { registerLoadMaintenance, storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import * as repo from '@/services/automerge/repositories/choreRepository';
 import type { CreateChoreInput } from '@/services/automerge/repositories/choreRepository';
-import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import { takeAutoWrite } from '@/utils/autoWriteBudget';
 import { clockVerdict, createSweepClock, CHORE_MARK_SWEEP_KEY } from '@/utils/cycleSweepClock';
@@ -59,6 +58,8 @@ import {
   sameChoreMoment,
   sortChores,
   choreWeekRecord,
+  isChoreStarValue,
+  REWARD_MARK_REF,
   type BeanChoreDay,
   type ChoreClock,
   type ChoreRefusal,
@@ -69,7 +70,6 @@ import { choreStarterSet, type StarterChoreDraft } from '@/constants/choreStarte
 export type { StarterChoreDraft } from '@/constants/choreStarterSets';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 import { firstName } from '@/utils/assignees';
@@ -131,16 +131,19 @@ export interface ChoreDraft {
   notifyParents?: boolean;
 }
 
-/** What a row edit can change on a chore (the bean's chore list). */
+/**
+ * What a row edit can change on a chore (the bean's chore list), and its star value (the Stars
+ * and Rewards setup page, #148): a whole number 1 to 5, anything else is the `invalid` refusal.
+ */
 export type ChoreEdit = Partial<
-  Pick<ChoreDraft, 'title' | 'emoji' | 'illustration' | 'block' | 'days'>
+  Pick<ChoreDraft, 'title' | 'emoji' | 'illustration' | 'block' | 'days'> & { stars: number }
 >;
 
 /**
  * Which grown-up surface made an edit, for the firehose (logged as `kind`, an allowlisted key).
  * Absent for the other surfaces (the Add Chores sheet, Copy, the wall).
  */
-export type ChoreEditVia = 'bean-editor';
+export type ChoreEditVia = 'bean-editor' | 'rewards';
 
 /** The optional tail of a grown-up action: where it came from. */
 export interface ChoreEditOpts {
@@ -219,46 +222,44 @@ export const useChoreStore = defineStore('chores', () => {
    * A bean's week (the Chores Done board): one `choreDayRecord` per day for the week holding
    * `weekOfYmd`, today by default. Reads the day clock, never the minute clock, so a board built
    * on it is not rebuilt every minute.
+   *
+   * `weekStartDay` (0 = Sunday .. 6) overrides the family's week start for this one read: a
+   * stars week frozen before a week-start change (#148) passes its own first day's weekday
+   * (`choreDayOfWeek(weekStart)`), so the stepped-back board draws the seven days that week
+   * really had. Absent = the family setting, exactly as before.
    */
-  function weekFor(memberId: string, weekOfYmd: string = todayYmd.value): ChoreWeekRecord {
+  function weekFor(
+    memberId: string,
+    weekOfYmd: string = todayYmd.value,
+    weekStartDay: number = settingsStore.weekStartDay
+  ): ChoreWeekRecord {
     return choreWeekRecord(
       chores.value,
       markIndex.value,
       memberId,
       weekOfYmd,
-      settingsStore.weekStartDay,
+      weekStartDay,
       livingIds.value
     );
   }
 
   // ========== TELEMETRY + REFUSALS ==========
 
-  function log(level: 'info' | 'warn', message: string, context?: Record<string, unknown>): void {
-    logEvent({ level, surface: SURFACE, message, context });
-  }
-
-  function t(key: UIStringKey): string {
-    return useTranslationStore().t(key);
-  }
-
-  /** A toast and a log, never a throw. Always `null`, so a caller can `return refuse(...)`. */
-  function refuse(detail: ChoreRefusal, action: string): null {
-    showToast('info', t(REFUSAL_MESSAGE[detail]));
-    log('warn', 'edit-refused', { action, detail });
-    return null;
-  }
+  // The grown-up write contract (`log`, `refuse`, `adultActor`, `write`), shared with the star
+  // store (#148) so the two cannot drift apart.
+  const { log, refuse, adultActor, write } = createGuardedWrites<ChoreRefusal>({
+    surface: SURFACE,
+    store: 'choreStore',
+    isLoading,
+    error,
+    messages: REFUSAL_MESSAGE,
+    notAdult: 'not-adult',
+  });
 
   /** `refuse` for the tick path: the same toast and log, answered as a tagged refusal. */
   function refuseTick(detail: ChoreRefusal): ChoreTickRefused {
     refuse(detail, 'toggleChore');
     return { action: 'refused', detail };
-  }
-
-  /** The actor, when they are an adult member; otherwise the refusal has been shown. */
-  function adultActor(actorId: string | null | undefined, action: string): string | null {
-    const actor = actorId ? familyStore.members.find((m) => m.id === actorId) : undefined;
-    if (!actor || !isAdultMember(actor)) return refuse('not-adult', action);
-    return actor.id;
   }
 
   /** `ids` kept to living people (no pets), deduped. An unloaded roster prunes nothing. */
@@ -283,20 +284,6 @@ export const useChoreStore = defineStore('chores', () => {
     if (!bean || isAdultMember(bean)) return false;
     const theirs = chores.value.filter((c) => (c.assigneeIds ?? []).includes(memberId));
     return theirs.length ? theirs.every((c) => c.notifyParents === true) : fallback;
-  }
-
-  /** Run a write under the one error contract. `undefined` from `wrapAsync` becomes `null`. */
-  async function write<T>(
-    action: string,
-    fn: () => Promise<T>,
-    opts: { errorToast?: boolean } = {}
-  ): Promise<T | null> {
-    const result = await wrapAsync(isLoading, error, fn, {
-      action: `choreStore:${action}`,
-      surface: SURFACE,
-      errorToast: opts.errorToast ?? true,
-    });
-    return result === undefined ? null : result;
   }
 
   // ========== LOAD ==========
@@ -441,6 +428,11 @@ export const useChoreStore = defineStore('chores', () => {
    *
    * Resolves the landed tick or untick, a `ChoreTickRefused` when a guard refused (toasted and
    * logged, or a quiet double tap), or `null` for a failed write (`useWallJobs` reports that one).
+   *
+   * EVERY tick path calls `void starStore.afterTick({ memberId, outcome, surface, showsBanner })`
+   * once this resolves (#148: `useChoreTicks.toggle` and the chore writer in `useWallJobs`).
+   * A new tick path must add that one line too, or it loses the weekly reward's achieved
+   * banner (the arc and badge are derived and still show). This store never learns about stars.
    */
   async function toggleChore(
     choreId: string,
@@ -592,14 +584,16 @@ export const useChoreStore = defineStore('chores', () => {
   }
 
   /**
-   * THE one write of a block's `celebrated` mark (`ifAbsent`), for the commit and `finishLate`:
-   * `created` (THIS write made it: celebrate), `exists` (another device or tick did), or
-   * `failed` (reported as a warning, never toasted; the ticks landed and the banner shows).
+   * THE one write of a `celebrated` mark (`ifAbsent`): a finished block's (the commit and
+   * `finishLate`), and the weekly reward's (`ref` = `REWARD_MARK_REF`, `ymd` = the week start;
+   * written by `starStore.afterTick`, #148), so marks keep one writer. `created` (THIS write made
+   * it: celebrate), `exists` (another device or tick did), or `failed` (reported as a warning,
+   * never toasted; the ticks landed, and the banner or the arc still shows).
    */
   async function writeCelebratedMark(
     memberId: string,
     ymd: string,
-    block: ChoreBlock,
+    block: ChoreBlock | typeof REWARD_MARK_REF,
     by: string
   ): Promise<'created' | 'exists' | 'failed'> {
     const id = choreMarkId('celebrated', memberId, ymd, block);
@@ -618,8 +612,7 @@ export const useChoreStore = defineStore('chores', () => {
     if (!created) {
       reportError({
         surface: SURFACE,
-        message:
-          'the celebrated mark for a finished block could not be written; the ticks landed and the banner shows',
+        message: 'the celebrated mark could not be written; the ticks landed',
         severity: 'warning',
         context: { action: 'celebrate-mark-failed', slot: block },
       });
@@ -764,6 +757,10 @@ export const useChoreStore = defineStore('chores', () => {
     if (patch.block !== undefined) {
       if (!isChoreBlock(patch.block)) return refuse('invalid', action);
       input.block = patch.block;
+    }
+    if (patch.stars !== undefined) {
+      if (!isChoreStarValue(patch.stars)) return refuse('invalid', action);
+      input.stars = patch.stars;
     }
     if ('days' in patch) {
       input.days = normalizeChoreDays(patch.days);
@@ -1083,6 +1080,8 @@ export const useChoreStore = defineStore('chores', () => {
           block,
           days: normalizeChoreDays(c.days),
           notifyParents: (notify ?? notifyFor(target, c.notifyParents === true)) || undefined,
+          // Its star value travels with it (#148); absent stays absent (= 1).
+          stars: c.stars,
           sortOrder: order++,
           starterKey: c.starterKey,
           createdBy: actor,
@@ -1207,6 +1206,7 @@ export const useChoreStore = defineStore('chores', () => {
     // Actions
     loadChores,
     toggleChore,
+    writeCelebratedMark,
     tickWillCelebrate,
     createChore,
     updateChore,

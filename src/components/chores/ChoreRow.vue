@@ -18,9 +18,13 @@
  * ticked tick is the Heritage Orange gradient with white ink in both themes (a filled control,
  * CIG slide 9); the resting tick's ring is `line-strong` on dark. The ✕ is `ink-faint`,
  * hovering to Heritage Orange / `accent-lift`.
+ *
+ * Stars (#148): `stars` (a child's chore while stars are on) draws the chore's value as a quiet
+ * `StarCount` before the tick, on every chore of a kid; absent, the row is exactly as before.
  */
 import { computed } from 'vue';
 import CardArt from '@/components/responsibilities/CardArt.vue';
+import StarCount from '@/components/chores/StarCount.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { choreArtSrc, choreEmoji } from '@/constants/choreBlocks';
@@ -42,8 +46,11 @@ const props = withDefaults(
     pending?: boolean;
     /** Show the ✕ (the "No one's" group), in place of the tick. */
     removable?: boolean;
+    /** What this chore is worth to this child (#148), or absent while stars are off. */
+    stars?: number | null;
   }>(),
   {
+    stars: null,
     compact: false,
     canTick: true,
     canEdit: false,
@@ -142,6 +149,8 @@ function onTick(): void {
         >{{ sharedWith }}</span
       >
     </component>
+
+    <StarCount v-if="stars !== null" :count="stars" kind="value" size="sm" />
 
     <!-- The "No one's" group: the ✕ takes the chore off the board. -->
     <button

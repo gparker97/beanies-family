@@ -29,6 +29,7 @@ import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import WallOwnerFaces from '@/components/wall/WallOwnerFaces.vue';
+import StarCount from '@/components/chores/StarCount.vue';
 import type { FamilyMember } from '@/types/models';
 import type { WallJob, WallJobNote, WallOwnerSize } from '@/types/wall';
 
@@ -308,6 +309,10 @@ watch(canEdit, (allowed) => {
         >
           {{ note.text }}
         </span>
+        <!-- Stars (#148): a chore's value, carried only when it is worth more than 1. In the
+             title's wrapping group (so on a narrow lane it drops under the title instead of
+             squeezing it) and inside the title button, so a tap on it still ticks the row. -->
+        <StarCount v-if="job.stars" :count="job.stars" kind="value" class="wall-job-stars" />
       </span>
       <WallOwnerFaces v-if="owners" :members="owners" :size="ownerSize" class="wall-job-owner" />
       <span

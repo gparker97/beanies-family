@@ -16736,6 +16736,586 @@ const STRING_DEFS = {
   'choreboard.widget.left.one': { en: '{name} · {n} left', beanie: '{name} · {n} left' },
   'choreboard.widget.left.other': { en: '{name} · {n} left', beanie: '{name} · {n} left' },
   'choreboard.widget.done': { en: '{name} · done', beanie: '{name} · done' },
+
+  // ── Stars and rewards for chores (#148) ──
+  // The star store's refusals: one each, saying what to do. An important surface (a grown-up's
+  // setting or a child's stars), so the beanie values keep every real noun and only drop case.
+  'choreStars.error.notAdult': {
+    en: 'Only a grown-up can change stars and rewards.',
+    beanie: 'only a grown-up can change stars and rewards.',
+  },
+  'choreStars.error.off': {
+    en: 'Turn on Stars and Rewards first.',
+    beanie: 'turn on stars and rewards first.',
+  },
+  'choreStars.error.notEarner': {
+    en: 'Only kids earn stars. Pick one of the kids.',
+    beanie: 'only kids earn stars. pick one of the kids.',
+  },
+  'choreStars.error.noteRequired': {
+    en: 'Add a short reason for taking stars away.',
+    beanie: 'add a short reason for taking stars away.',
+  },
+  'choreStars.error.overWeek': {
+    en: 'That is more than {name} has this week. The most you can take away is {count}.',
+    beanie: 'that is more than {name} has this week. the most you can take away is {count}.',
+  },
+  'choreStars.error.invalid': {
+    en: 'Something there is not quite right. Check the name and the numbers, then save again.',
+    beanie: 'something there is not quite right. check the name and the numbers, then save again.',
+  },
+  'choreStars.error.notFound': {
+    en: 'That was removed on another device.',
+    beanie: 'that was removed on another device.',
+  },
+  'choreStars.error.weekClosed': {
+    en: 'That week is finished and cannot be changed.',
+    beanie: 'that week is finished and cannot be changed.',
+  },
+  // A finished week no device recorded in time (the report and a stepped-back week).
+  'choreStars.noRecord': { en: 'No record for this week', beanie: 'no record for this week' },
+  'choreStars.noRecordHint': {
+    en: 'A finished week is recorded when a device opens the family within about four weeks of it ending.',
+    beanie:
+      'a finished week is recorded when a device opens the family within about four weeks of it ending.',
+  },
+  // An award's progress line (`awardProgressLabel`), always in stars.
+  'choreStars.award.progress.one': { en: '{have} of {need} star', beanie: '{have} of {need} star' },
+  'choreStars.award.progress.other': {
+    en: '{have} of {need} stars',
+    beanie: '{have} of {need} stars',
+  },
+  // Step 3 (#148): earning and the weekly reward. Cosmetic surfaces (the setup page, the
+  // strip, the count, the banner), so lowercase beanie values; no bean euphemism anywhere
+  // ("beans" is money in beanie mode; the currency here is stars).
+  'choreStars.title': { en: 'Stars and Rewards', beanie: 'stars and rewards' },
+  // The Choreboard home's view switch (grown-ups only), Who Owns What's pattern.
+  'choreStars.view.chores': { en: 'Chores', beanie: 'chores' },
+  // The switch's pill for the setup view (headed "Stars and Rewards" inside).
+  'choreStars.view.rewards': { en: 'Rewards', beanie: 'rewards' },
+  'choreStars.view.label': { en: 'Choreboard Views', beanie: 'choreboard views' },
+  // The one action that gives a child stars or takes some away.
+  'choreStars.give': { en: 'Give Stars', beanie: 'give stars' },
+  'choreStars.giveFor': { en: 'Give {name} Stars', beanie: 'give {name} stars' },
+  'choreStars.turnOn.subtitle': {
+    en: 'New, and off until you turn it on',
+    beanie: 'new, and off until you turn it on',
+  },
+  'choreStars.turnOn.body': {
+    en: "Each chore a child ticks earns a star. You choose a weekly reward and see how close each child's week is. Kids only tick chores; you set the rest.",
+    beanie:
+      "each chore a child ticks earns a star. you choose a weekly reward and see how close each child's week is. kids only tick chores; you set the rest.",
+  },
+  'choreStars.turnOn.action': {
+    en: 'Turn On Stars and Rewards',
+    beanie: 'turn on stars and rewards',
+  },
+  'choreStars.turnOn.footnote': {
+    en: "Only kids' chores earn stars. Stars have nothing to do with money in beanies.family.",
+    beanie: "only kids' chores earn stars. stars have nothing to do with money in beanies.family.",
+  },
+  'choreStars.turnOn.sampleReward': { en: 'Ice Cream', beanie: 'ice cream' },
+  'choreStars.setup.on': { en: 'Enable Rewards', beanie: 'enable rewards' },
+  'choreStars.setup.onHint': {
+    en: 'On: kids earn stars for their chores. Switching it off pauses stars and rewards and keeps what was earned.',
+    beanie:
+      'on: kids earn stars for their chores. switching it off pauses stars and rewards and keeps what was earned.',
+  },
+  'choreStars.weekly.title': { en: 'Weekly Reward', beanie: 'weekly reward' },
+  'choreStars.weekly.hint': {
+    en: 'One reward for each child who reaches the bar this week',
+    beanie: 'one reward for each child who reaches the bar this week',
+  },
+  'choreStars.weekly.nameLabel': { en: 'Reward Name', beanie: 'reward name' },
+  'choreStars.weekly.namePlaceholder': {
+    en: 'Ice cream, a movie night...',
+    beanie: 'ice cream, a movie night...',
+  },
+  'choreStars.weekly.emojiLabel': { en: 'Pick an Emoji', beanie: 'pick an emoji' },
+  'choreStars.weekly.fallbackName': { en: 'the weekly reward', beanie: 'the weekly reward' },
+  'choreStars.weekly.freshMonday': {
+    en: 'Starts fresh every Monday. Bonus stars can make up for a missed chore.',
+    beanie: 'starts fresh every monday. bonus stars can make up for a missed chore.',
+  },
+  'choreStars.weekly.freshSunday': {
+    en: 'Starts fresh every Sunday. Bonus stars can make up for a missed chore.',
+    beanie: 'starts fresh every sunday. bonus stars can make up for a missed chore.',
+  },
+  'choreStars.bar.title': { en: 'The Bar', beanie: 'the bar' },
+  'choreStars.bar.pct': { en: '{pct}%', beanie: '{pct}%' },
+  'choreStars.bar.ofFull': { en: "of a full week's stars", beanie: "of a full week's stars" },
+  'choreStars.bar.label': {
+    en: 'The bar, as a share of a full week',
+    beanie: 'the bar, as a share of a full week',
+  },
+  'choreStars.bar.child.one': { en: '{bar} of {full} star', beanie: '{bar} of {full} star' },
+  'choreStars.bar.child.other': { en: '{bar} of {full} stars', beanie: '{bar} of {full} stars' },
+  'choreStars.bar.nothingDue': { en: 'No chores this week', beanie: 'no chores this week' },
+  // Special rewards: on top of the weekly reward (keys say "award", the data name; never the copy).
+  'choreStars.awards.title': { en: 'Extra Special Rewards', beanie: 'extra special rewards' },
+  'choreStars.awards.add': { en: 'Add Special Reward', beanie: 'add special reward' },
+  'choreStars.awards.empty': {
+    en: 'Nothing yet. A special reward is for something bigger, like a trip or a sleepover.',
+    beanie: 'nothing yet. a special reward is for something bigger, like a trip or a sleepover.',
+  },
+  'choreStars.awards.kind.week': { en: 'This Week', beanie: 'this week' },
+  'choreStars.awards.kind.saved': { en: 'Saved Up', beanie: 'saved up' },
+  'choreStars.awards.oneTime': { en: 'One Time', beanie: 'one time' },
+  'choreStars.awards.repeats': { en: 'Repeats', beanie: 'repeats' },
+  'choreStars.awards.price.weeks.one': { en: '{count} full week', beanie: '{count} full week' },
+  'choreStars.awards.price.weeks.other': { en: '{count} full weeks', beanie: '{count} full weeks' },
+  'choreStars.awards.price.stars.one': { en: '{count} star', beanie: '{count} star' },
+  'choreStars.awards.price.stars.other': { en: '{count} stars', beanie: '{count} stars' },
+  'choreStars.worth.title': { en: 'What Chores Are Worth', beanie: 'what chores are worth' },
+  'choreStars.worth.hint': {
+    en: 'Every chore starts at 1 star',
+    beanie: 'every chore starts at 1 star',
+  },
+  'choreStars.worth.pickChild': { en: 'Whose Chores', beanie: 'whose chores' },
+  'choreStars.worth.stepperLabel': { en: 'Stars for {chore}', beanie: 'stars for {chore}' },
+  'choreStars.worth.fullWeek': { en: 'A full week for {name}', beanie: 'a full week for {name}' },
+  'choreStars.worth.noChores': {
+    en: '{name} has no chores yet.',
+    beanie: '{name} has no chores yet.',
+  },
+  'choreStars.worth.noKids': {
+    en: 'Stars are for kids. Add a child in Meet the Beans to use them.',
+    beanie: 'stars are for kids. add a child in meet the beans to use them.',
+  },
+  'choreStars.worth.footnote': {
+    en: "A chore shared by two kids has one value. Grown-ups' chores never earn stars.",
+    beanie: "a chore shared by two kids has one value. grown-ups' chores never earn stars.",
+  },
+  'choreStars.worth.preview': { en: "{name}'s Week So Far", beanie: "{name}'s week so far" },
+  'choreStars.achieved': { en: 'Achieved', beanie: 'achieved' },
+  'choreStars.strip.toReward': { en: '{more} to {reward}', beanie: '{more} to {reward}' },
+  'choreStars.strip.more.one': { en: '{count} more star', beanie: '{count} more star' },
+  'choreStars.strip.more.other': { en: '{count} more stars', beanie: '{count} more stars' },
+  'choreStars.strip.thisWeek.one': {
+    en: '{count} star this week',
+    beanie: '{count} star this week',
+  },
+  'choreStars.strip.thisWeek.other': {
+    en: '{count} stars this week',
+    beanie: '{count} stars this week',
+  },
+  'choreStars.strip.achievedOn': { en: '{reward}, {day}', beanie: '{reward}, {day}' },
+  'choreStars.strip.stepSize': {
+    en: 'Each step is {count} stars',
+    beanie: 'each step is {count} stars',
+  },
+  'choreStars.strip.barPct': { en: 'Bar {pct}%', beanie: 'bar {pct}%' },
+  'choreStars.strip.saved': { en: '{progress} to {reward}', beanie: '{progress} to {reward}' },
+  'choreStars.strip.aria.bar': {
+    en: '{total} of {bar} stars to {reward} this week',
+    beanie: '{total} of {bar} stars to {reward} this week',
+  },
+  'choreStars.strip.aria.achieved': {
+    en: '{reward} achieved this week, with {total} stars',
+    beanie: '{reward} achieved this week, with {total} stars',
+  },
+  'choreStars.strip.aria.plain': {
+    en: '{total} stars this week',
+    beanie: '{total} stars this week',
+  },
+  'choreStars.count.one': { en: '{count} star this week', beanie: '{count} star this week' },
+  'choreStars.count.other': { en: '{count} stars this week', beanie: '{count} stars this week' },
+  'choreStars.count.saved.one': { en: '{count} star saved up', beanie: '{count} star saved up' },
+  'choreStars.count.saved.other': {
+    en: '{count} stars saved up',
+    beanie: '{count} stars saved up',
+  },
+  'choreStars.value.one': { en: 'Worth {count} star', beanie: 'worth {count} star' },
+  'choreStars.value.other': { en: 'Worth {count} stars', beanie: 'worth {count} stars' },
+  'choreStars.banner.title': {
+    en: '{name} earned {reward} this week',
+    beanie: '{name} earned {reward} this week',
+  },
+  'choreStars.banner.body.one': {
+    en: '{count} star. Nice work, {name}.',
+    beanie: '{count} star. nice work, {name}.',
+  },
+  'choreStars.banner.body.other': {
+    en: '{count} stars. Nice work, {name}.',
+    beanie: '{count} stars. nice work, {name}.',
+  },
+  'choreStars.emoji.iceCream': { en: 'Ice cream', beanie: 'ice cream' },
+  'choreStars.emoji.pizza': { en: 'Pizza', beanie: 'pizza' },
+  'choreStars.emoji.movie': { en: 'Movie', beanie: 'movie' },
+  'choreStars.emoji.game': { en: 'Video game', beanie: 'video game' },
+  'choreStars.emoji.books': { en: 'Books', beanie: 'books' },
+  'choreStars.emoji.toy': { en: 'Toy', beanie: 'toy' },
+  'choreStars.emoji.art': { en: 'Art', beanie: 'art' },
+  'choreStars.emoji.sports': { en: 'Sports', beanie: 'sports' },
+  'choreStars.emoji.playground': { en: 'Playground', beanie: 'playground' },
+  'choreStars.emoji.swimming': { en: 'Swimming', beanie: 'swimming' },
+  'choreStars.emoji.outing': { en: 'Outing', beanie: 'outing' },
+  'choreStars.emoji.trip': { en: 'Big trip', beanie: 'big trip' },
+  'choreStars.emoji.lateNight': { en: 'Stay up late', beanie: 'stay up late' },
+  'choreStars.emoji.popcorn': { en: 'Popcorn', beanie: 'popcorn' },
+  'choreStars.emoji.treat': { en: 'Treat', beanie: 'treat' },
+  'choreStars.emoji.surprise': { en: 'Surprise', beanie: 'surprise' },
+  'choreStars.emoji.money': { en: 'Money', beanie: 'money' },
+  'choreStars.emoji.coins': { en: 'Coins', beanie: 'coins' },
+  'choreStars.emoji.piggyBank': { en: 'Piggy bank', beanie: 'piggy bank' },
+  'choreStars.emoji.screenTime': { en: 'Screen time', beanie: 'screen time' },
+  'choreStars.emoji.candy': { en: 'Candy', beanie: 'candy' },
+  'choreStars.emoji.cake': { en: 'Cake', beanie: 'cake' },
+  'choreStars.emoji.donut': { en: 'Donut', beanie: 'donut' },
+  'choreStars.emoji.eatingOut': { en: 'Eating out', beanie: 'eating out' },
+  'choreStars.emoji.bike': { en: 'Bike ride', beanie: 'bike ride' },
+  'choreStars.emoji.beach': { en: 'Beach', beanie: 'beach' },
+  'choreStars.emoji.camping': { en: 'Camping', beanie: 'camping' },
+  'choreStars.emoji.zoo': { en: 'Zoo', beanie: 'zoo' },
+  'choreStars.emoji.bowling': { en: 'Bowling', beanie: 'bowling' },
+  'choreStars.emoji.sleepover': { en: 'Sleepover', beanie: 'sleepover' },
+  'choreStars.emoji.trophy': { en: 'Trophy', beanie: 'trophy' },
+  'choreStars.emoji.wellDone': { en: 'Well done', beanie: 'well done' },
+  // Stars and rewards (#148), step 4: the special reward form, bonus and take-away, the report,
+  // looking back.
+  'choreStars.view.report': { en: 'Star Report', beanie: 'star report' },
+  'choreStars.week.backToThis': { en: 'Back to This Week', beanie: 'back to this week' },
+  'choreStars.lookback.notice': {
+    en: 'You are looking back at a past week. It cannot be changed.',
+    beanie: 'you are looking back at a past week. it cannot be changed.',
+  },
+  'choreStars.awards.editAria': { en: 'Edit {title}', beanie: 'edit {title}' },
+  'choreStars.awardForm.newTitle': { en: 'New Special Reward', beanie: 'new special reward' },
+  'choreStars.awardForm.editTitle': { en: 'Edit Special Reward', beanie: 'edit special reward' },
+  'choreStars.awardForm.add': { en: 'Add Special Reward', beanie: 'add special reward' },
+  'choreStars.awardForm.save': { en: 'Save Special Reward', beanie: 'save special reward' },
+  'choreStars.awardForm.award': { en: 'Special Reward', beanie: 'special reward' },
+  'choreStars.awardForm.nameLabel': { en: 'Special reward name', beanie: 'special reward name' },
+  'choreStars.awardForm.namePlaceholder': {
+    en: 'A trip, a sleepover...',
+    beanie: 'a trip, a sleepover...',
+  },
+  'choreStars.awardForm.who': { en: 'Who Is It For', beanie: 'who is it for' },
+  'choreStars.awardForm.who.all': { en: 'All Kids', beanie: 'all kids' },
+  'choreStars.awardForm.who.some': { en: 'Pick Kids', beanie: 'pick kids' },
+  'choreStars.awardForm.whoHint.all': {
+    en: 'Every child who earns stars, including any who join later.',
+    beanie: 'every child who earns stars, including any who join later.',
+  },
+  'choreStars.awardForm.whoHint.some': {
+    en: 'Only the children you pick can earn it.',
+    beanie: 'only the children you pick can earn it.',
+  },
+  'choreStars.awardForm.whoRequired': {
+    en: 'Pick at least one child.',
+    beanie: 'pick at least one child.',
+  },
+  'choreStars.awards.forKids': { en: 'For {names}', beanie: 'for {names}' },
+  'choreStars.awards.forNobody': {
+    en: 'Not for any child now',
+    beanie: 'not for any child now',
+  },
+  'choreStars.awardForm.kind': { en: 'Kind', beanie: 'kind' },
+  'choreStars.awardForm.kindHint.week': {
+    en: "Counts this week's stars only and starts again every week.",
+    beanie: "counts this week's stars only and starts again every week.",
+  },
+  'choreStars.awardForm.kindHint.saved': {
+    en: 'Keeps counting across weeks until it is reached. Nothing is spent along the way.',
+    beanie: 'keeps counting across weeks until it is reached. nothing is spent along the way.',
+  },
+  'choreStars.awardForm.repeatsLabel': { en: 'One Time or Repeats', beanie: 'one time or repeats' },
+  'choreStars.awardForm.repeatsHint.once': {
+    en: 'Once a child reaches it, it stays achieved for them.',
+    beanie: 'once a child reaches it, it stays achieved for them.',
+  },
+  'choreStars.awardForm.repeatsHint.repeats': {
+    en: 'After a child reaches it, the count starts again from zero the next week.',
+    beanie: 'after a child reaches it, the count starts again from zero the next week.',
+  },
+  'choreStars.awardForm.price': { en: 'Price', beanie: 'price' },
+  'choreStars.awardForm.weeksLabel': { en: 'Price in full weeks', beanie: 'price in full weeks' },
+  'choreStars.awardForm.starsLabel': { en: 'Price in stars', beanie: 'price in stars' },
+  'choreStars.awardForm.weeksUnit': { en: 'full weeks', beanie: 'full weeks' },
+  'choreStars.awardForm.starsUnit': { en: 'stars', beanie: 'stars' },
+  'choreStars.awardForm.span': { en: '{low} to {high}', beanie: '{low} to {high}' },
+  'choreStars.awardForm.priceHint': {
+    en: 'Type in either box. Full weeks is the fair way: the same effort from each child.',
+    beanie: 'type in either box. full weeks is the fair way: the same effort from each child.',
+  },
+  'choreStars.awardForm.priceInvalidWeeks': {
+    en: 'Use a number above 0, like 4 or 1.5.',
+    beanie: 'use a number above 0, like 4 or 1.5.',
+  },
+  'choreStars.awardForm.priceInvalidStars': {
+    en: 'Use a whole number above 0.',
+    beanie: 'use a whole number above 0.',
+  },
+  'choreStars.awardForm.priceTooBig': {
+    en: 'That is more than {max}. Try a smaller number.',
+    beanie: 'that is more than {max}. try a smaller number.',
+  },
+  'choreStars.awardForm.perChild': {
+    en: 'What That Means for Each Child',
+    beanie: 'what that means for each child',
+  },
+  'choreStars.awardForm.fullWeek.one': {
+    en: '{count} star in a full week',
+    beanie: '{count} star in a full week',
+  },
+  'choreStars.awardForm.fullWeek.other': {
+    en: '{count} stars in a full week',
+    beanie: '{count} stars in a full week',
+  },
+  'choreStars.awardForm.aboutWeeks': {
+    en: 'about {count} full weeks',
+    beanie: 'about {count} full weeks',
+  },
+  'choreStars.awardForm.nudge.title': {
+    en: 'Same stars, different effort.',
+    beanie: 'same stars, different effort.',
+  },
+  'choreStars.awardForm.nudge.body': {
+    en: '{slow} would need {ratio} times as long as {fast}.',
+    beanie: '{slow} would need {ratio} times as long as {fast}.',
+  },
+  'choreStars.awardForm.nudge.action.one': {
+    en: 'Price it as {count} full week instead',
+    beanie: 'price it as {count} full week instead',
+  },
+  'choreStars.awardForm.nudge.action.other': {
+    en: 'Price it as {count} full weeks instead',
+    beanie: 'price it as {count} full weeks instead',
+  },
+  'choreStars.awardForm.estimate.one': {
+    en: 'If each week reaches {pct}% of a full week, about {count} week for everyone.',
+    beanie: 'if each week reaches {pct}% of a full week, about {count} week for everyone.',
+  },
+  'choreStars.awardForm.estimate.other': {
+    en: 'If each week reaches {pct}% of a full week, about {count} weeks for everyone.',
+    beanie: 'if each week reaches {pct}% of a full week, about {count} weeks for everyone.',
+  },
+  'choreStars.awardForm.estimate.range': {
+    en: 'If each week reaches {pct}% of a full week, about {low} to {high} weeks, depending on the child.',
+    beanie:
+      'if each week reaches {pct}% of a full week, about {low} to {high} weeks, depending on the child.',
+  },
+  'choreStars.awardForm.bonusNeeded': {
+    en: 'That is more than a full week, so it takes bonus stars.',
+    beanie: 'that is more than a full week, so it takes bonus stars.',
+  },
+  'choreStars.awardForm.delete.title': {
+    en: 'Delete Special Reward?',
+    beanie: 'delete special reward?',
+  },
+  'choreStars.awardForm.delete.message': {
+    en: 'It comes off the list for every child. Stars already earned stay where they are.',
+    beanie: 'it comes off the list for every child. stars already earned stay where they are.',
+  },
+  'choreStars.gift.who': { en: 'Who', beanie: 'who' },
+  'choreStars.gift.kindLabel': { en: 'Give or take away', beanie: 'give or take away' },
+  'choreStars.gift.howMany': { en: 'How Many', beanie: 'how many' },
+  'choreStars.gift.unit.one': { en: 'star', beanie: 'star' },
+  'choreStars.gift.unit.other': { en: 'stars', beanie: 'stars' },
+  'choreStars.gift.countInvalid': {
+    en: 'Pick between 1 and 20 stars.',
+    beanie: 'pick between 1 and 20 stars.',
+  },
+  'choreStars.gift.willSee': { en: '{name} Will See', beanie: '{name} will see' },
+  'choreStars.note.someone': { en: 'A grown-up', beanie: 'a grown-up' },
+  'choreStars.bonus.title': { en: 'Give Bonus Stars', beanie: 'give bonus stars' },
+  'choreStars.bonus.tab': { en: 'Give Bonus', beanie: 'give bonus' },
+  'choreStars.bonus.whatFor': { en: 'What For (Optional)', beanie: 'what for (optional)' },
+  'choreStars.bonus.whatForPlaceholder': {
+    en: 'Helped with the dishes',
+    beanie: 'helped with the dishes',
+  },
+  'choreStars.bonus.save.one': { en: 'Give {count} Star', beanie: 'give {count} star' },
+  'choreStars.bonus.save.other': { en: 'Give {count} Stars', beanie: 'give {count} stars' },
+  'choreStars.bonus.note.title.one': {
+    en: '{by} gave you {count} bonus star!',
+    beanie: '{by} gave you {count} bonus star!',
+  },
+  'choreStars.bonus.note.title.other': {
+    en: '{by} gave you {count} bonus stars!',
+    beanie: '{by} gave you {count} bonus stars!',
+  },
+  'choreStars.bonus.note.quote': { en: '"{note}"', beanie: '"{note}"' },
+  'choreStars.takeBack.title': { en: 'Take Away Stars', beanie: 'take away stars' },
+  'choreStars.takeBack.tab': { en: 'Take Away', beanie: 'take away' },
+  'choreStars.takeBack.reason': { en: 'A Short Reason', beanie: 'a short reason' },
+  'choreStars.takeBack.reasonPlaceholder': {
+    en: 'Bike left out in the rain',
+    beanie: 'bike left out in the rain',
+  },
+  'choreStars.takeBack.reasonHint': {
+    en: '{name} reads this, so say it the way you would say it to them.',
+    beanie: '{name} reads this, so say it the way you would say it to them.',
+  },
+  'choreStars.takeBack.most.one': {
+    en: '{name} has {count} star this week, so {count} is the most.',
+    beanie: '{name} has {count} star this week, so {count} is the most.',
+  },
+  'choreStars.takeBack.most.other': {
+    en: '{name} has {count} stars this week, so {count} is the most.',
+    beanie: '{name} has {count} stars this week, so {count} is the most.',
+  },
+  'choreStars.takeBack.none': {
+    en: '{name} has no stars this week, so there is nothing to take away.',
+    beanie: '{name} has no stars this week, so there is nothing to take away.',
+  },
+  'choreStars.takeBack.save.one': {
+    en: 'Take Away {count} Star',
+    beanie: 'take away {count} star',
+  },
+  'choreStars.takeBack.save.other': {
+    en: 'Take Away {count} Stars',
+    beanie: 'take away {count} stars',
+  },
+  'choreStars.takeBack.note.title.one': {
+    en: '{by} took away {count} star.',
+    beanie: '{by} took away {count} star.',
+  },
+  'choreStars.takeBack.note.title.other': {
+    en: '{by} took away {count} stars.',
+    beanie: '{by} took away {count} stars.',
+  },
+  // The reason with no closing punctuation of its own (a reason that has one uses
+  // `choreStars.bonus.note.quote`).
+  'choreStars.takeBack.note.quotePeriod': { en: '"{note}."', beanie: '"{note}."' },
+  'choreStars.takeBack.note.forward.one': {
+    en: 'Your next chore wins it right back.',
+    beanie: 'your next chore wins it right back.',
+  },
+  'choreStars.takeBack.note.forward.other': {
+    en: 'Your next chores win them right back.',
+    beanie: 'your next chores win them right back.',
+  },
+  // A line in the Star Report's bonus summary (one child's entries, so no child's name).
+  'choreStars.takeBack.entry.one': {
+    en: '{by} took away {count} star',
+    beanie: '{by} took away {count} star',
+  },
+  'choreStars.takeBack.entry.other': {
+    en: '{by} took away {count} stars',
+    beanie: '{by} took away {count} stars',
+  },
+  'choreStars.report.stars': { en: 'Stars', beanie: 'stars' },
+  'choreStars.report.bonus': { en: 'Bonus', beanie: 'bonus' },
+  // The Bonus column and the summary: a signed net, "+2", "-1" or a plain "0".
+  'choreStars.report.bonusPlus': { en: '+{count}', beanie: '+{count}' },
+  'choreStars.report.bonusMinus': { en: '-{count}', beanie: '-{count}' },
+  'choreStars.report.bonusNone': { en: '0', beanie: '0' },
+  'choreStars.report.bonusAria': {
+    en: "Show {name}'s bonus stars ({net})",
+    beanie: "show {name}'s bonus stars ({net})",
+  },
+  'choreStars.report.bonusPop.title': {
+    en: "{name}'s Bonus Stars",
+    beanie: "{name}'s bonus stars",
+  },
+  'choreStars.report.bonusPop.week': { en: 'Week of {date}', beanie: 'week of {date}' },
+  'choreStars.report.bonusPop.footOpen': {
+    en: 'Made a mistake? Remove it here.',
+    beanie: 'made a mistake? remove it here.',
+  },
+  'choreStars.report.weeklyOf': { en: '{total} of {bar}', beanie: '{total} of {bar}' },
+  'choreStars.report.achievedOn': { en: 'Achieved {day}', beanie: 'achieved {day}' },
+  'choreStars.report.notYet': { en: 'Not started yet', beanie: 'not started yet' },
+  'choreStars.report.now': { en: 'Now', beanie: 'now' },
+  'choreStars.report.trend.title': { en: 'Stars by Week', beanie: 'stars by week' },
+  'choreStars.report.trend.span.0': { en: 'This week', beanie: 'this week' },
+  'choreStars.report.trend.span.1': {
+    en: 'This week and the one before it',
+    beanie: 'this week and the one before it',
+  },
+  'choreStars.report.trend.span.2': {
+    en: 'This week and the two before it',
+    beanie: 'this week and the two before it',
+  },
+  'choreStars.report.trend.span.3': {
+    en: 'This week and the three before it',
+    beanie: 'this week and the three before it',
+  },
+  'choreStars.report.trend.span.4': {
+    en: 'This week and the four before it',
+    beanie: 'this week and the four before it',
+  },
+  'choreStars.report.trend.total.one': { en: '{count} star', beanie: '{count} star' },
+  'choreStars.report.trend.total.other': { en: '{count} stars', beanie: '{count} stars' },
+  'choreStars.report.trend.totalAria.one': {
+    en: '{name}: {count} star over these weeks',
+    beanie: '{name}: {count} star over these weeks',
+  },
+  'choreStars.report.trend.totalAria.other': {
+    en: '{name}: {count} stars over these weeks',
+    beanie: '{name}: {count} stars over these weeks',
+  },
+  'choreStars.report.trend.foot': {
+    en: 'Striped is the week still in progress. Each child is shown against their own weeks, never ranked.',
+    beanie:
+      'striped is the week still in progress. each child is shown against their own weeks, never ranked.',
+  },
+  'choreStars.report.trend.aria.one': {
+    en: '{week}: {count} star',
+    beanie: '{week}: {count} star',
+  },
+  'choreStars.report.trend.aria.other': {
+    en: '{week}: {count} stars',
+    beanie: '{week}: {count} stars',
+  },
+  'choreStars.report.trend.noRecordAria': { en: '{week}: no record', beanie: '{week}: no record' },
+  'choreStars.report.trend.barAria.one': {
+    en: '{name}, week of {week}, {count} star. Show the breakdown',
+    beanie: '{name}, week of {week}, {count} star. show the breakdown',
+  },
+  'choreStars.report.trend.barAria.other': {
+    en: '{name}, week of {week}, {count} stars. Show the breakdown',
+    beanie: '{name}, week of {week}, {count} stars. show the breakdown',
+  },
+  'choreStars.report.weekPop.title': { en: "{name}'s Week", beanie: "{name}'s week" },
+  'choreStars.report.weekPop.chores.one': {
+    en: '{done} of {due} chore',
+    beanie: '{done} of {due} chore',
+  },
+  'choreStars.report.weekPop.chores.other': {
+    en: '{done} of {due} chores',
+    beanie: '{done} of {due} chores',
+  },
+  'choreStars.report.weekPop.nothingDue': { en: 'Nothing due', beanie: 'nothing due' },
+  'choreStars.report.weekPop.bonusTitle': { en: 'Bonus Stars', beanie: 'bonus stars' },
+  'choreStars.report.weekPop.bonusNet': {
+    en: 'Bonus stars, given and taken away',
+    beanie: 'bonus stars, given and taken away',
+  },
+  'choreStars.report.weekPop.total': { en: 'Total', beanie: 'total' },
+  'choreStars.report.weekPop.floor': {
+    en: 'A week never goes below zero stars.',
+    beanie: 'a week never goes below zero stars.',
+  },
+  // The report's lower card: each special reward's progress (the key keeps its old name).
+  'choreStars.report.entries.title': {
+    en: 'Special Rewards Progress',
+    beanie: 'special rewards progress',
+  },
+  'choreStars.report.rewardsSettings': { en: 'Rewards Settings', beanie: 'rewards settings' },
+  'choreStars.report.savedAria': {
+    en: '{name}, {reward}: {progress}',
+    beanie: '{name}, {reward}: {progress}',
+  },
+  'choreStars.report.entries.empty': {
+    en: 'No special rewards yet.',
+    beanie: 'no special rewards yet.',
+  },
+  'choreStars.report.bonusEntry.one': {
+    en: '{by} gave {count} bonus star',
+    beanie: '{by} gave {count} bonus star',
+  },
+  'choreStars.report.bonusEntry.other': {
+    en: '{by} gave {count} bonus stars',
+    beanie: '{by} gave {count} bonus stars',
+  },
+  'choreStars.report.remove.label': { en: 'Remove This Entry', beanie: 'remove this entry' },
+  'choreStars.report.remove.title': { en: 'Remove This Entry?', beanie: 'remove this entry?' },
+  'choreStars.report.remove.message': {
+    en: "The child's stars this week go back to how they were without it.",
+    beanie: "the child's stars this week go back to how they were without it.",
+  },
 } satisfies Record<string, StringEntry>;
 
 /**

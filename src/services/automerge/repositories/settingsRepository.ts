@@ -10,6 +10,7 @@ import type {
   ExchangeRate,
   AIProvider,
   AiTier,
+  ChoreRewards,
   CurrencyCode,
   LanguageCode,
   ISODateString,
@@ -170,6 +171,18 @@ export async function setHelpfulHintLeadDays(
 export async function addDismissedHintKey(hintKey: string, eventDate: string): Promise<Settings> {
   const current = (await getSettings()).dismissedHintKeys ?? {};
   return saveSettings({ dismissedHintKeys: { ...current, [hintKey]: eventDate } });
+}
+
+/**
+ * #148: write the family's `choreRewards` from the PROJECTION's current object (the same read
+ * `saveSettings` takes its merge base from), so only the keys `build` changes are written and a
+ * peer's keys are kept. `build` gets a plain copy (or `undefined` when none is stored).
+ */
+export async function patchChoreRewards(
+  build: (current: ChoreRewards | undefined) => ChoreRewards
+): Promise<Settings> {
+  const stored = (await getSettings()).choreRewards;
+  return saveSettings({ choreRewards: build(stored ? { ...stored } : undefined) });
 }
 
 /** #40: drop dismissed-hint entries (the reconcile engine's prune of past events). */

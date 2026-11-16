@@ -12,6 +12,7 @@ vi.mock(
   async () => (await import('./choreTestKit')).translationModule
 );
 vi.mock('@/stores/familyStore', async () => (await import('./choreTestKit')).familyStoreModule);
+vi.mock('@/stores/settingsStore', () => ({ useSettingsStore: () => ({ weekStartDay: 1 }) }));
 const logEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent }));
 
@@ -168,6 +169,130 @@ describe('ChoreWeekPanel: the grown-ups board', () => {
     // The legend moved to the "This Week" card; the board's sub-label is not repeated there.
     expect(w.find('[data-testid="chore-week-legend"]').exists()).toBe(false);
     expect(w.text()).not.toContain('choreboard.week.title');
+  });
+});
+
+describe('ChoreWeekPanel: the optional stepper and trailing facts', () => {
+  const WEEKS = ['2026-11-09', '2026-11-02', '2026-10-26'];
+
+  it('unused, the board has neither: no stepper, no notice, no extra columns, no week attribute', () => {
+    const w = mountPanel({});
+    expect(w.find('[data-testid="chore-week-stepper"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-lookback-notice"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-week-panel-extras"]').exists()).toBe(false);
+    expect(w.find('.board-grid-extras').exists()).toBe(false);
+    expect(w.attributes('data-week')).toBeUndefined();
+  });
+
+  it('weeks: the stepper in the header steps the week (v-model:week); this week has no notice', async () => {
+    const w = mountPanel({ weeks: WEEKS, week: WEEKS[0] });
+    const stepper = w.get('[data-testid="chore-week-stepper"]');
+    expect(stepper.attributes('data-week')).toBe(WEEKS[0]);
+    expect(w.find('[data-testid="chore-lookback-notice"]').exists()).toBe(false);
+    await stepper.get('[aria-label="planner.prevPeriod"]').trigger('click');
+    expect(w.emitted('update:week')).toEqual([[WEEKS[1]]]);
+  });
+
+  it('a past week: the looking-back notice, and Back to This Week on the stepper', async () => {
+    const w = mountPanel({ weeks: WEEKS, week: WEEKS[2] });
+    expect(w.attributes('data-looking-back')).toBe('true');
+    expect(w.get('[data-testid="chore-lookback-notice"]').text()).toContain(
+      'choreStars.lookback.notice'
+    );
+    await w
+      .findAll('[data-testid="chore-week-stepper"] [data-testid="calendar-today"]')[0]!
+      .trigger('click');
+    expect(w.emitted('update:week')).toEqual([[WEEKS[0]]]);
+  });
+
+  it('one week offered: no stepper', () => {
+    const w = mountPanel({ weeks: [WEEKS[0]], week: WEEKS[0] });
+    expect(w.find('[data-testid="chore-week-stepper"]').exists()).toBe(false);
+  });
+
+  it('extras: a head per column, then per bean its facts (labelled for screen readers) or one note', () => {
+    const w = mountPanel({
+      extras: {
+        heads: ['Stars', 'Bonus'],
+        rows: {
+          kid: [
+            { text: '14', tone: 'strong', testid: 'fact-stars' },
+            { text: '+2', tone: 'good', sub: 'nice', testid: 'fact-bonus' },
+          ],
+          sib: { note: 'No record', hint: 'Why' },
+        },
+      },
+    });
+    const grid = w.get('.board-grid-extras');
+    expect(grid.attributes('style')).toContain('--board-extras: 2');
+    expect(w.findAll('.board-extra-head').map((h) => h.text())).toEqual(['Stars', 'Bonus']);
+    const kid = w.get('[data-testid="chore-week-panel-extras"][data-member-id="kid"]');
+    expect(kid.get('[data-testid="fact-stars"]').text()).toContain('14');
+    expect(kid.get('[data-testid="fact-stars"] .board-extra-label').text()).toContain('Stars');
+    expect(kid.get('[data-testid="fact-bonus"]').text()).toContain('+2');
+    expect(kid.get('[data-testid="fact-bonus"]').text()).toContain('nice');
+    const sib = w.get('[data-testid="chore-week-panel-extras"][data-member-id="sib"]');
+    expect(sib.get('[data-testid="chore-week-panel-note"]').text()).toContain('No record');
+    expect(sib.text()).toContain('Why');
+    // Each bean's facts follow its total, in the board's one grid.
+    const html = w.html();
+    expect(html.indexOf('chore-week-panel-total" data-member-id="kid"')).toBeLessThan(
+      html.indexOf('chore-week-panel-extras" data-member-id="kid"')
+    );
+  });
+
+  it('extras: a fact with an action is a button that emits fact-action with its bean, id and anchor', async () => {
+    const w = mountPanel({
+      extras: {
+        heads: ['Stars', 'Bonus'],
+        rows: {
+          kid: [
+            { text: '14', tone: 'strong', testid: 'fact-stars' },
+            {
+              text: '+2',
+              tone: 'good',
+              testid: 'fact-bonus',
+              action: { id: 'bonus', label: 'Show the bonus', expanded: false },
+            },
+          ],
+          sib: [
+            { text: '3', tone: 'strong', testid: 'fact-stars' },
+            { text: '0', tone: 'quiet', testid: 'fact-bonus' },
+          ],
+        },
+      },
+    });
+    const kid = w.get('[data-testid="chore-week-panel-extras"][data-member-id="kid"]');
+    const button = kid.get(
+      '[data-testid="fact-bonus"] [data-testid="chore-week-panel-fact-action"]'
+    );
+    expect(button.element.tagName).toBe('BUTTON');
+    expect(button.text()).toBe('+2');
+    expect(button.attributes('aria-label')).toBe('Show the bonus');
+    expect(button.attributes('aria-haspopup')).toBe('dialog');
+    expect(button.attributes('aria-expanded')).toBe('false');
+    expect(button.classes()).toEqual(
+      expect.arrayContaining(['dark:bg-surface-overlay', 'dark:hover:bg-surface-hover'])
+    );
+    await button.trigger('click');
+    const [payload] = w.emitted('fact-action')![0] as [
+      { memberId: string; id: string; anchor: HTMLElement },
+    ];
+    expect(payload).toMatchObject({ memberId: 'kid', id: 'bonus' });
+    expect(payload.anchor).toBe(button.element);
+    // No action: plain text, never a button.
+    const sib = w.get('[data-testid="chore-week-panel-extras"][data-member-id="sib"]');
+    expect(sib.find('[data-testid="chore-week-panel-fact-action"]').exists()).toBe(false);
+    expect(sib.get('[data-testid="fact-bonus"]').text()).toContain('0');
+  });
+
+  it('a bean’s own week never draws extras', () => {
+    const w = mountPanel({
+      rows: rowsFor(['kid']),
+      single: true,
+      extras: { heads: ['Stars'], rows: { kid: [{ text: '1' }] } },
+    });
+    expect(w.find('[data-testid="chore-week-panel-extras"]').exists()).toBe(false);
   });
 });
 

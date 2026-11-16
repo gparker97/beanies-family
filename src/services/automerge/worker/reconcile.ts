@@ -75,6 +75,9 @@ export const MERGE_FIELDS: ReadonlySet<string> = new Set([
   'aiApiKeys',
   'helpfulHintLeadDays',
   'dismissedHintKeys',
+  // #148 stars and rewards settings: independent keys (on, the weekly reward, its name and emoji,
+  // the bar), so two grown-ups changing different ones both keep their change.
+  'choreRewards',
 ]);
 
 /**

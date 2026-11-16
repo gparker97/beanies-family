@@ -331,6 +331,14 @@ describe.each(RUNNERS)(
       expect(value).toEqual({ rate: 5, term: 25 });
     });
 
+    it('a concurrent choreRewards key survives a grown-up changing another (#148)', () => {
+      const base = { on: true, weeklyOn: true, title: 'Ice cream', barPct: 100 };
+      // Another grown-up moved the bar; this one renamed the reward.
+      const target = { ...base, barPct: 80 };
+      const { value } = run('choreRewards', target, { ...base, title: 'Pizza' }, base);
+      expect(value).toEqual({ on: true, weeklyOn: true, title: 'Pizza', barPct: 80 });
+    });
+
     it('a concurrent aiApiKeys provider survives the caller adding another', () => {
       const { value } = run('aiApiKeys', { claude: 'k1' }, { openai: 'k2' }, {});
       expect(value).toEqual({ claude: 'k1', openai: 'k2' });
@@ -533,6 +541,7 @@ describe('copies and helpers', () => {
     });
     expect([...MERGE_FIELDS].sort()).toEqual([
       'aiApiKeys',
+      'choreRewards',
       'dismissedHintKeys',
       'helpfulHintLeadDays',
       'loan',

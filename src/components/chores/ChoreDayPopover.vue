@@ -20,6 +20,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
 import { CHORE_BLOCK_META, choreEmoji } from '@/constants/choreBlocks';
+import { CHORE_POPOVER_CARD, CHORE_POPOVER_SHEET } from '@/constants/tileStyles';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { ChoreDayRecord } from '@/utils/chores';
 import type { FamilyMember } from '@/types/models';
@@ -53,11 +54,6 @@ const isOpen = computed(() => props.open && !!props.record && !!props.member);
 function close(): void {
   emit('close');
 }
-
-const SHEET_CLASS =
-  'dark:bg-surface-overlay dark:border-line-strong max-h-[75dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-[var(--tint-slate-10)] bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(44,62,80,0.16)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.5)]';
-const CARD_CLASS =
-  'dark:bg-surface-overlay dark:border-line-strong max-h-[min(36rem,calc(100dvh-1rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-[1.25rem] border border-[var(--tint-slate-10)] bg-white shadow-[0_14px_44px_rgba(44,62,80,0.2)] dark:shadow-[0_14px_44px_rgba(0,0,0,0.45)]';
 
 const title = computed(() =>
   fillTemplate(t(props.isToday ? 'choreboard.pop.titleToday' : 'choreboard.pop.title'), {
@@ -111,8 +107,8 @@ const itemLabel = (title: string, done: boolean) =>
     initial-focus="[data-testid='chore-day-popover-close']"
     card-testid="chore-day-popover"
     dim-testid="chore-day-popover-dim"
-    :sheet-class="SHEET_CLASS"
-    :card-class="CARD_CLASS"
+    :sheet-class="CHORE_POPOVER_SHEET"
+    :card-class="CHORE_POPOVER_CARD"
     :data-ymd="record?.ymd"
     :data-member-id="member?.id"
     @close="close"

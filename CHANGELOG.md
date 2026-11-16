@@ -10,8 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-11-16
 
+### Added
+
+- Stars and Rewards for the Choreboard: each chore a child ticks can now earn a star. It is off until a grown-up turns it on.
+- An optional weekly reward with a bar, and special rewards on top of it (for this week or saved up over several weeks, for all kids or chosen children), can now be set up, with chore values and fair pricing in full weeks.
+- Grown-ups can now give bonus stars or take stars away, with a reason the child sees.
+- The Star Report is now available, showing each child's week (a child's Bonus number opens that week's bonus stars) and each special reward's progress, and the Choreboard's Chores Done board can now be stepped back up to four weeks, with or without Stars and Rewards.
+- The arc and star count are now shown on the Beanie Wall and on a child's day.
+
 ### Changed
 
+- The Choreboard now has a view switch at the top for grown-ups (Chores, Star Report and Rewards).
 - On the Beanie Wall's Choreboard, finished times of day are now listed in the order of the day (morning, afternoon, evening, anytime) at the bottom of each lane, under a "Done" line, so what is finished and what is still to do are easy to tell apart.
 
 ## 2026-11-15

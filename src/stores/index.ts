@@ -15,4 +15,5 @@ export { useRecipesStore } from './recipesStore';
 export { useMealPlanStore } from './mealPlanStore';
 export { useResponsibilityStore } from './responsibilityStore';
 export { useChoreStore } from './choreStore';
+export { useStarStore } from './starStore';
 export { useEmergencyContactsStore } from './emergencyContactsStore';

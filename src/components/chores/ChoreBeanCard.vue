@@ -12,6 +12,9 @@
  * do Edit Chores and a chore's name. The chip sits on the strip's raised card, so it is
  * `surface-overlay` on dark.
  *
+ * Stars (#148): an optional `strip` slot under the header, where the page puts a kid's path strip
+ * for a grown-up while the feature is on. Empty, nothing is drawn (no wrapper in the DOM).
+ *
  * Reads only the one read model (`BeanChoreDay`); ticks and edits are intents for the page.
  * Dark mode: the card is `surface-raised` with a `line` edge; text is `ink` / `ink-faint`;
  * accent text pairs with `accent-lift`.
@@ -31,7 +34,7 @@ import {
   choreTickSelector,
   type ChoreCelebrationAnchor,
 } from '@/utils/choreCelebration';
-import type { ChoreBlock, ChoreBlockStarts, FamilyMember } from '@/types/models';
+import type { Chore, ChoreBlock, ChoreBlockStarts, FamilyMember } from '@/types/models';
 
 const props = withDefaults(
   defineProps<{
@@ -44,8 +47,16 @@ const props = withDefaults(
     canTick?: boolean;
     canEdit?: boolean;
     isPending?: (choreId: string) => boolean;
+    /** Stars (#148): what this child's chores are worth (`starStore.valueFor`), or null (off). */
+    starValue?: ((chore: Chore) => number) | null;
   }>(),
-  { day: () => ({ blocks: [], left: 0 }), canTick: true, canEdit: false, isPending: () => false }
+  {
+    day: () => ({ blocks: [], left: 0 }),
+    canTick: true,
+    canEdit: false,
+    isPending: () => false,
+    starValue: null,
+  }
 );
 
 const emit = defineEmits<{
@@ -224,6 +235,11 @@ const subline = computed(() => {
       </template>
     </div>
 
+    <!-- Stars (#148): the grown-up's path strip for a kid (the page fills it only then). -->
+    <div v-if="$slots.strip" class="px-0.5" data-testid="chore-bean-strip">
+      <slot name="strip" />
+    </div>
+
     <div v-if="blocks.length" class="flex flex-col gap-1.5">
       <ChoreBlockSummary
         v-for="b in blocks"
@@ -245,6 +261,7 @@ const subline = computed(() => {
             :can-tick="canTick"
             :can-edit="canEdit"
             :pending="isPending(item.chore.id)"
+            :stars="starValue ? starValue(item.chore) : null"
             @toggle="onToggle(b.block, item.chore.id)"
             @edit="emit('edit-chores')"
           />

@@ -34,6 +34,9 @@ import type {
   ResponsibilityCheckIn,
   Chore,
   ChoreMark,
+  ChoreWeek,
+  ChoreAward,
+  ChoreStarGift,
   Settings,
   PodLineage,
 } from './models';
@@ -121,6 +124,24 @@ export interface FamilyDocument {
    */
   chores: Record<string, Chore>;
   choreMarks: Record<string, ChoreMark>;
+  /**
+   * Stars and rewards (#148): one frozen record per child per CLOSED week, keyed
+   * `${memberId}:${weekStart}` (`choreWeekId`). Always written WHOLE (a `set` of a deterministic
+   * id), never patched, so two devices that close the same week converge on one whole record.
+   * Never swept. The only write surface is `starRepository.ts`.
+   */
+  choreWeeks: Record<string, ChoreWeek>;
+  /**
+   * Stars and rewards (#148): the family's extra credit awards, one entity each. Created whole,
+   * edited with a based patch, deleted by a grown-up. Write surface: `starRepository.ts`.
+   */
+  choreAwards: Record<string, ChoreAward>;
+  /**
+   * Stars and rewards (#148): bonus (positive `stars`) and take-back (negative) entries.
+   * Write-once, removable by a grown-up while their week is open. Never swept (a closed week's
+   * `bonus` already holds their net). Write surface: `starRepository.ts`.
+   */
+  choreStarGifts: Record<string, ChoreStarGift>;
   settings: Settings | null;
   /**
    * Which HISTORY this document descends from — see `PodLineage` and ADR-036.
@@ -237,6 +258,9 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
   responsibilityCheckIns: 0,
   chores: 0,
   choreMarks: 0,
+  choreWeeks: 0,
+  choreAwards: 0,
+  choreStarGifts: 0,
 };
 export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];
 

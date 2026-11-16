@@ -1149,12 +1149,20 @@ export interface Chore {
   sortOrder: number;
   /** Which starter set seeded it (analytics, dedupe). */
   starterKey?: string;
+  /**
+   * Stars and rewards (#148): what one tick of this chore earns, 1 to 5. Absent = 1. Read ONLY
+   * through `starsOf` in `utils/choreStars.ts`, which rounds and clamps anything stored.
+   */
+  stars?: number;
   createdBy: UUID;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
 
-/** `'done'`: a bean ticked a chore that day. `'celebrated'`: a bean's block celebration played. */
+/**
+ * `'done'`: a bean ticked a chore that day. `'celebrated'`: a bean's block celebration played,
+ * or (ref `'reward'`, dated the week's first day) their weekly reward's achieved banner (#148).
+ */
 export type ChoreMarkKind = 'done' | 'celebrated';
 
 /**
@@ -1171,7 +1179,7 @@ export interface ChoreMark {
   memberId: UUID;
   /** YYYY-MM-DD, the chore day (from the one chore clock). */
   date: ISODateString;
-  /** `'done'`: the chore id. `'celebrated'`: the block. */
+  /** `'done'`: the chore id. `'celebrated'`: the block, or `'reward'` (`REWARD_MARK_REF`, #148). */
   ref: string;
   /** Who is credited with the tick. */
   by: UUID;
@@ -1184,6 +1192,112 @@ export interface ChoreBlockStarts {
   morning: string;
   afternoon: string;
   evening: string;
+}
+
+// Stars and rewards for chores (#148). Read and write them ONLY through `starStore` and the pure
+// rules in `src/utils/choreStars.ts`; every write surface is `starRepository.ts`. Plan:
+// `~/projects/beanies-ops/docs/plans/2026-11-16-stars-and-rewards-for-chores.md`.
+
+/**
+ * The family's stars and rewards settings (`Settings.choreRewards`). Absent and `{ on: false }`
+ * both mean off (greg, 2026-11-16: there is no "decided no" state). Only `on` is required. Never read directly: every reader goes
+ * through `rewardsOf(settings)`, which fills the defaults and clamps `barPct`.
+ */
+export interface ChoreRewards {
+  on: boolean;
+  /**
+   * Local YYYY-MM-DD the feature was last turned on (stamped on every turn-on from off), so the
+   * weeks while it was off are never frozen or counted.
+   */
+  startedOn?: ISODateString;
+  /** A weekly reward is set. Absent = false. */
+  weeklyOn?: boolean;
+  title?: string;
+  emoji?: string;
+  /** The share of a full week's stars the weekly reward needs: 50 to 100 in steps of 5. Absent = 100. */
+  barPct?: number;
+}
+
+/**
+ * An extra credit award (#148): one per entity, family-wide, every child counts toward it on
+ * their own. Created whole, edited with a based patch. "Achieved" is never stored: it is derived
+ * from the weeks (`awardProgress`).
+ */
+export interface ChoreAward {
+  id: UUID;
+  title: string;
+  emoji: string;
+  /** `week`: this week's stars only, every week. `saved`: counts across weeks until achieved. */
+  kind: 'week' | 'saved';
+  /** The price's unit: full weeks (one decimal) or stars (a whole number). */
+  unit: 'weeks' | 'stars';
+  price: number;
+  /** Saved only: the count starts again the week after each achieved week. Absent = one time. */
+  repeats?: boolean;
+  /**
+   * The kids it is for. Absent (or empty) = every kid who earns stars, including one who joins
+   * later; a grown-up who picks every kid stores it absent. Written whole with the award. Read
+   * only through `awardIsFor` (`utils/choreStars.ts`), which ignores an id that is no longer a
+   * kid. The weekly reward is always for every kid.
+   */
+  memberIds?: UUID[];
+  /** YYYY-MM-DD, the first day of the week it counts from. */
+  weekStart: ISODateString;
+  createdBy: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/** A grown-up's bonus (positive `stars`) or take-back (negative) for one child on one chore day. */
+export interface ChoreStarGift {
+  id: UUID;
+  /** The child. */
+  memberId: UUID;
+  /** YYYY-MM-DD, the local chore day it was given. */
+  date: ISODateString;
+  /** Positive = bonus, negative = taken back. */
+  stars: number;
+  /** The grown-up. */
+  by: UUID;
+  /** Optional for a bonus, required for a take-back. */
+  note?: string;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/**
+ * One child's CLOSED week, frozen (#148): the only star record that outlives mark retention.
+ * WRITTEN WHOLE (a `set`), never patched: `days` is positional, and a per-item patch from two
+ * devices could merge to eight days. Do not add an update path. Built only by `planWeekClose`.
+ */
+export interface ChoreWeek {
+  /** `${memberId}:${weekStart}`, from `choreWeekId` only. Never parse it. */
+  id: string;
+  memberId: UUID;
+  /** YYYY-MM-DD, the week's first day. */
+  weekStart: ISODateString;
+  /** Chores done of due over the week's counted days. */
+  done: number;
+  due: number;
+  /** Stars from chores. */
+  stars: number;
+  /** Net of the week's gifts (may be negative). */
+  bonus: number;
+  /** What a full week was worth for this child that week. */
+  full: number;
+  /** Stars the weekly reward needed that week; 0 = no weekly reward. */
+  bar: number;
+  /** Seven numbers: chore stars per day from `weekStart`. */
+  days: number[];
+  /** The day the weekly reward was reached, when it was. */
+  hitOn?: ISODateString;
+  /**
+   * The child's RAW `done` marks on the week's counted days when written (every mark, whether
+   * or not its chore still exists). With `bonus`, the re-settle detector.
+   */
+  marks: number;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
 }
 
 /**
@@ -2549,6 +2663,13 @@ export interface Settings {
    * devices' edits. Absent = the defaults, which `blockStarts()` applies and never stores.
    */
   choreBlockStarts?: ChoreBlockStarts;
+  /**
+   * #148 stars and rewards. Read ONLY through `rewardsOf` (`utils/choreStars.ts`); written ONLY
+   * by `settingsStore.setChoreRewards` (from `starStore.setRewards`). Patched PER KEY
+   * (`MERGE_FIELDS`): its keys are independent, so two grown-ups changing different settings
+   * both keep their change.
+   */
+  choreRewards?: ChoreRewards;
   /**
    * #95: the family's plan token, a bearer secret the billing Lambda hands out once on the
    * first paid claim (Phase 5). It gates the Customer Portal and the `full` AI allowance and

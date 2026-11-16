@@ -373,4 +373,32 @@ describe('WallJobRow', () => {
       expect(writers.renameJob).toHaveBeenCalledWith(job, 'goggles case');
     });
   });
+
+  /** Stars (#148): a chore's value tag, carried by the bundle only above 1. */
+  describe("a chore's star value", () => {
+    const chore: WallJob = {
+      key: 'chore:c1:m1',
+      title: 'Homework',
+      done: false,
+      ownerId: 'm1',
+      source: 'chore',
+      choreId: 'c1',
+      locked: true,
+    };
+
+    it('shows the value inside the title button, so a tap on it still ticks the row', async () => {
+      const { wrapper } = mountRow({ job: { ...chore, stars: 2 } });
+      const tag = wrapper.get('[data-testid="star-count"]');
+      expect(tag.text()).toBe('2');
+      expect(tag.attributes('aria-label')).toBe('choreStars.value.other');
+      expect(tag.element.closest('button')).not.toBeNull();
+      await tag.trigger('click');
+      expect(wrapper.emitted('toggle')).toHaveLength(1);
+    });
+
+    it('shows nothing for a chore without a value (worth 1, or stars off)', () => {
+      const { wrapper } = mountRow({ job: chore });
+      expect(wrapper.find('[data-testid="star-count"]').exists()).toBe(false);
+    });
+  });
 });

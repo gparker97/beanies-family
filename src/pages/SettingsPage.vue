@@ -381,6 +381,25 @@ function updatePhoneDensity(value: string | number): void {
   );
 }
 
+/**
+ * Family week start (pod managers only). The setter toasts and reports a failed save once,
+ * then re-throws so a caller can revert; the select reads the store value, so it already
+ * shows the old day. Nothing more to show here: the rejection is only marked as handled.
+ */
+async function updateWeekStartDay(value: string | number): Promise<void> {
+  try {
+    await settingsStore.setWeekStartDay(Number(value) as 0 | 1);
+  } catch {
+    // Already toasted and reported by the store (`persistAiSetting`); no second toast.
+    logEvent({
+      level: 'debug',
+      surface: 'settings',
+      message: 'week-start-save-handled',
+      context: { action: 'settings', kind: 'week-start' },
+    });
+  }
+}
+
 const showRatesWarning = ref(false);
 const pendingCurrency = ref<string | null>(null);
 const isFetchingRates = ref(false);
@@ -2301,7 +2320,7 @@ async function handleDeleteFamilyClick() {
         :label="t('settings.weekStart')"
         :hint="t('settings.weekStartHint')"
         :disabled="!canManagePod"
-        @update:model-value="settingsStore.setWeekStartDay(Number($event) as 0 | 1)"
+        @update:model-value="updateWeekStartDay"
       />
       <!-- Week-start is family-shared config (unlike theme/text-size above) — admins only. -->
       <SettingsAdminOnlyNotice v-if="!canManagePod" />

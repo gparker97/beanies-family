@@ -66,6 +66,13 @@ describe('uiStrings', () => {
     // brand nouns and stay; the bare app name "beanies" is allowed unless it is
     // being used as a noun for data ("your beanies").
     const IMPORTANT_PREFIXES = [
+      // Stars and rewards (#148): the refusals a parent acts on, every take-away string (what a
+      // child reads when stars are taken away keeps its real nouns and only drops case), and the
+      // two destructive confirms (removing a bonus entry, deleting a special reward).
+      'choreStars.error',
+      'choreStars.takeBack',
+      'choreStars.report.remove',
+      'choreStars.awardForm.delete',
       // The "Update beanies" action and its outcomes (web stale-build plan, 2026-11-11):
       // a person who cannot open their family file must be told plainly what the button does.
       // Exact keys for the two recovery labels: their tables also hold older playful labels

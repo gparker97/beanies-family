@@ -3,6 +3,7 @@
 // tint, the ink and their dark partners). The block ORDER and every rule about blocks live in
 // `utils/chores.ts`; this file is display data only.
 import { choreDaysKind, type ChoreDayBlock } from '@/utils/chores';
+import { emojiSuggester, type EmojiKeywordEntry } from '@/utils/emojiSuggest';
 import { formatTime12 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { ChoreBlock, ChoreBlockStarts } from '@/types/models';
@@ -174,17 +175,12 @@ export const CHORE_EMOJI_OPTIONS: readonly { emoji: string; labelKey: UIStringKe
 ];
 
 /**
- * Keyword data for `suggestChoreEmoji`: never shown, only matched against a chore's title.
- * English words match whole words (an optional plural `s` / `es` allowed), so "cat" never fires
- * inside "education"; Chinese words match anywhere in the title. `weak` marks a generic verb
- * ("feed", "brush", "walk"): any object word beats it, so "feed the dog" is the dog and "brush
- * teeth" is the toothbrush. Within a tier the longest keyword wins, then table order.
+ * Keyword data for `suggestChoreEmoji`: never shown, only matched against a chore's title by the
+ * shared matcher (`emojiSuggester`, `utils/emojiSuggest.ts`, which holds the matching rules).
+ * `weak` marks a generic verb ("feed", "brush", "walk"): any object word beats it, so "feed the
+ * dog" is the dog and "brush teeth" is the toothbrush.
  */
-const CHORE_EMOJI_KEYWORDS: readonly {
-  emoji: string;
-  words: readonly string[];
-  weak?: boolean;
-}[] = [
+const CHORE_EMOJI_KEYWORDS: readonly EmojiKeywordEntry[] = [
   { emoji: '🛏️', words: ['bed', 'make bed', 'make your bed', '床', '铺床', '叠被'] },
   { emoji: '🪥', words: ['teeth', 'tooth', 'toothbrush', 'floss', '刷牙', '牙'] },
   { emoji: '🪥', words: ['brush', '刷'], weak: true },
@@ -247,58 +243,14 @@ const CHORE_EMOJI_KEYWORDS: readonly {
   },
 ];
 
-/** Each keyword compiled once: whole-word for Latin words, anywhere for Chinese. */
-const KEYWORD_MATCHERS = CHORE_EMOJI_KEYWORDS.flatMap((entry, order) =>
-  entry.words.map((word) => ({
-    emoji: entry.emoji,
-    weak: !!entry.weak,
-    order,
-    size: word.length,
-    test: matcherFor(word),
-  }))
-);
-
-function matcherFor(word: string): (title: string) => boolean {
-  if (!/[a-z]/.test(word)) return (title) => title.includes(word);
-  // Whole word, with an optional plural. Plain string search: no pattern is built from data.
-  const forms = [word, `${word}s`, `${word}es`];
-  return (title) => forms.some((form) => hasWholeWord(title, form));
-}
-
-const isLatinLetter = (ch: string) => ch >= 'a' && ch <= 'z';
-
-function hasWholeWord(title: string, form: string): boolean {
-  for (let at = title.indexOf(form); at !== -1; at = title.indexOf(form, at + 1)) {
-    const before = at === 0 ? '' : title.charAt(at - 1);
-    const after = title.charAt(at + form.length);
-    if (!isLatinLetter(before) && !isLatinLetter(after)) return true;
-  }
-  return false;
-}
-
 /**
  * A picture for a chore from the words in its title (English or Simplified Chinese), or
  * `undefined` when nothing in the title is known. Pure; the caller falls back to `choreEmoji()`.
  * The most specific word wins: an object word over a generic verb, then the longest keyword,
  * then the earlier table entry.
  */
-export function suggestChoreEmoji(title: string): string | undefined {
-  const text = title.trim().toLocaleLowerCase();
-  if (!text) return undefined;
-  let best: (typeof KEYWORD_MATCHERS)[number] | undefined;
-  for (const m of KEYWORD_MATCHERS) {
-    if (!m.test(text)) continue;
-    if (
-      !best ||
-      (best.weak && !m.weak) ||
-      (best.weak === m.weak &&
-        (m.size > best.size || (m.size === best.size && m.order < best.order)))
-    ) {
-      best = m;
-    }
-  }
-  return best?.emoji;
-}
+export const suggestChoreEmoji: (title: string) => string | undefined =
+  emojiSuggester(CHORE_EMOJI_KEYWORDS);
 
 /**
  * The automatic picture for a chore a grown-up typed (both chore lists' new rows): from its

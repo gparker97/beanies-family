@@ -174,6 +174,8 @@ export default [
             '🃏', // Who Owns What deal pile, all sorted (#109)
             '🙋', // Who Owns What nav emoji, deal board title (#109)
             '👀', // a list's "Shows from ..." tag and drawer pill (#147)
+            '⚖️', // the award form's "same stars, different effort" nudge (#148)
+            '🧭', // the award form's real-time estimate (#148)
             '⏰',
             '⏳',
             '⚠',

@@ -42,6 +42,7 @@ import type {
   WeatherPlace,
   TemperatureUnit,
   ChoreBlockStarts,
+  ChoreRewards,
 } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
@@ -1114,13 +1115,27 @@ export const useSettingsStore = defineStore('settings', () => {
     });
   }
 
-  async function setWeekStartDay(day: 0 | 1): Promise<void> {
-    try {
-      settings.value = await settingsRepo.saveSettings({ weekStartDay: day });
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update week start day';
-    }
+  /**
+   * #148 stars and rewards: write the family's `choreRewards`. `build` gets the PROJECTION's
+   * stored object (the merge base `saveSettings` diffs against), never this store's copy, which
+   * can lag it: a stale copy would write another grown-up's keys back or delete them. Patched PER
+   * KEY in the worker (`MERGE_FIELDS`). The `addDismissedHintKey` shape. THROWS on failure: its
+   * one caller, `starStore.setRewards`, validates first and runs this under `write`, which toasts
+   * and reports exactly once.
+   */
+  async function setChoreRewards(
+    build: (current: ChoreRewards | undefined) => ChoreRewards
+  ): Promise<void> {
+    settings.value = await settingsRepo.patchChoreRewards(build);
   }
+
+  // Family-shared (the calendar's and the chore week's first day; #148 reads it for the stars
+  // week). The `setWeatherEnabled` shape: a failed save toasts and reports once, then RE-THROWS
+  // so a caller can revert. It used to set `error.value` and swallow the failure.
+  const setWeekStartDay = (day: 0 | 1) =>
+    persistAiSetting('settings.weekStart', 'weekStartDay', () =>
+      settingsRepo.saveSettings({ weekStartDay: day })
+    );
 
   // Family-only preference (no device mirror): whether to show public holidays
   // on the planner. Only meaningful once a country is set.
@@ -1429,6 +1444,7 @@ export const useSettingsStore = defineStore('settings', () => {
     onboardingCompleted,
     weekStartDay,
     setChoreBlockStarts,
+    setChoreRewards,
     country,
     showPublicHolidays,
     skipDocumentConsentPrompt,
