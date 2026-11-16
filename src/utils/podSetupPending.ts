@@ -28,7 +28,7 @@
  * ⚠️ ONE SENDER AT A TIME, ACROSS TABS. localStorage is shared by every tab of the profile, the
  * per-tab latch in `syncStore` is not. So the wizard HOLDS a Web Lock named for the family
  * (`holdPodSetupLock`) from the pod write until its completion returns or it unmounts, and the
- * late path asks for the same lock with `ifAvailable` (`withPodSetupLockIfAvailable`): while the
+ * late path asks for the same lock with `ifAvailable` (the lock helper below): while the
  * wizard (or another tab's late send) owns it, the late path skips. Where `navigator.locks` is
  * unavailable (or refuses), both fall back to running unlocked, the pre-lock behaviour; the done
  * record still stops any send that starts after another one finished.
