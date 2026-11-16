@@ -11,12 +11,13 @@
  * one store action, made with an explicit `actorId` and `via: 'bean-editor'` (the firehose's
  * `kind`), and answered by the store's re-read:
  *  - rename (Enter or blur; Escape cancels), time, picture, days: `updateChore`. A rename's
- *    picture follows the one rename rule (`chorePictureAfterRename`) against the stored title: a
- *    title whose meaning moved away from its picture (it no longer matches the old title's
- *    suggestion at all) re-picks (the new emoji replaces a hand pick or card art, in the same
- *    write); a small edit, even one that adds a longer keyword, or a title that suggests nothing
- *    keeps the picture. A pick by hand is saved at once, so the stored title is always the one
- *    it was settled against;
+ *    picture follows the one rename rule (`chorePictureAfterRename`) against the stored title. A
+ *    new title that suggests nothing keeps the picture. Otherwise it re-picks (the new emoji
+ *    replaces a hand pick or card art, in the same write) when the title moved away from the
+ *    picture: the old title suggested one and the new title no longer matches it at all, or the
+ *    old title suggested nothing and the new one is a different name (no word in common). A small
+ *    edit keeps it, even one that adds a longer keyword. A pick by hand is saved at once, so the
+ *    stored title is always the one it was settled against;
  *  - a new row: created when its title is committed (`createChore`, for this bean, its picture
  *    by the same rule from the blank row's: the title's suggestion while the row still has the
  *    default picture, else the default, or what was picked by hand); a row left empty is

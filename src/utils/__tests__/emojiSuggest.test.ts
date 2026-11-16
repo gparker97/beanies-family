@@ -1,9 +1,9 @@
 /**
  * The shared keyword matcher behind the chore and reward suggesters (`emojiSuggester`), and the
- * rename rule both follow (`pictureAfterRename`).
+ * rename rule both follow (`pictureAfterRename`, with `isEditOfName`).
  */
 import { describe, it, expect } from 'vitest';
-import { emojiSuggester, pictureAfterRename } from '@/utils/emojiSuggest';
+import { emojiSuggester, isEditOfName, pictureAfterRename } from '@/utils/emojiSuggest';
 
 const suggester = emojiSuggester([
   { emoji: 'A', words: ['cat', 'cat food'] },
@@ -84,7 +84,27 @@ describe('pictureAfterRename', () => {
       'HAIR',
     ],
     ['the new name suggests nothing: keep', 'trash', 'help out', 'X', undefined],
-    ['the old name suggested nothing: a hand pick stays', 'help', 'walk the dog', 'X', undefined],
+    [
+      'the old name suggested nothing: an edit of it keeps a hand pick',
+      'help out',
+      'help walk the dog',
+      'X',
+      undefined,
+    ],
+    [
+      'the old name suggested nothing: a different name re-picks over a hand pick',
+      'help',
+      'walk the dog',
+      'X',
+      'DOG',
+    ],
+    [
+      'the old name suggested nothing: a first title keeps a hand pick',
+      '',
+      'walk the dog',
+      'X',
+      undefined,
+    ],
     [
       'the old name suggested nothing: the plain default yields',
       '',
@@ -99,7 +119,31 @@ describe('pictureAfterRename', () => {
   });
 
   it('card art is a real picture even on the default emoji', () => {
-    expect(next('help', 'trash after dinner', DEFAULT, true)).toBeUndefined();
-    expect(next('help', 'trash after dinner', DEFAULT, false)).toBe('DINNER');
+    expect(next('help', 'help after dinner', DEFAULT, true)).toBeUndefined();
+    expect(next('help', 'help after dinner', DEFAULT, false)).toBe('DINNER');
+    // A different name re-picks over the art as well.
+    expect(next('help', 'trash after dinner', DEFAULT, true)).toBe('DINNER');
+  });
+});
+
+describe('isEditOfName: the new name shares a significant word with the old one', () => {
+  it.each([
+    ['Clear your plate', 'Clear your plate after dinner', true],
+    ['Clear your plate', 'Clear the table', true],
+    ['Clear your plate', 'CLEAR UP', true],
+    ['Clear your plate', 'Feed the dog', false],
+    ['Something nice', 'Allowance', false],
+    ['Help Grandma', 'Feed the dog', false],
+    // Words under three letters and common filler words are not significant.
+    ['Go to bed', 'Go to school', false],
+    ['Clean the room', 'Walk the dog', false],
+    ['Tidy up, 2 rooms', 'Feed 2 cats', false],
+    // A name without spaces (Chinese) shares a character that is not punctuation or a digit.
+    ['洗碗', '洗衣服', true],
+    ['洗碗', '喂狗', false],
+    ['1。作业', '2。喂狗', false],
+    ['', 'Feed the dog', false],
+  ] as const)('%s -> %s: %s', (from, to, want) => {
+    expect(isEditOfName(from, to)).toBe(want);
   });
 });

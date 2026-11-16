@@ -6,10 +6,11 @@
  *
  *  - Special Reward: an emoji (`EmojiPicker`, `REWARD_EMOJI_OPTIONS`) and a name (`CHORE_TITLE_MAX`).
  *    The emoji follows the one rule (`rewardEmojiAfterRename`) against the name it was last
- *    settled against (as opened, or at a pick by hand): a rename whose meaning moved away from
- *    the emoji (the new name no longer matches the old name's suggestion) picks the new one,
- *    even over a hand pick; otherwise the emoji stays. Opening a special reward never changes
- *    its emoji.
+ *    settled against (as opened, or at a pick by hand): a rename that moved away from the emoji
+ *    picks the new name's suggestion, even over a hand pick. That is: the new name no longer
+ *    matches the old name's suggestion, or the old name suggested nothing and the new one is a
+ *    different name (no word in common). Otherwise the emoji stays. Opening a special reward
+ *    never changes its emoji.
  *  - Who Is It For (with two kids or more, or when the special reward being edited is for
  *    nobody now because its kids have left): All Kids (the default, stored as no `memberIds`,
  *    so a kid who joins later is included) or Pick Kids (`FamilyChipPicker`, at least one). An

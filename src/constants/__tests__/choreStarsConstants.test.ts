@@ -149,9 +149,16 @@ describe('rewardEmojiAfterRename: the rule with the reward suggester', () => {
     ['a Chinese keyword', 'Ice cream', '零花钱', '🐷', '💵'],
     ['a Chinese small edit keeps a hand pick', '零花钱', '每周零花钱', '🐷', '🐷'],
     [
-      'an unmatched name with a hand pick renamed to "Allowance": the hand pick stays',
+      'an unmatched name with a hand pick renamed to "Allowance" (a different name): money',
       'Something nice',
       'Allowance',
+      '🐷',
+      '💵',
+    ],
+    [
+      'an unmatched name with a hand pick edited to "Something nice, allowance": the pick stays',
+      'Something nice',
+      'Something nice, allowance',
       '🐷',
       '🐷',
     ],

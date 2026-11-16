@@ -8,7 +8,7 @@
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { nextTick, reactive, toRaw } from 'vue';
+import { nextTick, reactive, ref, toRaw } from 'vue';
 import type {
   Chore,
   ChoreAward,
@@ -298,6 +298,11 @@ import {
 } from '@/services/automerge/loadMaintenance';
 import { markAuthoritative, resetProjection } from '@/services/automerge/projection';
 import {
+  ReadOnlyError,
+  __resetWriteGateForTesting,
+  setWriteGate,
+} from '@/services/automerge/worker/writeGate';
+import {
   REWARD_MARK_REF,
   choreMarkId,
   choreWeekRecord,
@@ -428,6 +433,7 @@ beforeEach(() => {
   markWrites.calls = [];
   ticking.pending = null;
   ticking.waits = 0;
+  __resetWriteGateForTesting();
   store = useStarStore();
   vi.clearAllMocks();
 });
@@ -874,6 +880,40 @@ describe('turning it off records the books as they stand', () => {
       expect(settings.sent.at(-1)!.on).toBe(false);
     }
   );
+
+  it('a read-only family can still turn it off: the record is skipped before any write (no gate toast), one info event, no critical report, no error toast', async () => {
+    chores.todayYmd = FRI;
+    await setup({ marks: ticks('kid', days7(MON).slice(0, 5)) });
+    setWriteGate(() => ({ block: true, wouldBlock: false }));
+    expect(await store.setRewards({ on: false }, 'mom')).toBe(true);
+    expect(writes.setChoreWeeks).not.toHaveBeenCalled();
+    expect(reads.marks).not.toHaveBeenCalled();
+    expect(settings.sent.at(-1)!.on).toBe(false);
+    expect(store.isOn).toBe(false);
+    expect(reportError).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
+    expect(logged('off-record-skipped').map((e) => [e.level, e.context])).toEqual([
+      ['info', { detail: 'read-only' }],
+    ]);
+    expect(logged('week-recorded-at-off')).toEqual([]);
+    expect(logged('rewards-set')[0]!.context).toMatchObject({ action: 'off' });
+  });
+
+  it('a ReadOnlyError from the record write (the gate flipped mid-call) is the same read-only skip, not a failure', async () => {
+    chores.todayYmd = FRI;
+    await setup({ marks: ticks('kid', days7(MON).slice(0, 5)) });
+    proj.failWrite = new ReadOnlyError('choreWeeks');
+    expect(await store.setRewards({ on: false }, 'mom')).toBe(true);
+    expect(settings.sent.at(-1)!.on).toBe(false);
+    expect(reportError).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalledWith(
+      'error',
+      'choreStars.error.offNotRecorded',
+      undefined,
+      expect.anything()
+    );
+    expect(logged('off-record-skipped')[0]!.context).toEqual({ detail: 'read-only' });
+  });
 
   it('a patch that is not a turn-off (or off while already off) records nothing', async () => {
     chores.todayYmd = FRI;
@@ -1330,19 +1370,52 @@ describe('the achieved banner: claimed only while a banner host is mounted', () 
     tickSunday();
     await settle();
     expect(banner.shown).toBe(1);
+    expect(markWrites.calls).toHaveLength(1);
     expect(logged('reward-achieved')[0]!.context).toMatchObject({ stage: 'unmarked' });
     // A later change re-runs the claim: the latch keeps it to one banner, the mark is retried.
-    chores.choreMarks = [...chores.choreMarks];
-    await settle();
-    expect(banner.calls).toHaveLength(1);
     markWrites.fail = false;
     chores.choreMarks = [...chores.choreMarks];
     await settle();
-    expect(markWrites.calls).toHaveLength(3);
+    expect(markWrites.calls).toHaveLength(2);
     expect(banner.calls).toHaveLength(1);
     chores.choreMarks = [...chores.choreMarks];
     await settle();
-    expect(markWrites.calls).toHaveLength(3); // marked now
+    expect(markWrites.calls).toHaveLength(2); // marked now
+  });
+
+  it('a mark write that keeps failing is retried once this session, not on every recompute', async () => {
+    await nearTheBar();
+    host();
+    markWrites.fail = true;
+    tickSunday();
+    await settle();
+    for (let i = 0; i < 5; i++) {
+      chores.choreMarks = [...chores.choreMarks];
+      await settle();
+    }
+    // The claim's write, then ONE silent retry; the banner played once.
+    expect(markWrites.calls).toHaveLength(2);
+    expect(banner.calls).toHaveLength(1);
+    expect(banner.shown).toBe(1);
+  });
+
+  it('while the family is read-only nothing is claimed (no write, no toast, no banner); once writable it is', async () => {
+    const readOnly = ref(true);
+    setWriteGate(() => ({ block: readOnly.value, wouldBlock: false }));
+    await nearTheBar();
+    host();
+    tickSunday();
+    await settle();
+    chores.choreMarks = [...chores.choreMarks];
+    await settle();
+    expect(markWrites.calls).toEqual([]);
+    expect(banner.calls).toEqual([]);
+    expect(showToast).not.toHaveBeenCalled();
+    expect(logged('skipped while the family is read-only')).toHaveLength(1);
+    readOnly.value = false;
+    await settle();
+    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+    expect(banner.shown).toBe(1);
   });
 
   it('the banner outcome (played, waited) is logged as the composable answers it', async () => {

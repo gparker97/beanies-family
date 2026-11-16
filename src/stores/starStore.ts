@@ -29,6 +29,11 @@ import { isDocLoaded } from '@/services/automerge/docService';
 import { registerLoadMaintenance, storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import * as choreRepo from '@/services/automerge/repositories/choreRepository';
 import * as repo from '@/services/automerge/repositories/starRepository';
+import {
+  ReadOnlyError,
+  readWriteGate,
+  skipWhileReadOnly,
+} from '@/services/automerge/worker/writeGate';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { useTranslationStore } from '@/stores/translationStore';
 import { takeAutoWrite } from '@/utils/autoWriteBudget';
@@ -626,14 +631,17 @@ export const useStarStore = defineStore('stars', () => {
    *     it holds (a re-tick, the host mounted again) the sequence runs again;
    *  4. write the once-only mark (`ifAbsent`) and show the banner only if THIS write created it.
    *     A failed write still shows it on this device, once (`shownUnmarked`), and the mark is
-   *     retried silently the next time the claim runs. A mark another device wrote first shows
-   *     nothing.
+   *     retried silently ONCE, the next time the claim runs this session (`markRetried`); a
+   *     second failure leaves that kid-week alone until the next app session. A mark another
+   *     device wrote first shows nothing.
    * So: a device with no host mounted claims nothing; a marked week never replays; a grown-up's
    * tick on the Chores view's home cards plays it the next time the child's day or lane is on
    * screen. Two hosts on one device make one claim (one key in flight). Two devices each with a
    * host: the `ifAbsent` mark means one plays (both playing when both were offline is the
    * accepted residual). Never for a grown-up, a pet, while the feature is off, with no weekly
    * reward, or on the stores' snapshot copy (`storesAuthoritative`, the automatic writers' rule).
+   * Never while the family is read-only (`skipWhileReadOnly`, the automatic writers' rule): no
+   * write, no gate toast, no banner; the claim runs when the family is writable again.
    */
 
   /** Every mounted banner host: an id per registration, so two hosts of one kid count apart. */
@@ -669,6 +677,13 @@ export const useStarStore = defineStore('stars', () => {
    * on-device latch, so it plays once here; the next claim retries the mark without a banner.
    */
   const shownUnmarked = new Set<string>();
+  /**
+   * `member:weekStart` whose one silent mark retry this session is spent. The bound on retries:
+   * the trigger re-reads on every change to what it watches and an unmarked week stays owed, so
+   * without this a write that keeps failing would be retried, and warned about, on every
+   * recompute. One retry covers a passing failure; a lasting one waits for the next app session.
+   */
+  const markRetried = new Set<string>();
 
   const isMarked = (memberId: string, weekStart: string) =>
     marksOn(choreStore.markIndex, memberId, weekStart).celebrated.has(REWARD_MARK_REF);
@@ -692,6 +707,9 @@ export const useStarStore = defineStore('stars', () => {
       if (!week || !weeklyAchieved(week) || isMarked(memberId, week.weekStart)) continue;
       out.push({ memberId, weekStart: week.weekStart, surface });
     }
+    // Read-only: claim nothing (the mark write would be refused). Asked only when something is
+    // owed; the gate's verdict is reactive, so the claim runs once the family is writable again.
+    if (out.length && skipWhileReadOnly(SURFACE)) return [];
     return out;
   }
 
@@ -730,7 +748,10 @@ export const useStarStore = defineStore('stars', () => {
       const writeMark = () =>
         choreStore.writeCelebratedMark(memberId, weekStart, REWARD_MARK_REF, memberId);
       if (shownUnmarked.has(key)) {
-        // Shown here already; only the mark is owed. A failure was reported by the chore store.
+        // Shown here already; only the mark is owed, retried once a session (`markRetried`). A
+        // failure was reported by the chore store.
+        if (markRetried.has(key)) return;
+        markRetried.add(key);
         if ((await writeMark()) !== 'failed') shownUnmarked.delete(key);
         return;
       }
@@ -744,6 +765,8 @@ export const useStarStore = defineStore('stars', () => {
         emoji: rewards.value.emoji ?? '',
         stillClaimable: () => {
           if (hostOf(memberId) === null || isMarked(memberId, weekStart)) return false;
+          // Turned read-only during the wait: no write (and no gate toast); claimed once writable.
+          if (readWriteGate()?.block) return false;
           const now = weekFor(memberId);
           return !!now && now.weekStart === weekStart && weeklyAchieved(now);
         },
@@ -920,9 +943,19 @@ export const useStarStore = defineStore('stars', () => {
    * `startedOn` and the week would never be recorded. A `false` has already shown the grown-up
    * an error toast (rewards were not turned off, try again) and been reported as critical: a
    * grown-up's action failed.
+   *
+   * READ-ONLY IS NOT A FAILURE. A read-only family cannot write the record (`choreWeeks` is
+   * gated) but can still write the setting (settings pass the gate), so the record is skipped
+   * BEFORE it is attempted (no gate toast), one info event says so, and the turn-off goes ahead
+   * (`true`). That week's stars are then not recorded; refusing the turn-off forever would be
+   * worse. A `ReadOnlyError` from a gate that flipped mid-call is treated the same way.
    */
   async function recordAtTurnOff(): Promise<boolean> {
     if (!CHORE_WEEK_CLOSE_ENABLED) return true;
+    const skipped = (): true => {
+      log('info', 'off-record-skipped', { detail: 'read-only' });
+      return true;
+    };
     const failed = (detail: 'not-loaded' | 'write-failed', e?: unknown): false => {
       reportError({
         surface: SURFACE,
@@ -939,6 +972,7 @@ export const useStarStore = defineStore('stars', () => {
       return false;
     };
     if (!isDocLoaded()) return failed('not-loaded');
+    if (readWriteGate()?.block) return skipped();
     try {
       // A close already running writes the same deterministic records; let it finish first.
       if (closing) await closing;
@@ -946,6 +980,7 @@ export const useStarStore = defineStore('stars', () => {
       log('info', 'week-recorded-at-off', { count: plan.write.length, detail: planDetail(plan) });
       return true;
     } catch (e) {
+      if (e instanceof ReadOnlyError) return skipped();
       return failed('write-failed', e);
     }
   }
@@ -970,6 +1005,7 @@ export const useStarStore = defineStore('stars', () => {
     loggedOn.clear();
     rewarding.clear();
     shownUnmarked.clear();
+    markRetried.clear();
     // `hosts` is left alone: it mirrors what is mounted, not the family's data.
   }
 

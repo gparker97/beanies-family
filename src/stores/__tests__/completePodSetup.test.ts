@@ -740,7 +740,7 @@ describe('finishPendingPodSetup: the late completion', () => {
     expect(h.logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'complete-setup',
-        context: { action: 'sent', stage: 'late', detail: 'not-seen' },
+        context: { action: 'sent', stage: 'late', detail: 'registry:ok+slack:dispatched' },
       })
     );
   });
@@ -845,6 +845,12 @@ describe('finishPendingPodSetup: the late completion', () => {
     expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
     // The failure is logged by the write itself.
     expect(registryLines().map((l) => l.context.detail)).toEqual(['failed']);
+    expect(h.logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'complete-setup',
+        context: { action: 'sent', stage: 'late', detail: 'registry:failed+slack:dispatched' },
+      })
+    );
   });
 
   it('with no webhook configured (the dev case) it counts as sent', async () => {
@@ -906,7 +912,7 @@ describe('finishPendingPodSetup: the late completion', () => {
     expect(h.registerFamily.mock.calls[1]![1]).not.toHaveProperty('setupComplete');
   });
 
-  describe('delivery: sent only when the post left an online device', () => {
+  describe('delivery: sent when the registry write OR the Slack post got through', () => {
     it('offline: nothing is sent or counted, the marker is kept, and the next open sends once', async () => {
       openAttempt('att-1');
       marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
@@ -940,9 +946,38 @@ describe('finishPendingPodSetup: the late completion', () => {
       expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
     });
 
-    it('a Slack network error defers; the retry counts the conversion once', async () => {
+    it('a blocked Slack webhook with a landed registry write counts as sent, once, and never re-sends', async () => {
+      openAttempt('att-1');
+      marker.markPodSetupPending('fam-1', 'mem-1', 'att-1');
+      const store = useSyncStore();
+      h.slackOutcome.value = { outcome: 'network_error' };
+
+      store.finishPendingPodSetup(RELOADED);
+      await settle();
+
+      expect(h.track).toHaveBeenCalledTimes(1);
+      expect(h.endCreateAttempt).toHaveBeenCalledWith('done');
+      expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+      expect(lateLines('deferred')).toEqual([]);
+      expect(h.logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'complete-setup',
+          context: { action: 'sent', stage: 'late', detail: 'registry:ok+slack:network_error' },
+        })
+      );
+
+      // The next open (a reload) finds the done record: no second registry write.
+      store.resetState();
+      store.finishPendingPodSetup(RELOADED);
+      await settle();
+      expect(h.registerFamily).toHaveBeenCalledTimes(1);
+      expect(h.track).toHaveBeenCalledTimes(1);
+    });
+
+    it('only when BOTH the registry write and the Slack post failed is it deferred; the retry counts once', async () => {
       marker.markPodSetupPending('fam-1', 'mem-1', null);
       const store = useSyncStore();
+      h.registerFamily.mockResolvedValueOnce(null);
       h.slackOutcome.value = { outcome: 'network_error' };
 
       store.finishPendingPodSetup(RELOADED);
@@ -950,7 +985,9 @@ describe('finishPendingPodSetup: the late completion', () => {
 
       expect(h.track).not.toHaveBeenCalled();
       expect(marker.readPodSetupPending('fam-1').kind).toBe('ok');
-      expect(lateLines('deferred').map((l) => l.context.detail)).toEqual(['slack-network-error']);
+      expect(lateLines('deferred').map((l) => l.context)).toEqual([
+        { action: 'deferred', detail: 'both-failed', kind: 'page-reloaded' },
+      ]);
 
       h.slackOutcome.value = { outcome: 'dispatched' };
       store.resetState();
@@ -960,6 +997,23 @@ describe('finishPendingPodSetup: the late completion', () => {
       expect(h.slackNotifyWithOutcome).toHaveBeenCalledTimes(2);
       expect(h.track).toHaveBeenCalledTimes(1);
       expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+    });
+
+    it('going offline after the post was dispatched still counts it as sent (no second online check)', async () => {
+      marker.markPodSetupPending('fam-1', 'mem-1', null);
+      const store = useSyncStore();
+      h.slackNotifyWithOutcome.mockImplementationOnce(async () => {
+        setOnline(false);
+        return { outcome: 'dispatched' };
+      });
+
+      store.finishPendingPodSetup(RELOADED);
+      await settle();
+
+      expect(marker.readPodSetupPending('fam-1')).toEqual({ kind: 'done' });
+      expect(h.track).toHaveBeenCalledTimes(1);
+      expect(lateLines('deferred')).toEqual([]);
+      expect(lateLines('sent')).toHaveLength(1);
     });
 
     it('a throw before the post counts nothing and keeps the marker for the next open', async () => {
@@ -1118,7 +1172,7 @@ describe('finishPendingPodSetup: the late completion', () => {
       expect(lateLines('skipped').map((l) => l.context.detail)).toEqual(['done-elsewhere']);
     });
 
-    it('without Web Locks, a wizard completing after a late send in another tab skips (done-elsewhere)', async () => {
+    it('without Web Locks, a wizard completing after a late send in another tab skips (done-elsewhere) but still sends its survey answer', async () => {
       fake.installLocks(undefined);
       marker.markPodSetupPending('fam-1', 'mem-1', null);
       const tabA = tab();
@@ -1130,12 +1184,32 @@ describe('finishPendingPodSetup: the late completion', () => {
 
       expect(slackPosts()).toBe(1);
       expect(h.track).toHaveBeenCalledTimes(1);
+      expect(h.trackOnboardingStep).not.toHaveBeenCalled(); // the late send's attempt was gone
       expect(h.logEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'complete-setup',
           context: { action: 'skipped', stage: 'wizard', detail: 'done-elsewhere' },
         })
       );
+      // The late send carried `heardVia: null`; the wizard's ONE write carries the answer.
+      expect(h.registerFamily).toHaveBeenCalledTimes(2);
+      expect(h.registerFamily.mock.calls[0]![1]).toEqual(
+        expect.objectContaining({ heardVia: null })
+      );
+      expect(h.registerFamily.mock.calls[1]![0]).toBe('fam-1');
+      expect(h.registerFamily.mock.calls[1]![1]).toEqual(
+        expect.objectContaining({ isLoginEvent: false, heardVia: 'chatgpt_ad' })
+      );
+      expect(h.clearAttribution).toHaveBeenCalledWith('consumed');
+      // No second done record: the late send wrote the only one.
+      expect(
+        h.logEvent.mock.calls.filter(
+          ([e]) => e.message === 'setup-marker' && e.context?.action === 'done'
+        )
+      ).toHaveLength(1);
+      // A second wizard call is the plain latch skip, with no further write.
+      await tabA.completePodSetup({ survey: ANSWERED });
+      expect(h.registerFamily).toHaveBeenCalledTimes(2);
     });
   });
 });

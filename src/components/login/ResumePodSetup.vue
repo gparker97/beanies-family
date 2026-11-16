@@ -448,7 +448,8 @@ onBeforeUnmount(() => {
   // redirect for the rest of the session.
   syncStore.membersStepActive = false;
   // And let the family's setup Web Lock go (held since the pod write): a wizard left mid-setup
-  // must not stop the late completion in another tab. A no-op once `completePodSetup` returned.
+  // must not stop the late completion in another tab. A no-op once `completePodSetup` returned,
+  // and while it is still running (it lets the lock go itself, after its done record).
   syncStore.releasePodSetupLock();
 });
 

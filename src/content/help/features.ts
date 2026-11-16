@@ -2369,7 +2369,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Every chore has a picture, so even a child who can’t read yet knows what it is. When you type a chore, beanies picks a picture from its name: “Feed the cat” gets a cat and “Homework” gets a pencil. A chore from a set brings its own picture. To change one, tap the picture beside the chore and choose from <strong>Emoji</strong> or <strong>Beanie Pictures</strong>. You can always choose your own. Renaming a chore to something different that beanies recognizes, like “Make bed” to “Brush teeth”, picks a fresh picture, while a small change to the name keeps the one it has.',
+          'Every chore has a picture, so even a child who can’t read yet knows what it is. When you type a chore, beanies picks a picture from its name: “Feed the cat” gets a cat and “Homework” gets a pencil. A chore from a set brings its own picture. To change one, tap the picture beside the chore and choose from <strong>Emoji</strong> or <strong>Beanie Pictures</strong>. You can always choose your own. Renaming a chore to something different that beanies recognizes, like “Make bed” to “Brush teeth” or “Clear your plate” to “Feed the dog”, picks a fresh picture, even over one you chose. A small change to the name, like “Clear your plate” to “Clear your plate after dinner”, keeps the picture it has.',
       },
 
       { type: 'heading', content: 'Editing someone’s chores', level: 2, id: 'editing' },

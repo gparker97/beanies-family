@@ -1016,6 +1016,89 @@ describe('pod creation: full end-to-end flow', () => {
       }
     });
 
+    /**
+     * Only the `completePodSetup` call that owns the run lets the lock go, after its done record:
+     * not a second call the latch skipped, and not `ResumePodSetup`'s unmount while it runs.
+     * `run` gets the store, the lock's state and the hung completion write's resolve.
+     */
+    async function withHungCompletion(
+      run: (ctx: {
+        store: ReturnType<typeof useSyncStore>;
+        held: () => boolean;
+        marker: () => string;
+        resolveWrite: () => void;
+      }) => Promise<void>
+    ) {
+      const { podSetupPendingKey, podSetupLockName, readPodSetupPending } =
+        await import('@/utils/podSetupPending');
+      const registryService = await import('@/services/registry/registryService');
+      const fake = await import('@/test/fakeLocks');
+      const locks = fake.fakeLocks();
+      fake.installLocks(locks);
+      try {
+        await createPod();
+        await new Promise((r) => setTimeout(r, 0));
+        let resolve!: (v: unknown) => void;
+        vi.mocked(registryService.registerFamily).mockReturnValueOnce(
+          new Promise((r) => (resolve = r)) as never
+        );
+        await run({
+          store: useSyncStore(),
+          held: () => locks.heldNames.has(podSetupLockName('fam-test-1')),
+          marker: () => readPodSetupPending('fam-test-1').kind,
+          resolveWrite: () => resolve({ pointerAccepted: true }),
+        });
+      } finally {
+        fake.restoreLocks();
+        localStorage.removeItem(podSetupPendingKey('fam-test-1'));
+      }
+    }
+    const tick = () => new Promise((r) => setTimeout(r, 0));
+
+    it('a concurrent second completion call (skipped by the latch) never lets the lock go; the first does, after its done record', async () => {
+      await withHungCompletion(async ({ store, held, marker, resolveWrite }) => {
+        const first = store.completePodSetup({ survey: { kind: 'skipped' } });
+        await store.completePodSetup({ survey: { kind: 'skipped' } });
+        await tick();
+        expect(held()).toBe(true);
+        expect(marker()).toBe('ok');
+
+        resolveWrite();
+        await first;
+        await tick();
+        expect(marker()).toBe('done');
+        expect(held()).toBe(false);
+      });
+    });
+
+    it('the wizard unmounting while its completion is awaited keeps the lock until the completion settles', async () => {
+      await withHungCompletion(async ({ store, held, marker, resolveWrite }) => {
+        const run = store.completePodSetup({ survey: { kind: 'skipped' } });
+        await tick();
+        store.releasePodSetupLock(); // `ResumePodSetup`'s onBeforeUnmount, mid-await
+        await tick();
+        expect(held()).toBe(true);
+
+        resolveWrite();
+        await run;
+        await tick();
+        expect(marker()).toBe('done');
+        expect(held()).toBe(false);
+      });
+    });
+
+    it('a sign-out (resetState) while the completion is awaited lets the lock go at once', async () => {
+      await withHungCompletion(async ({ store, held, resolveWrite }) => {
+        const run = store.completePodSetup({ survey: { kind: 'skipped' } });
+        await tick();
+        store.resetState();
+        await tick();
+        expect(held()).toBe(false);
+        resolveWrite();
+        await run;
+      });
+    });
+
     it('never holds the setup lock for the demo seed, and the wizard unmount releases it', async () => {
       const { podSetupPendingKey, podSetupLockName } = await import('@/utils/podSetupPending');
       const fake = await import('@/test/fakeLocks');

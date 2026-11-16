@@ -3656,15 +3656,33 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * The wizard's hold on the family's setup lock (`holdPodSetupLock`), from the pod write in
-   * `createNewFile` until the wizard's `completePodSetup` returns or `ResumePodSetup` unmounts.
-   * While it is held, a late completion in another tab skips (`wizard-active`).
+   * `createNewFile` until the wizard's `completePodSetup` run settles (after its done record) or
+   * `ResumePodSetup` unmounts with no completion running. While it is held, a late completion in
+   * another tab skips (`wizard-active`).
    */
   let releaseSetupLockHold: (() => void) | null = null;
 
-  /** Let the wizard's setup lock go. Safe with none held. */
-  function releasePodSetupLock(): void {
+  /**
+   * The `completePodSetup` call that owns the running completion, or null. Only that call lets
+   * the lock go, when it settles: a skipped second call never does, and neither does the
+   * unmount release while it runs. Cleared by `resetState`, so a call from before a sign-out
+   * never touches a later family's hold.
+   */
+  let setupCompletionOwner: object | null = null;
+
+  function dropSetupLockHold(): void {
     releaseSetupLockHold?.();
     releaseSetupLockHold = null;
+  }
+
+  /**
+   * Let the wizard's setup lock go (`ResumePodSetup`'s unmount: a wizard left mid-setup must not
+   * stop another tab's late completion). Does nothing while a completion is running: the call
+   * that owns it lets the lock go when it settles. Safe with none held.
+   */
+  function releasePodSetupLock(): void {
+    if (setupCompletionOwner) return;
+    dropSetupLockHold();
   }
 
   /**
@@ -3690,16 +3708,18 @@ export const useSyncStore = defineStore('sync', () => {
   let pendingRegistryWrite: Promise<void> | null = null;
 
   /**
-   * Put a gate on the registry queue now, released by the returned function (idempotent) or
-   * after `PENDING_REGISTRY_WRITE_MAX_MS`, whichever comes first. See `pendingRegistryWrite`.
+   * Gate the registry queue on `until`: every later registry write waits until it settles
+   * (either way) or `PENDING_REGISTRY_WRITE_MAX_MS` passes, whichever comes first (a timeout is
+   * logged). Returns the gate, which never rejects. The clear is chained FIRST, so it runs before
+   * any write queued behind the gate, and only clears the gate if it is still this one. See
+   * `pendingRegistryWrite`.
    */
-  function holdRegistryQueue(): () => void {
-    let release: () => void = () => {};
-    const released = new Promise<void>((r) => {
-      release = r;
-    });
+  function gateRegistryQueue(until: Promise<unknown>): Promise<void> {
     const gate = raceTimeout(
-      released.then(() => true),
+      until.then(
+        () => true,
+        () => true
+      ),
       PENDING_REGISTRY_WRITE_MAX_MS
     ).then((done) => {
       if (!done) registryActionLog('complete-setup')('queue-released-timeout', 'warn');
@@ -3708,6 +3728,19 @@ export const useSyncStore = defineStore('sync', () => {
     void gate.then(() => {
       if (pendingRegistryWrite === gate) pendingRegistryWrite = null;
     });
+    return gate;
+  }
+
+  /**
+   * Put a gate on the registry queue now, released by the returned function (idempotent) or
+   * after `PENDING_REGISTRY_WRITE_MAX_MS`, whichever comes first. See `pendingRegistryWrite`.
+   */
+  function holdRegistryQueue(): () => void {
+    let release: () => void = () => {};
+    const released = new Promise<void>((r) => {
+      release = r;
+    });
+    void gateRegistryQueue(released);
     return release;
   }
 
@@ -3762,20 +3795,7 @@ export const useSyncStore = defineStore('sync', () => {
   ): { write: Promise<registry.RegistryWriteResult | null>; settled: Promise<void> } {
     const log = registryActionLog('complete-setup');
     const write = registry.registerFamily(familyId, body);
-    // The clear is chained FIRST, so it runs before any write queued behind it.
-    const settled = raceTimeout(
-      write.then(
-        () => true,
-        () => true
-      ),
-      PENDING_REGISTRY_WRITE_MAX_MS
-    ).then((done) => {
-      if (!done) log('queue-released-timeout', 'warn');
-    });
-    pendingRegistryWrite = settled;
-    void settled.then(() => {
-      if (pendingRegistryWrite === settled) pendingRegistryWrite = null;
-    });
+    const settled = gateRegistryQueue(write);
     void write.then((r) => log(r ? 'ok' : 'failed', r ? 'info' : 'warn'));
     return { write, settled };
   }
@@ -3857,8 +3877,10 @@ export const useSyncStore = defineStore('sync', () => {
    * step 5 runs whatever happened before it (the pod already exists). Idempotent per family:
    * a second call in this tab returns early with an `onboarding` `complete-setup` `skipped`
    * line, and a completion another tab already sent (the done record) is skipped with
-   * `done-elsewhere` and counts nothing. The setup Web Lock this wizard held since the pod write
-   * is released when this returns. The demo seed never reaches this (it stops at `createNewFile`
+   * `done-elsewhere` and counts nothing, but still sends the survey answer to the registry
+   * (`sendSurveyAfterLateCompletion`). The setup Web Lock this wizard held since the pod write
+   * is released by the call that owns the run, after its done record; a skipped second call
+   * never releases it. The demo seed never reaches this (it stops at `createNewFile`
    * with `suppressRemoteSideEffects`).
    *
    * The LATE completion (a setup left in the wizard, finished on a later open) does not come
@@ -3866,30 +3888,67 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function completePodSetup({ survey }: { survey: SetupSurveyOutcome }): Promise<void> {
     const familyId = useFamilyContextStore().activeFamilyId;
+    if (familyId && completedSetupFamilyId === familyId) {
+      // Not this call's run: the setup lock is the owning call's to let go, after its done record.
+      logEvent({
+        level: 'info',
+        surface: 'onboarding',
+        message: 'complete-setup',
+        context: { action: 'skipped', stage: 'wizard' },
+      });
+      return;
+    }
+    const owner = {};
+    setupCompletionOwner = owner;
     try {
-      if (familyId && completedSetupFamilyId === familyId) {
-        logEvent({
-          level: 'info',
-          surface: 'onboarding',
-          message: 'complete-setup',
-          context: { action: 'skipped', stage: 'wizard' },
-        });
-        return;
-      }
       if (familyId && readPodSetupPending(familyId).kind === 'done') {
-        // Another tab (or an earlier open) already sent it; possible only where Web Locks are
-        // missing, since the wizard holds the setup lock from the pod write.
-        logEvent({
-          level: 'info',
-          surface: 'onboarding',
-          message: 'complete-setup',
-          context: { action: 'skipped', stage: 'wizard', detail: 'done-elsewhere' },
-        });
+        await sendSurveyAfterLateCompletion(familyId, survey);
         return;
       }
       await runWizardCompletion(familyId, survey);
     } finally {
-      releasePodSetupLock();
+      // Only the owning call, and only if no sign-out (`resetState`) took the hold meanwhile.
+      if (setupCompletionOwner === owner) {
+        setupCompletionOwner = null;
+        dropSetupLockHold();
+      }
+    }
+  }
+
+  /**
+   * The wizard finishing after another tab's late completion already sent it (possible only where
+   * Web Locks are missing, since the wizard holds the setup lock from the pod write). The late
+   * path sends `heardVia: null` (survey not seen), so the answer the person just gave still goes
+   * to the registry in ONE completion write (the Lambda stamps it write-once); nothing else is
+   * repeated: no Slack post, no conversion count, no second done record. The attribution stash is
+   * consumed, as the wizard path does. Never throws.
+   */
+  async function sendSurveyAfterLateCompletion(
+    familyId: string,
+    survey: SetupSurveyOutcome
+  ): Promise<void> {
+    // Latched BEFORE the first await, so a concurrent second call is skipped too.
+    completedSetupFamilyId = familyId;
+    logEvent({
+      level: 'info',
+      surface: 'onboarding',
+      message: 'complete-setup',
+      context: { action: 'skipped', stage: 'wizard', detail: 'done-elsewhere' },
+    });
+    try {
+      if (survey.kind === 'answered') {
+        const snap = capturePodSetupSnapshot(survey.heardVia.id);
+        await awaitCompletionWrite(startCompletionWrite(familyId, snap.registryBody).write);
+      }
+      clearAttribution('consumed');
+    } catch (e) {
+      reportError({
+        surface: 'onboarding',
+        message: `complete-setup survey write failed: ${e instanceof Error ? e.message : String(e)}`,
+        error: e,
+        severity: 'warning',
+        context: { action: 'complete-setup', detail: 'failed', stage: 'wizard' },
+      });
     }
   }
 
@@ -4062,12 +4121,16 @@ export const useSyncStore = defineStore('sync', () => {
    *
    *   - The marker is read again first, inside the lock: a done record another tab wrote since
    *     is a `done-elsewhere` skip.
-   *   - Sent means the Slack post was dispatched (or the webhook URL is not configured, the dev
-   *     case) AND the device is online. Otherwise the marker is KEPT and `late-complete`
-   *     `deferred` names why (`offline`, `slack-network-error`); the next signed-in open retries.
-   *     Offline before anything is sent, nothing is attempted.
-   *   - A failed registry write alone does not block (it never did on the wizard path); it is
-   *     logged by the write (`registry` `complete-setup failed` / `timeout`).
+   *   - Offline before anything is sent: nothing is attempted, the marker is KEPT and
+   *     `late-complete` `deferred` `offline` says so; the next signed-in open retries.
+   *   - Sent means EITHER the registry completion write succeeded OR the Slack post was
+   *     dispatched (or the webhook URL is not configured, the dev case), so a network that
+   *     blocks the Slack webhook (a content blocker, a DNS filter) still counts it, as the
+   *     wizard path always did. Only when BOTH failed is the marker kept (`deferred`
+   *     `both-failed`) for the next open. The `complete-setup` `sent` line's `detail` says which
+   *     got through (`registry:ok|failed|timeout+slack:<outcome>`); a failed write is also
+   *     logged by the write itself (`registry` `complete-setup failed` / `timeout`). There is no
+   *     second online check after a dispatched post: it could only cause a duplicate.
    *   - No "Came from" line and the attribution stash is neither read nor cleared: days later the
    *     stash holds the RETURN visit's tag (it is re-captured from the landing URL on every boot
    *     and cleared on sign-out), not the sign-up's. The registry row already carries the
@@ -4082,7 +4145,7 @@ export const useSyncStore = defineStore('sync', () => {
     onWriteStarted: (settled: Promise<void>) => void
   ): Promise<boolean> {
     const kind = setupReturnKind(late.via);
-    const deferred = (detail: 'offline' | 'slack-network-error'): false => {
+    const deferred = (detail: 'offline' | 'both-failed'): false => {
       logEvent({
         level: 'info',
         surface: 'onboarding',
@@ -4103,14 +4166,21 @@ export const useSyncStore = defineStore('sync', () => {
       const posted = await slackNotifyWithOutcome(
         podCreatedSlackText(snap, { kind: 'not-seen' }, late, '', registered)
       );
-      if (posted.outcome === 'network_error') return deferred('slack-network-error');
-      if (isOffline()) return deferred('offline');
+      // `registered`: a result on success, null on a failed write, undefined on the wait's timeout.
+      const written = registered ? 'ok' : registered === null ? 'failed' : 'timeout';
+      if (written !== 'ok' && posted.outcome === 'network_error') return deferred('both-failed');
       markPodSetupDone(familyId);
       logEvent({
         level: 'info',
         surface: 'onboarding',
         message: 'complete-setup',
-        context: { action: 'sent', stage: 'late', detail: 'not-seen' },
+        // The survey is always `not-seen` here (`stage: 'late'` says so); `detail` is what got
+        // through, so a webhook blocked on this network is visible.
+        context: {
+          action: 'sent',
+          stage: 'late',
+          detail: `registry:${written}+slack:${posted.outcome}`,
+        },
       });
       logEvent({
         level: 'info',
@@ -4565,9 +4635,9 @@ export const useSyncStore = defineStore('sync', () => {
       // demo seed, which never completes. Never throws.
       // The wizard's setup lock is requested FIRST, so no other tab can read the marker and win
       // the lock before the wizard does (see `finishPendingPodSetup`); held until the wizard's
-      // `completePodSetup` returns or `ResumePodSetup` unmounts (`releasePodSetupLock`).
+      // `completePodSetup` run settles or `ResumePodSetup` unmounts (`releasePodSetupLock`).
       if (!suppressRemote) {
-        releasePodSetupLock();
+        dropSetupLockHold();
         releaseSetupLockHold = holdPodSetupLock(familyId);
         markPodSetupPending(familyId, memberId, currentCreateAttempt()?.id ?? null);
       }
@@ -6174,7 +6244,8 @@ export const useSyncStore = defineStore('sync', () => {
     clearPodUnopenable();
     completedSetupFamilyId = null;
     pendingRegistryWrite = null;
-    releasePodSetupLock();
+    setupCompletionOwner = null;
+    dropSetupLockHold();
     if (autoSyncStopHandle) {
       autoSyncStopHandle();
       autoSyncStopHandle = null;
