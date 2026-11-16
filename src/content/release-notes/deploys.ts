@@ -17,6 +17,58 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.17',
+    date: '2026-11-17',
+    month: '17 november 2026',
+    summary: {
+      en: 'Stars and Rewards are now on the Choreboard.',
+      beanie: 'stars and rewards are now on the choreboard.',
+    },
+    features: [
+      {
+        icon: '⭐',
+        title: { en: 'Stars and Rewards', beanie: 'stars and rewards' },
+        description: {
+          en: "Chores can now earn stars toward a weekly reward and special rewards like a trip or a movie night. It stays off until a grown-up turns it on in the Choreboard's Rewards view.",
+          beanie:
+            "chores can now earn stars toward a weekly reward and special rewards like a trip or a movie night. it stays off until a grown-up turns it on in the choreboard's rewards view.",
+        },
+        tryItRoute: '/choreboard?view=rewards',
+      },
+      {
+        icon: '📊',
+        title: { en: 'Star Report', beanie: 'star report' },
+        description: {
+          en: "Each child's week is now shown in one place: chores done, stars earned, bonus stars and progress toward special rewards.",
+          beanie:
+            "each child's week is now shown in one place: chores done, stars earned, bonus stars and progress toward special rewards.",
+        },
+      },
+      {
+        icon: '✈️',
+        title: { en: 'Clearer trip titles', beanie: 'clearer trip titles' },
+        description: {
+          en: 'Flights and other trip segments are now titled from their details everywhere they appear, and a title can be typed in the segment editor.',
+          beanie:
+            'flights and other trip segments are now titled from their details everywhere they appear, and a title can be typed in the segment editor.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.15',
     date: '2026-11-15',
     month: '15 november 2026',
