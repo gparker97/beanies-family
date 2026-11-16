@@ -8233,6 +8233,10 @@ const STRING_DEFS = {
     en: '{block} all done',
     beanie: '{block} all done',
   },
+  'wall.chores.lane.doneRule': {
+    en: 'Done',
+    beanie: 'done',
+  },
   'wall.chores.lane.nothing.morning': {
     en: 'Nothing this morning',
     beanie: 'nothing this morning',

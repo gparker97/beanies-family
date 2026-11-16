@@ -208,7 +208,7 @@ describe('WallChoreLanes', () => {
     ]);
   });
 
-  it('keeps several finished blocks in the lane’s order, each in its own colour', () => {
+  it('draws several finished blocks in the order of the day, each in its own colour', () => {
     const w = mountLanes({
       pip: lane('pip', [
         block('evening', [job('bath', 'pip')], { isNow: true }),
@@ -220,16 +220,50 @@ describe('WallChoreLanes', () => {
     const blocks = w.findAll('[data-testid="wall-chore-block"]');
     expect(blocks.map((b) => b.attributes('data-block'))).toEqual([
       'evening',
-      'anytime',
       'morning',
       'afternoon',
+      'anytime',
     ]);
     const strips = w.findAll('[data-testid="wall-chore-done-strip"]');
     expect(strips.map((x) => x.classes().find((c) => c.startsWith('chore-block-')))).toEqual([
-      'chore-block-anytime',
       'chore-block-morning',
       'chore-block-afternoon',
+      'chore-block-anytime',
     ]);
+  });
+
+  it('pins the finished group to the lane’s foot under one rule, while something is left', () => {
+    const w = mountLanes({
+      pip: lane('pip', [
+        block('evening', [job('bath', 'pip')], { isNow: true }),
+        block('anytime', [job('plants', 'pip', true)]),
+        block('morning', [job('bed', 'pip', true)]),
+      ]),
+    });
+    const blocks = w.findAll('[data-testid="wall-chore-block"]');
+    expect(w.findAll('[data-testid="wall-chore-done-rule"]')).toHaveLength(1);
+    // The rule and the auto margin sit on the first finished line (morning, in day order).
+    expect(
+      blocks.map((b) => [b.attributes('data-block'), b.classes().includes('mt-auto')])
+    ).toEqual([
+      ['evening', false],
+      ['morning', true],
+      ['anytime', false],
+    ]);
+    expect(blocks[1]!.find('[data-testid="wall-chore-done-rule"]').exists()).toBe(true);
+  });
+
+  it('draws no rule when the whole lane is finished: there is one group, not two', () => {
+    const w = mountLanes({
+      pip: lane('pip', [
+        block('morning', [job('bed', 'pip', true)]),
+        block('anytime', [job('plants', 'pip', true)]),
+      ]),
+    });
+    expect(w.find('[data-testid="wall-chore-done-rule"]').exists()).toBe(false);
+    expect(
+      w.findAll('[data-testid="wall-chore-block"]').some((b) => b.classes().includes('mt-auto'))
+    ).toBe(false);
   });
 
   it('a tick carries its lane’s block as the celebration anchor, clipped to the lane', () => {

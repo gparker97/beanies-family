@@ -19,7 +19,8 @@
  *            Tapping it reopens the chores, so a mis-tick of the last one can be undone at the
  *            wall. The orange `CelebrationBanner` appears only for the celebration itself, then
  *            folds to the line. Finished blocks sink to the bottom of the lane (in day order),
- *            so what is left to do is always at the top;
+ *            so what is left to do is always at the top; while anything is left, they are
+ *            pinned to the lane's foot under a "Done" rule, apart from the still-to-do lines;
  *   - open:  the block happening now and Anytime: a colour header (the Heritage Orange ring and
  *            "Now" tag on the current block) over its rows;
  *   - quiet: a later block (or one whose window has passed) is one line in its colour with a
@@ -63,6 +64,7 @@ import { formatTime12 } from '@/utils/date';
 import { choreProgress } from '@/utils/wallJobs';
 import { wallChoreProgressText } from '@/components/wall/wallChoreText';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { CHORE_BLOCKS } from '@/utils/chores';
 import type { ChoreBlock, FamilyMember } from '@/types/models';
 import type { WallChoreBlock, WallChoreLane, WallJob, WallPeripheralData } from '@/types/wall';
 import { choreTickAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
@@ -219,11 +221,29 @@ function settledDone(b: WallChoreBlock, memberId: string): boolean {
   return blockState(b, memberId) === 'done' && !choreBannerCelebration(memberId, b.block);
 }
 
-/** A lane's blocks as drawn: what is left to do first, finished blocks last, each in lane order. */
+/**
+ * A lane's blocks as drawn: what is left to do first, in lane order (now, Anytime, later), then
+ * the finished lines in the order of the day (`CHORE_BLOCKS`: morning, afternoon, evening,
+ * Anytime). The lane order ranks by the clock, which says nothing useful about finished work
+ * and read as a shuffle (Anytime, Morning, Afternoon under an open Evening).
+ */
 function laneBlocks(lane: WallChoreLane, memberId: string): WallChoreBlock[] {
   const settled = lane.blocks.filter((b) => settledDone(b, memberId));
   if (!settled.length) return lane.blocks;
+  settled.sort((a, b) => CHORE_BLOCKS.indexOf(a.block) - CHORE_BLOCKS.indexOf(b.block));
   return [...lane.blocks.filter((b) => !settledDone(b, memberId)), ...settled];
+}
+
+/**
+ * The first finished line of a lane that still has something left to do, or null. That block
+ * carries the "Done" rule and the auto margin that pins the finished group to the lane's foot,
+ * so finished and still-to-do read as two groups (both are one tinted line otherwise). A lane
+ * with nothing left has one group, so it gets no rule and stays at the top.
+ */
+function doneStart(lane: WallChoreLane, memberId: string): ChoreBlock | null {
+  const drawn = laneBlocks(lane, memberId);
+  const first = drawn.findIndex((b) => settledDone(b, memberId));
+  return first > 0 ? drawn[first]!.block : null;
 }
 
 /** Blocks opened by hand (a quiet line, or a done line reopened): `${memberId}:${block}`. */
@@ -388,11 +408,23 @@ function addChore(memberId: string, title: string): Promise<boolean> {
             v-for="b in laneBlocks(lane, member.id)"
             :key="b.block"
             class="flex flex-col gap-1"
+            :class="doneStart(lane, member.id) === b.block ? 'mt-auto' : ''"
             data-testid="wall-chore-block"
             :data-block="b.block"
             :data-state="blockState(b, member.id)"
             :data-now="b.isNow ? 'true' : 'false'"
           >
+            <!-- Where the finished group starts: a hairline with its caption. The section's
+                 auto margin opens the gap above it; on a full lane only the rule remains. -->
+            <p
+              v-if="doneStart(lane, member.id) === b.block"
+              class="font-inter dark:text-ink-soft flex items-center gap-2 px-1 pt-1 text-xs font-semibold text-[var(--muted-text,#4d5d6c)]"
+              data-testid="wall-chore-done-rule"
+            >
+              {{ t('wall.chores.lane.doneRule') }}
+              <span class="dark:bg-line h-px flex-1 bg-[rgba(44,62,80,0.12)]" aria-hidden="true" />
+            </p>
+
             <!-- Done. The banner is the celebration only; settled, the block is one slim line
                  in its own colour, reopenable so a mis-tick can be undone. -->
             <template v-if="blockState(b, member.id) === 'done'">
@@ -509,7 +541,11 @@ function addChore(memberId: string, title: string): Promise<boolean> {
           </section>
 
           <!-- The wall's one chore edit: add for THIS bean, in the block happening now. -->
-          <div v-if="canAdd" class="mt-auto" data-testid="wall-chore-add">
+          <div
+            v-if="canAdd"
+            :class="doneStart(lane, member.id) ? '' : 'mt-auto'"
+            data-testid="wall-chore-add"
+          >
             <WallAddRow
               :placeholder="t(ADD_PLACEHOLDER[timed(lane.current)])"
               :submit="(title: string) => addChore(member.id, title)"

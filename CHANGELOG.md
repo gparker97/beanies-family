@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-16
+
+### Changed
+
+- On the Beanie Wall's Choreboard, finished times of day are now listed in the order of the day (morning, afternoon, evening, anytime) at the bottom of each lane, under a "Done" line, so what is finished and what is still to do are easy to tell apart.
+
 ## 2026-11-15
 
 ### Added

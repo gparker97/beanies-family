@@ -3626,6 +3626,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'wall.chores.lane.progress.afternoon': '下午 {done}/{total}',
   'wall.chores.lane.progress.evening': '晚上 {done}/{total}',
   'wall.chores.lane.allDone': '{block}全部完成',
+  'wall.chores.lane.doneRule': '已完成',
   'wall.chores.lane.nothing.morning': '早上没有家务',
   'wall.chores.lane.nothing.afternoon': '下午没有家务',
   'wall.chores.lane.nothing.evening': '晚上没有家务',
