@@ -1,5 +1,5 @@
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import { emojiSuggester, type EmojiKeywordEntry } from '@/utils/emojiSuggest';
+import { emojiAfterRename, emojiSuggester, type EmojiKeywordEntry } from '@/utils/emojiSuggest';
 
 /**
  * Stars and rewards for chores (#148): the bounds and options every star surface and rule reads.
@@ -209,32 +209,9 @@ export const suggestRewardEmoji: (name: string) => string | undefined =
   emojiSuggester(REWARD_EMOJI_KEYWORDS);
 
 /**
- * A picture once its name has changed, from the suggestions for the old and the new name (any
- * suggester: it takes the two answers, not the names). Only a CHANGE of suggestion re-picks:
- * when `after` is defined and differs from `before`, the thing turned into something else and
- * gets `after`, even over a picture picked by hand. Otherwise (the same suggestion, as for
- * "Allowance" to "Weekly allowance", or none) `current` stays, picked by hand or not; only no
- * picture at all gets `after`, else `fallback`.
- *
- * `before` is the suggestion for the name the picture was last settled against (the stored or
- * opened name, or the name at a pick by hand), never the previous keystroke, so a small edit
- * cannot clobber a hand pick and opening something never changes its picture. Nothing records
- * how a picture was chosen. Pure.
- */
-export function emojiAfterRename(rename: {
-  before: string | undefined;
-  after: string | undefined;
-  current: string | undefined;
-  fallback: string;
-}): string {
-  const { before, after, current, fallback } = rename;
-  if (after !== undefined && after !== before) return after;
-  return current || (after ?? fallback);
-}
-
-/**
- * `emojiAfterRename` with the reward suggester: the ONE rule for the weekly reward and the
- * special reward drawer. `settledName` is the name `current` was last settled against.
+ * `emojiAfterRename` (`utils/emojiSuggest.ts`, the rule chores share) with the reward
+ * suggester: the ONE rule for the weekly reward and the special reward drawer. `settledName`
+ * is the name `current` was last settled against.
  */
 export function rewardEmojiAfterRename(
   settledName: string | undefined,

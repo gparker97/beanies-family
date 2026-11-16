@@ -10,13 +10,18 @@
  * (`ChoreSetChips`, `ChoreEditList` of `ChoreEditRow`s, `ChoreDaysChooser`). Each row intent is
  * one store action, made with an explicit `actorId` and `via: 'bean-editor'` (the firehose's
  * `kind`), and answered by the store's re-read:
- *  - rename (Enter or blur; Escape cancels), time, picture, days: `updateChore`;
- *  - a new row: created when its title is committed (`createChore`, for this bean, with an
- *    automatic picture from its title until one is picked by hand); a row left empty is
- *    dropped; Enter opens the next row in its block. The row's key IS its chore's id, minted when
- *    the row is added, and the row is drawn from here until its create has fully settled, so it
- *    never remounts (an open chooser stays open, focus stays put); a change made while the
- *    create is in flight is saved right after it;
+ *  - rename (Enter or blur; Escape cancels), time, picture, days: `updateChore`. A rename's
+ *    picture follows the one rename rule (`chorePictureAfterRename`) against the stored title: a
+ *    title whose suggestion changes re-picks (the new emoji replaces a hand pick or card art, in
+ *    the same write), a small edit or a title that suggests nothing keeps the picture. A pick by
+ *    hand is saved at once, so the stored title is always the one it was settled against;
+ *  - a new row: created when its title is committed (`createChore`, for this bean, its picture
+ *    by the same rule from the blank row's: the title's suggestion, else the default, or what
+ *    was picked by hand while the title suggests nothing); a row left empty is dropped; Enter
+ *    opens the next row in its block. The row's key IS its chore's id, minted when the row is
+ *    added, and the row is drawn from here until its create has fully settled, so it never
+ *    remounts (an open chooser stays open, focus stays put); a change made while the create is
+ *    in flight (a rename's picture by the same rule) is saved right after it;
  *  - a previewed set: `addChores` for this bean, duplicates dimmed and skipped;
  *  - ✕: `removeChoresForMember`, at once (a chore shared with other beans keeps them);
  *  - Remove All: one ConfirmModal (danger), then the same action for every chore here;
@@ -69,7 +74,7 @@ import {
   starterSetPreview,
   type ChoreStarterSetKey,
 } from '@/constants/choreStarterSets';
-import { DEFAULT_CHORE_EMOJI, choreEmoji, pictureForTitle } from '@/constants/choreBlocks';
+import { DEFAULT_CHORE_EMOJI, chorePictureAfterRename, choreEmoji } from '@/constants/choreBlocks';
 import { canSetNotifyParents, isChildOnly } from '@/utils/audience';
 import { firstName, formatNameList, membersByIds } from '@/utils/assignees';
 import { choreBlockOf, choreDupKey, livingAssignees, normalizeChoreDays } from '@/utils/chores';
@@ -137,7 +142,6 @@ interface NewRow {
   emoji: string;
   illustration?: string;
   days?: number[];
-  pictureByHand: boolean;
   /** Its create (and the follow-up patch) is in flight. */
   inFlight: boolean;
   /** Its ✕ was tapped while in flight: it is removed once the create lands. */
@@ -280,11 +284,18 @@ async function addRow(block: ChoreBlock): Promise<void> {
     block,
     title: '',
     emoji: DEFAULT_CHORE_EMOJI,
-    pictureByHand: false,
     inFlight: false,
   });
   await nextTick();
   listRef.value?.focusRow(key);
+}
+
+/** A new row's title, committed: its picture follows the rule against the title it had. */
+function renameNewRow(row: NewRow, title: string): void {
+  const next = chorePictureAfterRename(row.title, title, row);
+  row.title = title;
+  row.emoji = next.emoji;
+  row.illustration = next.illustration;
 }
 
 /** What a new row sends: compared after the create, to save what changed during it. */
@@ -306,8 +317,7 @@ const rowFields = (r: NewRow) => ({
 async function createFrom(row: NewRow, title: string, enter: boolean): Promise<void> {
   const actorId = actor();
   if (!actorId || row.inFlight) return;
-  row.title = title;
-  if (!row.pictureByHand) row.emoji = pictureForTitle(title);
+  renameNewRow(row, title);
   row.inFlight = true;
   const sent = rowFields(row);
   // A bean with no chores yet takes the switch's choice; otherwise the store decides.
@@ -360,12 +370,17 @@ async function createFrom(row: NewRow, title: string, enter: boolean): Promise<v
 function onCommit(key: string, title: string, enter: boolean): void {
   const row = newRowOf(key);
   if (row) {
-    if (row.inFlight) row.title = title;
+    if (row.inFlight) renameNewRow(row, title);
     else void createFrom(row, title, enter);
     return;
   }
   const chore = choreStore.choreById(key);
-  if (chore && chore.title !== title) void saveChore(key, { title });
+  if (!chore || chore.title === title) return;
+  // The stored title is the one the picture was settled against (a hand pick saves at once).
+  const now = { emoji: choreEmoji(chore), illustration: chore.illustration };
+  const next = chorePictureAfterRename(chore.title, title, now);
+  const repicked = next.emoji !== now.emoji || next.illustration !== now.illustration;
+  void saveChore(key, repicked ? { title, ...next } : { title });
 }
 
 /** Committed empty, or Escape: a new row is dropped; a stored row shows its title again. */
@@ -386,7 +401,6 @@ function onPicture(key: string, picture: { emoji: string; illustration: string }
   if (row) {
     row.emoji = picture.emoji;
     row.illustration = illustration;
-    row.pictureByHand = true;
   } else {
     void saveChore(key, { emoji: picture.emoji, illustration });
   }

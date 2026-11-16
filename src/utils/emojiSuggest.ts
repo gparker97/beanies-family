@@ -78,3 +78,40 @@ export function emojiSuggester(
     return best?.emoji;
   };
 }
+
+/**
+ * Does a rename re-pick the picture? Only when the new name suggests something (`after`) and
+ * that differs from what the old name suggested (`before`): the thing turned into something
+ * else. The one condition `emojiAfterRename` and a caller with more than an emoji (a chore's card
+ * art, `chorePictureAfterRename`) both read. Pure.
+ */
+export function renameRepicks(
+  before: string | undefined,
+  after: string | undefined
+): after is string {
+  return after !== undefined && after !== before;
+}
+
+/**
+ * A picture once its name has changed, from the suggestions for the old and the new name (any
+ * suggester: it takes the two answers, not the names), shared by chores and rewards. Only a
+ * CHANGE of suggestion re-picks (`renameRepicks`): the new name's suggestion wins, even over a
+ * picture picked by hand. Otherwise (the same suggestion, as for "Allowance" to "Weekly
+ * allowance", or none) `current` stays, picked by hand or not; only no picture at all gets
+ * `after`, else `fallback`.
+ *
+ * `before` is the suggestion for the name the picture was last settled against (the stored or
+ * opened name, or the name at a pick by hand), never the previous keystroke, so a small edit
+ * cannot clobber a hand pick and opening something never changes its picture. Nothing records
+ * how a picture was chosen. Pure.
+ */
+export function emojiAfterRename(rename: {
+  before: string | undefined;
+  after: string | undefined;
+  current: string | undefined;
+  fallback: string;
+}): string {
+  const { before, after, current, fallback } = rename;
+  if (renameRepicks(before, after)) return after;
+  return current || (after ?? fallback);
+}

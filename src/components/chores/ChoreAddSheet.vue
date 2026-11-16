@@ -18,9 +18,10 @@
  *    same block (list entry); Escape cancels an edit, or drops a new row; a new row committed
  *    empty is dropped. A title still being typed already counts (`typing`): the button names it
  *    and Add sends it, so nothing typed is lost to a tap that did not blur the field first.
- *  - A picture is automatic: a row of the grown-up's own takes one from its title each time the
- *    title is committed (`pictureForTitle`), until its picture is picked by
- *    hand. A suggested row keeps its set's picture.
+ *  - A picture comes from the title: each committed title follows the one rename rule
+ *    (`renameRow`, `chorePictureAfterRename`). A title whose suggestion changes picks a fresh
+ *    picture, even over a set's picture or card art or one picked by hand; a small edit, or a
+ *    title that suggests nothing, keeps the picture. A pick by hand shows at once.
  *  - Every chooser closes when the sheet closes (the drawer unmounts its body) or its row
  *    leaves the list; the pieces own their Escape tokens, above the drawer's own, so Escape
  *    closes a row edit, chooser or preview first and the drawer after.
@@ -50,11 +51,10 @@ import {
   addSet,
   clearChoreAddDraft,
   editCount,
-  followTitlePicture,
   isSetOn,
-  markPictureByHand,
   previewSet,
   removeRow,
+  renameRow,
   removeSet,
   useChoreAddDraft,
   type ChoreAddRow,
@@ -150,11 +150,10 @@ function titleNow(r: ChoreAddRow): string {
   return live.trim() || (r.fresh ? '' : r.draft.title.trim());
 }
 
-/** Give a row its title: a new row is named, and its picture follows (`followTitlePicture`). */
+/** Give a row its title: a new row is named, and its picture follows the rule (`renameRow`). */
 function applyTitle(row: ChoreAddRow, title: string): void {
-  row.draft.title = title;
+  renameRow(row, title);
   row.fresh = false;
-  followTitlePicture(row);
 }
 
 function clearList(): void {
@@ -192,13 +191,12 @@ function onTime(key: string, block: ChoreBlock): void {
   if (row) row.draft.block = block;
 }
 
-/** A picture picked by hand: the row's title stops choosing it (`followTitlePicture`). */
+/** A picture picked by hand: shown at once, kept until a rename changes the suggestion. */
 function onPicture(key: string, picture: { emoji: string; illustration: string }): void {
   const row = rowOf(key);
   if (!row) return;
   row.draft.emoji = picture.emoji;
   row.draft.illustration = picture.illustration || undefined;
-  markPictureByHand(row);
 }
 
 function onDays(key: string, days: number[]): void {

@@ -3,8 +3,9 @@
  * bean's on every day, edited like a Beanie List with changes saved as they are made. Each row
  * intent is one store action with the grown-up as `actorId` and `via: 'bean-editor'`; a failed
  * write leaves the stored value showing; a new row is created when its title is committed (with
- * the parents switch's state and an automatic picture); a set adds for this bean only, skipping
- * what the bean has; ✕ takes a shared chore off this bean only; Remove All asks once; the parents
+ * the parents switch's state and an automatic picture); a rename re-picks the picture only when
+ * the title's suggestion changes (over a hand pick or card art); a set adds for this bean only,
+ * skipping what the bean has; ✕ takes a shared chore off this bean only; Remove All asks once; the parents
  * switch reads and writes the whole list; drag reorders a block; kids never see it; no chooser
  * leaves an Escape token behind.
  */
@@ -226,6 +227,56 @@ describe('ChoreBeanEditor: rows save as they change', () => {
     expect(w.emitted('close')).toBeUndefined();
   });
 
+  it('a rename re-picks the picture only when the title suggests something different, card art too', async () => {
+    updateLands();
+    chores.list = [
+      chore('k1', { title: 'Make bed', emoji: '🧸', sortOrder: 0 }),
+      chore('art', {
+        title: 'Feed the dog',
+        emoji: '🐕',
+        illustration: 'school-drop-off',
+        sortOrder: 1,
+      }),
+      chore('k3', { title: 'Make bed', emoji: '⭐', block: 'evening', sortOrder: 2 }),
+    ];
+    const w = await openEditor();
+    // Opening changes no picture.
+    expect(choreActions.updateChore).not.toHaveBeenCalled();
+    // Hand-picked teddy, "Make bed" to "Brush teeth": the toothbrush, in the rename's one write.
+    await typeTitle(rowOf(w, 'k1'), 'Brush teeth', 'blur');
+    expect(choreActions.updateChore).toHaveBeenLastCalledWith(
+      'k1',
+      { title: 'Brush teeth', emoji: '🪥', illustration: undefined },
+      'mom',
+      VIA
+    );
+    // Card art, a small edit (still the dog): the art stays, only the title is written.
+    await typeTitle(rowOf(w, 'art'), 'Feed the dog before school', 'blur');
+    expect(choreActions.updateChore).toHaveBeenLastCalledWith(
+      'art',
+      { title: 'Feed the dog before school' },
+      'mom',
+      VIA
+    );
+    // Card art, renamed to something different: the new emoji replaces the art.
+    await typeTitle(rowOf(w, 'art'), 'Feed the cat', 'blur');
+    expect(choreActions.updateChore).toHaveBeenLastCalledWith(
+      'art',
+      { title: 'Feed the cat', emoji: '🐈', illustration: undefined },
+      'mom',
+      VIA
+    );
+    // A title that suggests nothing keeps a hand pick.
+    await typeTitle(rowOf(w, 'k3'), 'Say thank you', 'blur');
+    expect(choreActions.updateChore).toHaveBeenLastCalledWith(
+      'k3',
+      { title: 'Say thank you' },
+      'mom',
+      VIA
+    );
+    expect(choreActions.updateChore).toHaveBeenCalledTimes(4);
+  });
+
   it('a failed write shows the stored title again (the store has toasted); nothing is left', async () => {
     choreActions.updateChore.mockResolvedValueOnce(null);
     const w = await openEditor();
@@ -301,8 +352,13 @@ describe('ChoreBeanEditor: rows save as they change', () => {
   it('a renamed or moved shared chore changes for everyone; its ✕ takes it off this bean only', async () => {
     choreActions.removeChoresForMember.mockResolvedValue({ deleted: 0, unassigned: 1 });
     const w = await openEditor();
-    await typeTitle(rowOf(w, 'sh'), 'Feed Rex', 'blur');
-    expect(choreActions.updateChore).toHaveBeenCalledWith('sh', { title: 'Feed Rex' }, 'mom', VIA);
+    await typeTitle(rowOf(w, 'sh'), 'Feed the dog at six', 'blur');
+    expect(choreActions.updateChore).toHaveBeenCalledWith(
+      'sh',
+      { title: 'Feed the dog at six' },
+      'mom',
+      VIA
+    );
     await rowOf(w, 'sh').get('[data-testid="chore-draft-remove"]').trigger('click');
     await flushPromises();
     expect(choreActions.removeChoresForMember).toHaveBeenCalledWith(['sh'], 'kid', 'mom', VIA);
@@ -427,7 +483,8 @@ describe('ChoreBeanEditor: adding', () => {
     await fresh().get('[data-testid="chore-draft-picture"]').trigger('click');
     w.findComponent(PictureStub).vm.$emit('pick', { emoji: '⭐', illustration: 'trash' });
     await flushPromises();
-    await typeTitle(fresh(), 'Feed the dog', 'enter');
+    // A title that suggests nothing keeps the pick (one that does would take its place).
+    await typeTitle(fresh(), 'Say thank you', 'enter');
     expect(choreActions.createChore).toHaveBeenCalledWith(
       expect.objectContaining({ emoji: '⭐', illustration: 'trash' }),
       'mom',

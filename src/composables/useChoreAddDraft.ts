@@ -5,7 +5,7 @@ import {
   type ChoreStarterSetKey,
   type StarterChoreDraft,
 } from '@/constants/choreStarterSets';
-import { DEFAULT_CHORE_EMOJI, pictureForTitle } from '@/constants/choreBlocks';
+import { DEFAULT_CHORE_EMOJI, chorePictureAfterRename } from '@/constants/choreBlocks';
 import { choreDupKey, normalizeChoreDays } from '@/utils/chores';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { ChoreBlock } from '@/types/models';
@@ -34,8 +34,6 @@ export interface ChoreAddRow {
   origin?: string;
   /** Added under a heading and not yet named: an empty commit drops it silently. */
   fresh?: boolean;
-  /** The grown-up picked this row's picture by hand: its title no longer suggests one. */
-  pictureByHand?: boolean;
 }
 
 type Resolve = (key: UIStringKey) => string;
@@ -122,18 +120,17 @@ export function addBlankRow(block: ChoreBlock): ChoreAddRow {
 }
 
 /**
- * A row of the grown-up's own takes its picture from its title (`suggestChoreEmoji`, else the
- * default) each time the title is committed, until they pick a picture by hand. A suggested
- * row keeps the set's picture: it is never overridden.
+ * Give `row` the committed `title`; its picture follows the one rename rule
+ * (`chorePictureAfterRename`) against the title it had: a title whose suggestion changes
+ * re-picks (a set's picture and card art and a hand pick alike), a small edit or a title that
+ * suggests nothing keeps it. A blank row takes its first title's suggestion, else the default.
  */
-export function followTitlePicture(row: ChoreAddRow): void {
-  if (row.origin !== undefined || row.pictureByHand) return;
-  row.draft.emoji = pictureForTitle(row.draft.title);
-}
-
-/** The grown-up picked `row`'s picture: from now on its title leaves the picture alone. */
-export function markPictureByHand(row: ChoreAddRow): void {
-  row.pictureByHand = true;
+export function renameRow(row: ChoreAddRow, title: string): void {
+  const picture = chorePictureAfterRename(row.draft.title, title, row.draft);
+  row.draft.title = title;
+  row.draft.emoji = picture.emoji;
+  if (picture.illustration) row.draft.illustration = picture.illustration;
+  else delete row.draft.illustration;
 }
 
 /** Remove one row. A suggested row removed by hand counts as an edit. */

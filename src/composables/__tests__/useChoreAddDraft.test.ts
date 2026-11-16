@@ -1,7 +1,9 @@
 /**
  * The Add Chores list (#146): one list for the session, sets appended without duplicates (same
  * title, same block, any case), a set taken off keeps its edited rows, and the edit count is
- * what `chores-add-edited` logs.
+ * what `chores-add-edited` logs. A committed title's picture follows the rename rule
+ * (`renameRow`): a set's picture and card art stay on a small edit and give way to a title that
+ * suggests something different, as a pick by hand does.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -13,9 +15,12 @@ import {
   previewSet,
   removeRow,
   removeSet,
+  renameRow,
   useChoreAddDraft,
 } from '@/composables/useChoreAddDraft';
 import { CHORE_STARTER_SETS, choreStarterSet } from '@/constants/choreStarterSets';
+import { DEFAULT_CHORE_EMOJI } from '@/constants/choreBlocks';
+import { UI_STRINGS, type UIStringKey } from '@/services/translation/uiStrings';
 
 const resolve = (k: string) => k;
 const list = useChoreAddDraft();
@@ -75,5 +80,46 @@ describe('useChoreAddDraft', () => {
     expect(list.sets).toEqual([]);
     expect(editCount()).toBe(0);
     expect(JSON.stringify(CHORE_STARTER_SETS)).toBe(before);
+  });
+});
+
+describe('renameRow: a committed title and the rename rule', () => {
+  const english = (k: UIStringKey) => UI_STRINGS[k];
+  const rowOf = (chore: string) => list.rows.find((r) => r.draft.starterChoreKey === chore)!;
+
+  it('a set row keeps its picture and card art on a small edit, and takes a new suggestion', () => {
+    addSet('school-morning', english);
+    const bag = rowOf('pack-bag');
+    expect(bag.draft).toMatchObject({ emoji: '🎒', illustration: 'school-drop-off' });
+    renameRow(bag, 'Pack your school bag tonight');
+    expect(bag.draft).toMatchObject({ emoji: '🎒', illustration: 'school-drop-off' });
+    renameRow(bag, 'Make your lunch');
+    expect(bag.draft.emoji).toBe('🥪');
+    expect(bag.draft.illustration).toBeUndefined();
+    // A title that suggests nothing keeps the set's picture.
+    const shoes = rowOf('shoes-on');
+    renameRow(shoes, 'Say goodbye');
+    expect(shoes.draft.emoji).toBe('👟');
+  });
+
+  it('a hand pick stays on a small edit and gives way to a title that suggests something else', () => {
+    addSet('school-morning', english);
+    const bed = rowOf('make-bed');
+    bed.draft.emoji = '🧸'; // picked by hand
+    renameRow(bed, 'Make your bed neatly');
+    expect(bed.draft.emoji).toBe('🧸');
+    renameRow(bed, 'Brush teeth');
+    expect(bed.draft.emoji).toBe('🪥');
+  });
+
+  it('a blank row takes its first title’s suggestion, else the default; committing the same title changes nothing', () => {
+    const own = addBlankRow('anytime');
+    renameRow(own, 'Say thank you');
+    expect(own.draft.emoji).toBe(DEFAULT_CHORE_EMOJI);
+    renameRow(own, 'Feed the dog');
+    expect(own.draft.emoji).toBe('🐕');
+    own.draft.emoji = '⭐';
+    renameRow(own, 'Feed the dog');
+    expect(own.draft.emoji).toBe('⭐');
   });
 });

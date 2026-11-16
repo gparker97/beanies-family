@@ -2,9 +2,16 @@
  * `suggestChoreEmoji` (#146): a chore's picture from the words in its title, English or
  * Simplified Chinese. The most specific word wins (an object over a generic verb, then the
  * longest keyword); English matches whole words only; nothing known is `undefined`.
+ * `chorePictureAfterRename`: the rename rule rewards share, with card art.
  */
 import { describe, it, expect } from 'vitest';
-import { CHORE_EMOJI_OPTIONS, suggestChoreEmoji } from '@/constants/choreBlocks';
+import {
+  CHORE_EMOJI_OPTIONS,
+  DEFAULT_CHORE_EMOJI,
+  chorePictureAfterRename,
+  suggestChoreEmoji,
+  type ChorePicture,
+} from '@/constants/choreBlocks';
 
 describe('suggestChoreEmoji', () => {
   it.each([
@@ -85,5 +92,99 @@ describe('suggestChoreEmoji', () => {
       expect(e.length).toBeLessThanOrEqual(4);
     }
     expect(known.has(suggestChoreEmoji('Make bed')!)).toBe(true);
+  });
+});
+
+describe('chorePictureAfterRename: only a change of suggestion re-picks', () => {
+  const art = (emoji: string, illustration: string): ChorePicture => ({ emoji, illustration });
+  const emoji = (e: string): ChorePicture => ({ emoji: e, illustration: undefined });
+  it.each([
+    [
+      '"Feed the dog" with card art picked by hand to "Feed the dog before school": the art stays',
+      'Feed the dog',
+      'Feed the dog before school',
+      art('🐕', 'school-drop-off'),
+      art('🐕', 'school-drop-off'),
+    ],
+    [
+      '"Make bed" with a hand pick to "Brush teeth": the toothbrush',
+      'Make bed',
+      'Brush teeth',
+      emoji('🧸'),
+      emoji('🪥'),
+    ],
+    [
+      'a rename whose suggestion changes replaces card art with the emoji',
+      'Do the laundry',
+      'Feed the cat',
+      art('🧺', 'laundry'),
+      emoji('🐈'),
+    ],
+    [
+      'an unmatched rename keeps a hand pick',
+      'Make bed',
+      'Say thank you',
+      emoji('⭐'),
+      emoji('⭐'),
+    ],
+    [
+      'an unmatched rename keeps card art',
+      'Do the laundry',
+      'Help Grandma',
+      art('🧺', 'laundry'),
+      art('🧺', 'laundry'),
+    ],
+    [
+      'an unmatched rename keeps a suggested picture (no jump to the default)',
+      'Feed the dog',
+      'Say thank you',
+      emoji('🐕'),
+      emoji('🐕'),
+    ],
+    [
+      'the title unchanged (opening): the picture stays',
+      'Make bed',
+      'Make bed',
+      emoji('🧸'),
+      emoji('🧸'),
+    ],
+    ['a Chinese title: 铺床 to 刷牙', '铺床', '刷牙', emoji('⭐'), emoji('🪥')],
+    [
+      'a Chinese small edit keeps a hand pick: 刷牙 to 早上刷牙',
+      '刷牙',
+      '早上刷牙',
+      emoji('⭐'),
+      emoji('⭐'),
+    ],
+    [
+      'a blank row named: its suggestion',
+      '',
+      'Feed the dog',
+      emoji(DEFAULT_CHORE_EMOJI),
+      emoji('🐕'),
+    ],
+    [
+      'a blank row named with nothing known: the default',
+      '',
+      'Say thank you',
+      emoji(DEFAULT_CHORE_EMOJI),
+      emoji(DEFAULT_CHORE_EMOJI),
+    ],
+    [
+      'a hand pick on a blank row gives way to a first title that suggests something',
+      '',
+      'Feed the dog',
+      art('⭐', 'trash-night'),
+      emoji('🐕'),
+    ],
+    [
+      'no picture at all, nothing known: the default',
+      'Help',
+      'Help out',
+      emoji(''),
+      emoji(DEFAULT_CHORE_EMOJI),
+    ],
+  ] as const)('%s', (_n, settled, renamed, current, expected) => {
+    expect(chorePictureAfterRename(settled, renamed, current)).toEqual(expected);
   });
 });

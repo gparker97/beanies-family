@@ -5,8 +5,8 @@
  * removed, renamed the list-entry way (Enter, blur, Escape) and added under any block; the
  * button counts named rows; one `addChores` call; the list is the session's (kept across close
  * and reopen, cleared after an Add, by Clear List and on sign-out); `?starter=` adds a set
- * straight in; the built-in set definitions are never touched; an IME Enter is typing; a row
- * of the grown-up's own takes its picture from its title until one is picked by hand; no
+ * straight in; the built-in set definitions are never touched; an IME Enter is typing; a
+ * row's picture follows the rename rule (a title whose suggestion changes re-picks); no
  * chooser leaves an Escape token behind when the sheet closes or its row goes.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -403,7 +403,7 @@ describe('ChoreAddSheet: the rows', () => {
     expect(blockRows(w, 'morning').map((r) => titleOf(r).value)).toEqual(['喂狗', '']);
   });
 
-  it('an own row’s picture follows its title until it is picked by hand; set rows keep theirs', async () => {
+  it('a row’s picture follows the rename rule: a new suggestion re-picks, over a hand pick or card art', async () => {
     const w = await openSheet();
     await addSetVia(w, 'school-morning');
     await w.get('[data-testid="chore-add-row"][data-block="anytime"]').trigger('click');
@@ -422,24 +422,35 @@ describe('ChoreAddSheet: the rows', () => {
     expect(ownEmoji()).toBe('🐕');
     await commit('Brush teeth');
     expect(ownEmoji()).toBe('🪥');
-    // A suggested row renamed keeps the set's picture.
-    await commitTitle(w, 'make-bed', 'Feed the cat');
+    // Picked by hand: shown at once, kept through a small edit...
     await own().get('[data-testid="chore-draft-picture"]').trigger('click');
     w.findComponent(PictureStub).vm.$emit('pick', { emoji: '⭐', illustration: '' });
-    await commit('Feed the fish'); // picked by hand: the title no longer chooses
+    await flushPromises();
     expect(ownEmoji()).toBe('⭐');
+    await commit('Brush teeth well');
+    expect(ownEmoji()).toBe('⭐');
+    // ...and replaced by a title that suggests something different.
+    await commit('Feed the fish');
+    expect(ownEmoji()).toBe('🐟');
+    // A set row with card art renamed to something different: the emoji replaces the art.
+    await commitTitle(w, 'pack-bag', 'Feed the cat');
     await submit(w);
-    expect(sentDrafts().find((d) => d.title === 'Feed the fish')!.emoji).toBe('⭐');
-    expect(sentDrafts().find((d) => d.title === 'Feed the cat')!.emoji).toBe(
-      school.chores[0]!.emoji
-    );
+    expect(sentDrafts().find((d) => d.title === 'Feed the fish')!.emoji).toBe('🐟');
+    const cat = sentDrafts().find((d) => d.title === 'Feed the cat')!;
+    expect(cat.emoji).toBe('🐈');
+    expect(cat.illustration).toBeUndefined();
   });
 
-  it('no match keeps the default picture', async () => {
+  it('no match keeps the picture the row has', async () => {
     const w = await openSheet();
     await w.get('[data-testid="chore-add-row"][data-block="morning"]').trigger('click');
     await flushPromises();
     const input = blockRows(w, 'morning')[0]!.get('[data-testid="chore-draft-title"]');
+    await input.trigger('focus');
+    await input.setValue('Say thank you');
+    await input.trigger('blur');
+    await flushPromises();
+    expect(useChoreAddDraft().rows[0]!.draft.emoji).toBe('🧹');
     await input.trigger('focus');
     await input.setValue('Feed the dog');
     await input.trigger('blur');
@@ -447,7 +458,7 @@ describe('ChoreAddSheet: the rows', () => {
     await input.setValue('Say thank you');
     await input.trigger('blur');
     await submit(w);
-    expect(sentDrafts()[0]!.emoji).toBe('🧹');
+    expect(sentDrafts()[0]!.emoji).toBe('🐕');
   });
 
   it('closing the sheet with a preview or a time chooser open leaves no Escape token', async () => {

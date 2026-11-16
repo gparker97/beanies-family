@@ -1,15 +1,14 @@
 /**
  * Stars and rewards (#148): the reward picture options and their suggester. The keyword table is
  * private; it is tested through `suggestRewardEmoji` (every option reachable from a name) and the
- * rename rule the weekly reward and the special reward drawer share (`emojiAfterRename`, through
- * `rewardEmojiAfterRename`).
+ * rename rule the weekly reward and the special reward drawer share (`rewardEmojiAfterRename`;
+ * the rule itself, `emojiAfterRename`, is tested beside it in `utils/emojiSuggest.test.ts`).
  */
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_REWARD_EMOJI,
   DEFAULT_SPECIAL_REWARD_EMOJI,
   REWARD_EMOJI_OPTIONS,
-  emojiAfterRename,
   rewardEmojiAfterRename,
   suggestRewardEmoji,
 } from '@/constants/choreStars';
@@ -131,27 +130,6 @@ describe('suggestRewardEmoji', () => {
     expect(suggestRewardEmoji('A trip to the zoo')).toBe('🦁');
     expect(suggestRewardEmoji('Save for a bike')).toBe('🚲');
     expect(suggestRewardEmoji('Ice cream treat')).toBe('🍦');
-  });
-});
-
-describe('emojiAfterRename: only a change of suggestion re-picks', () => {
-  it.each([
-    ['a new suggestion re-picks over a hand pick', '🍦', '💵', '🐷', '💵'],
-    ['a first suggestion re-picks over a followed picture', undefined, '🎬', '🎁', '🎬'],
-    ['the same suggestion keeps a hand pick', '💵', '💵', '🐷', '🐷'],
-    ['no suggestion keeps a hand pick', '🍦', undefined, '🐷', '🐷'],
-    [
-      'no suggestion keeps a followed picture (no jump to the default)',
-      '🍦',
-      undefined,
-      '🍦',
-      '🍦',
-    ],
-    ['no picture, the same suggestion: the suggestion', '💵', '💵', undefined, '💵'],
-    ['no picture, no suggestion: the default', undefined, undefined, undefined, '🎁'],
-    ['an empty picture counts as none', undefined, undefined, '', '🎁'],
-  ] as const)('%s', (_n, before, after, current, expected) => {
-    expect(emojiAfterRename({ before, after, current, fallback: '🎁' })).toBe(expected);
   });
 });
 
