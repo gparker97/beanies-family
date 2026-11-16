@@ -59,6 +59,9 @@
  *   the app, after the pod write, so it is off the critical path. Its answer rides
  *   `completePodSetup` (the registry write + the "Family pod created!" Slack). It is
  *   optional/skippable and MUST never block entry to the app (see `onErrorCaptured`).
+ *   A reload or restart after the write never resumes these steps (the pod exists, so the next
+ *   open signs straight in); the device marker `podSetupPending`, set at the write and stepped
+ *   by the phase watcher, lets that open finish the setup instead (`finishPendingPodSetup`).
  *
  *   load (existing pod — NEVER reaches `members`):
  *     auto-loadable → auto-load → completeAutoLoad success → signed-in /nook
@@ -116,6 +119,7 @@ import { trackOnboardingStep, type OnboardingStep } from '@/services/telemetry/o
 import { confirm } from '@/composables/useConfirm';
 import { consumeResumeReason } from '@/components/login/resumePaths';
 import type { HeardVia } from '@beanies/brand/heardVia';
+import { isPodSetupStep, type SetupSurveyOutcome } from '@/utils/podSetupPending';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -189,9 +193,10 @@ const password = ref('');
 // phase displays it; the code leaves memory on confirmation.
 const kitCode = ref('');
 const kitId = ref('');
-// "How did you hear about us?" answer (`{ id, label }`; null = skipped). Captured in the
-// `survey` phase, handed to `syncStore.completePodSetup` at the end.
-const heardVia = ref<HeardVia | null>(null);
+// "How did you hear about us?" outcome, handed to `syncStore.completePodSetup` at the end. Set
+// in the `survey` phase, the only route to the setup modal: `answered` or `skipped` (the person
+// saw the survey). `not-seen` is the honest default and belongs to the late path, not here.
+const surveyOutcome = ref<SetupSurveyOutcome>({ kind: 'not-seen' });
 const formError = ref<string | null>(null);
 const busy = ref(false);
 const showLocalFileWarning = ref(false);
@@ -268,6 +273,9 @@ watch(
     if (!step) return;
     if (driveFailure.value) trackOnboardingStep(step, 'shown', { error_code: driveFailure.value });
     else trackOnboardingStep(step, 'shown');
+    // A post-write step (kit, members, survey) also goes on the device marker, so a setup left
+    // here and finished on the next open says where the person left. No-op with no marker.
+    if (isPodSetupStep(step)) syncStore.notePodSetupStep(step);
   },
   { immediate: true }
 );
@@ -889,7 +897,8 @@ async function proceedToFinalize(opts: { storageNotice?: CreateDriveErrorCode | 
  * A survey failure must NEVER block entry to the app (see `onErrorCaptured` below).
  */
 function handleSurveyComplete(heard: HeardVia | null) {
-  heardVia.value = heard;
+  // The survey was on screen, so no answer is a skip, never "not seen".
+  surveyOutcome.value = heard ? { kind: 'answered', heardVia: heard } : { kind: 'skipped' };
   trackOnboardingStep('survey', 'submitted');
   openSetupModal();
 }
@@ -918,7 +927,8 @@ onErrorCaptured((err) => {
     error: err,
     severity: 'warning',
   });
-  heardVia.value = null;
+  // The survey was shown and degraded to a skip.
+  surveyOutcome.value = { kind: 'skipped' };
   openSetupModal();
   return false; // handled — stop propagation
 });
@@ -1166,7 +1176,7 @@ async function handleSetupComplete() {
   // created!" Slack post, Plausible `pod_created` and the end of the create attempt. Never
   // throws and bounded, so entry to the app is never blocked by it; a second call for the
   // same family is a logged no-op.
-  await syncStore.completePodSetup({ heardVia: heardVia.value });
+  await syncStore.completePodSetup({ survey: surveyOutcome.value });
   // Refresh the reactive settings projection from the just-written doc BEFORE
   // routing. `buildOwnerDoc` set `onboardingCompleted:false`, but the snapshot
   // in `settingsStore.settings` can lag the doc — and `/nook`'s onboarding

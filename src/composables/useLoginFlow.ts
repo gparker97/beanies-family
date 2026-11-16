@@ -42,9 +42,10 @@ import {
   emitEnvelopeCapabilitiesUnknown,
   emitLinkRedeemed,
   emitOpenFetchRecovery,
-  emitProveOutcome,
+  emitProveOutcome as emitProveOutcomeEvent,
   emitRosterFallbackUsed,
 } from '@/services/telemetry/loginFlowEvents';
+import type { SignInVia } from '@/utils/podSetupPending';
 import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import {
   unlockWithPin,
@@ -130,7 +131,8 @@ export interface UseLoginFlow {
 }
 
 export function useLoginFlow(opts: {
-  onSignedIn: (destination: string) => void;
+  /** `via`: how the person proved, when known (a setup finished late names it, 2026-11-16). */
+  onSignedIn: (destination: string, via?: SignInVia) => void;
   onExit: () => void;
 }): UseLoginFlow {
   const authStore = useAuthStore();
@@ -173,6 +175,35 @@ export function useLoginFlow(opts: {
    * field with the passphrase error above it.
    */
   const lastAttempted = ref<'password' | 'passphrase' | null>(null);
+
+  /**
+   * The method of this arrival's last SUCCESSFUL prove, as `prove_outcome` names it. Set by the
+   * one emitter every prove goes through (below), cleared with `recoveryOpenedBy`. Closure-local
+   * for `openedByLink`'s reason: a stale value would credit a later, unrelated sign-in.
+   */
+  let provenBy: string | null = null;
+  function emitProveOutcome(payload: Parameters<typeof emitProveOutcomeEvent>[0]): void {
+    if (payload.ok) provenBy = payload.method;
+    emitProveOutcomeEvent(payload);
+  }
+
+  /** How this arrival signed in, for `onSignedIn`. A recovery opener outranks the re-prove after it. */
+  function signedInVia(): SignInVia | undefined {
+    if (recoveryOpenedBy.value === 'kit') return 'recovery-kit';
+    if (recoveryOpenedBy.value === 'passphrase') return 'recovery-passphrase';
+    switch (provenBy) {
+      case 'recovery-reset':
+        return 'recovery-kit';
+      case 'pin':
+      case 'biometric':
+      case 'tap-through':
+      case 'password':
+      case 'passphrase':
+        return provenBy;
+      default:
+        return undefined;
+    }
+  }
 
   function dispatch(event: LoginFlowEvent): void {
     const next = transition(state.value, event);
@@ -620,8 +651,11 @@ export function useLoginFlow(opts: {
       // never had: mints were countable, successes were not.
       if (openedByLink) emitLinkRedeemed({ kind: openedByLink, ok: true });
       openedByLink = null;
+      // Read before the clears below, which it depends on.
+      const via = signedInVia();
       recoveryOpenedBy.value = null;
-      opts.onSignedIn(s.destination);
+      provenBy = null;
+      opts.onSignedIn(s.destination, via);
       return;
     }
     if (s.kind === 'open-recovery') {
@@ -632,6 +666,7 @@ export function useLoginFlow(opts: {
       pendingPassword = null;
       lastAttempted.value = null;
       recoveryOpenedBy.value = null;
+      provenBy = null;
       // Abandoned arrival: clear it, or the next manual login inherits the attribution.
       openedByLink = null;
       opts.onExit();

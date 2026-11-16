@@ -63,6 +63,7 @@ const h = vi.hoisted(() => {
       isGoogleDriveAvailable: true,
       membersStepActive: false,
       completePodSetup: vi.fn(async () => {}),
+      notePodSetupStep: vi.fn(),
     },
   };
 });
@@ -581,7 +582,7 @@ describe('ResumePodSetup — #128 order: write → kit → members → survey �
     expect(h.sync.membersStepActive).toBe(true);
   });
 
-  it('kit → members → survey → setup modal → completePodSetup(heardVia) → /nook', async () => {
+  it('kit → members → survey → setup modal → completePodSetup(answered) → /nook', async () => {
     const { wrapper, vm } = await throughPin();
 
     await vm.handleKitStepStored('saved');
@@ -602,22 +603,30 @@ describe('ResumePodSetup — #128 order: write → kit → members → survey �
     expect(h.sync.completePodSetup).not.toHaveBeenCalled();
 
     await vm.handleSetupComplete();
-    expect(h.sync.completePodSetup).toHaveBeenCalledWith({ heardVia: heard });
+    expect(h.sync.completePodSetup).toHaveBeenCalledWith({
+      survey: { kind: 'answered', heardVia: heard },
+    });
+    // Each post-write step shown went on the device marker, in order.
+    expect(h.sync.notePodSetupStep.mock.calls.map(([step]) => step)).toEqual([
+      'kit',
+      'members',
+      'survey',
+    ]);
     expect(h.sync.membersStepActive).toBe(false);
     expect(wrapper.emitted('signed-in')).toEqual([['/nook']]);
   });
 
-  it('a skipped survey completes with heardVia: null', async () => {
+  it('a skipped survey completes as skipped, never "not seen"', async () => {
     const { vm } = await throughPin();
     await vm.handleKitStepStored('acknowledged');
     vm.handleMembersFinish();
     vm.handleSurveyComplete(null);
     await vm.handleSetupComplete();
 
-    expect(h.sync.completePodSetup).toHaveBeenCalledWith({ heardVia: null });
+    expect(h.sync.completePodSetup).toHaveBeenCalledWith({ survey: { kind: 'skipped' } });
   });
 
-  it('a survey that THROWS still opens the setup modal with heardVia null', async () => {
+  it('a survey that THROWS still opens the setup modal, as a skip', async () => {
     h.surveyThrows.value = true;
     const { vm } = await throughPin();
     await vm.handleKitStepStored('saved');
@@ -625,12 +634,12 @@ describe('ResumePodSetup — #128 order: write → kit → members → survey �
     await flushPromises();
 
     expect(vm.showSetupModal).toBe(true);
-    expect(vm.heardVia).toBeNull();
+    expect(vm.surveyOutcome).toEqual({ kind: 'skipped' });
     expect(h.reportError).toHaveBeenCalledWith(
       expect.objectContaining({ surface: 'resumeSetup.survey', severity: 'warning' })
     );
     await vm.handleSetupComplete();
-    expect(h.sync.completePodSetup).toHaveBeenCalledWith({ heardVia: null });
+    expect(h.sync.completePodSetup).toHaveBeenCalledWith({ survey: { kind: 'skipped' } });
   });
 
   it('hides "Start over" on every post-write step, and shows it on storage and the PIN step', async () => {
@@ -1595,7 +1604,7 @@ describe('ResumePodSetup — a survey that throws can never block completion', (
     expect(escaped).not.toHaveBeenCalled();
 
     await vm.handleSetupComplete();
-    expect(h.sync.completePodSetup).toHaveBeenCalledWith({ heardVia: null });
+    expect(h.sync.completePodSetup).toHaveBeenCalledWith({ survey: { kind: 'skipped' } });
     expect(wrapper.emitted('signed-in')).toEqual([['/nook']]);
   });
 

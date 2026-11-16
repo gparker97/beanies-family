@@ -166,9 +166,21 @@ import { knownDeviceTimeZone } from '@/utils/timeZone';
 import { clearAttribution, peekAttribution } from '@/utils/attributionStash';
 import { currentCreateAttempt } from '@/utils/createAttemptState';
 import { endCreateAttempt, trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
+import {
+  clearPodSetupPending,
+  heardViaSlackLine,
+  markPodSetupPending,
+  notePodSetupStep as notePodSetupStepFor,
+  readPodSetupPending,
+  setupSlackLine,
+  type LateSetupFinish,
+  type PodSetupStep,
+  type SetupReturnVia,
+  type SetupSurveyOutcome,
+} from '@/utils/podSetupPending';
 import { track } from '@/services/analytics/plausible';
 import { summariseAttribution, type Attribution } from '@beanies/brand/attribution';
-import type { HeardVia, HeardViaId } from '@beanies/brand/heardVia';
+import type { HeardViaId } from '@beanies/brand/heardVia';
 import { measureAsync, record as recordPerf } from '@/utils/perfTiming';
 import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
 import {
@@ -3651,7 +3663,9 @@ export const useSyncStore = defineStore('sync', () => {
    * and then builds its payload, and the Lambda reads the row the completion wrote. Settles
    * after at most `PENDING_REGISTRY_WRITE_MAX_MS` even if the write hangs. Cleared on settle and
    * on sign-out (`resetState`); a write already queued behind it is bound to its family by
-   * `afterPendingRegistryWrite`, so it never lands on another family's row.
+   * `afterPendingRegistryWrite`, so it never lands on another family's row. The late completion
+   * (`finishPendingPodSetup`) uses the same queue: it starts the completion write just before
+   * `handleSignedIn`'s login register, which therefore queues behind it too.
    */
   let pendingRegistryWrite: Promise<void> | null = null;
 
@@ -3676,22 +3690,42 @@ export const useSyncStore = defineStore('sync', () => {
    * step 4 runs whatever happened before it (the pod already exists). Idempotent per family:
    * a second call returns early with an `onboarding` `complete-setup` `skipped` line. The demo
    * seed never reaches this (it stops at `createNewFile` with `suppressRemoteSideEffects`).
+   *
+   * Two callers, ONE completion:
+   *   - the wizard (`ResumePodSetup.handleSetupComplete`), with the survey `answered` or
+   *     `skipped` and no `late`;
+   *   - `finishPendingPodSetup`, on the next signed-in open of a pod whose wizard was left after
+   *     the pod write, with the survey `not-seen` and `late` saying where they left and how they
+   *     came back (the Slack post's Setup line). `late.attemptId` scopes the funnel's `done`:
+   *     only THAT create attempt is ended, never another one open on this device.
+   * Either way the device marker (`podSetupPending`) is cleared once the Slack post has gone
+   * out, which makes the latch durable across reloads; a throw before the post keeps it, so the
+   * next open retries.
    */
-  async function completePodSetup({ heardVia }: { heardVia: HeardVia | null }): Promise<void> {
+  async function completePodSetup({
+    survey,
+    late,
+  }: {
+    survey: SetupSurveyOutcome;
+    late?: LateSetupFinish;
+  }): Promise<void> {
     const ctx = useFamilyContextStore();
     const familyId = ctx.activeFamilyId;
+    const stage = late ? 'late' : 'wizard';
     if (familyId && completedSetupFamilyId === familyId) {
       logEvent({
         level: 'info',
         surface: 'onboarding',
         message: 'complete-setup',
-        context: { action: 'skipped' },
+        context: { action: 'skipped', stage },
       });
       return;
     }
     // Latched BEFORE the first await, so a concurrent second call is skipped too.
     completedSetupFamilyId = familyId;
     const log = registryActionLog('complete-setup');
+    // `null` for both `skipped` and `not-seen`: the Lambda accepts only a survey id here.
+    const heardViaId = survey.kind === 'answered' ? survey.heardVia.id : null;
     try {
       const familyStoreInst = useFamilyStore();
       const membersAdded = familyStoreInst.members.filter((m) => m.role !== 'owner').length;
@@ -3700,8 +3734,11 @@ export const useSyncStore = defineStore('sync', () => {
       if (familyId) {
         // `setupComplete` is transient (never stored, client or server). This is the one write
         // that sends it, so it is spread on here rather than added to the shared builder.
+        // ⚠️ STILL SYNCHRONOUS UP TO `pendingRegistryWrite` BELOW, and `finishPendingPodSetup`
+        // relies on it: it calls this un-awaited just before `handleSignedIn`'s login register,
+        // which must find the completion write already in flight and queue behind it.
         const write = registry.registerFamily(familyId, {
-          ...buildRegistryPayload({}, { isLoginEvent: false, heardVia: heardVia?.id ?? null }),
+          ...buildRegistryPayload({}, { isLoginEvent: false, heardVia: heardViaId }),
           setupComplete: true,
         });
         // Every later registry write waits for this one (see `pendingRegistryWrite`), but for
@@ -3740,8 +3777,11 @@ export const useSyncStore = defineStore('sync', () => {
       const cameFrom = attribution ? summariseAttribution(attribution) : '';
       slackNotify(
         `🎉 *Family pod created!*\n*Family:* ${ctx.activeFamilyName ?? ''}\n*Owner:* ${familyStoreInst.owner?.name ?? ''}\n*Storage:* ${storageLabel}` +
-          // Always present: "(skipped)" tells a skip apart from a missing line.
-          `\n*Heard via:* ${heardVia?.label || '(skipped)'}` +
+          // Always present: "(skipped)" and "(not seen)" tell a skip and a survey never reached
+          // apart from each other and from a missing line.
+          heardViaSlackLine(survey) +
+          // Only when setup finished on a later open: where they left and how they came back.
+          setupSlackLine(late) +
           // One code span: the value charset admits `_` `~` `:`, which Slack would render
           // as italic / strike / emoji, and excludes the backtick, so nothing breaks out.
           // Omitted when the tag has none of source / campaign / content (ad ids only).
@@ -3752,21 +3792,147 @@ export const useSyncStore = defineStore('sync', () => {
           `\n*Members added:* ${membersAdded}` +
           podSlackFooter(registered?.deviceCountry)
       );
+      // The one count of completions, split wizard vs late (`stage`); `detail` is the survey
+      // outcome. A late one also has its `late-complete` `sent` line, with the step and the way
+      // back, so CloudWatch alone counts both paths and the late ones by step.
+      logEvent({
+        level: 'info',
+        surface: 'onboarding',
+        message: 'complete-setup',
+        context: { action: 'sent', stage, detail: survey.kind },
+      });
+      if (late) {
+        logEvent({
+          level: 'info',
+          surface: 'onboarding',
+          message: 'late-complete',
+          context: {
+            action: 'sent',
+            detail: late.leftAt,
+            kind: late.via,
+            // Explicit, for the join when the attempt itself has expired off the device.
+            ...(late.attemptId ? { create_attempt_id: late.attemptId } : {}),
+          },
+        });
+      }
       // Consume once, now that the registry row (stamped at the signup write) and the Slack
       // line both have it.
       clearAttribution('consumed');
+      // Only now, after the post: a throw above keeps the marker for the next open's retry.
+      if (familyId) clearPodSetupPending(familyId, 'completed');
     } catch (e) {
       reportError({
         surface: 'onboarding',
         message: `complete-setup failed: ${e instanceof Error ? e.message : String(e)}`,
         error: e,
         severity: 'warning',
-        context: { action: 'complete-setup', detail: 'failed' },
+        context: { action: 'complete-setup', detail: 'failed', stage },
       });
     }
     track('pod_created');
-    trackOnboardingStep('done', 'submitted');
-    endCreateAttempt('done');
+    // The wizard's completion ends the open attempt, as always. A late one ends it only when it
+    // is still the attempt that created this pod: another attempt open on this device (a Create
+    // tap since) is not this pod's to end, and an expired one is already gone.
+    if (!late || (late.attemptId !== null && currentCreateAttempt()?.id === late.attemptId)) {
+      trackOnboardingStep('done', 'submitted');
+      endCreateAttempt('done');
+    }
+  }
+
+  /**
+   * Finish a setup left unfinished in the wizard, on a signed-in open (2026-11-16). Called from
+   * the two places a signed-in family opens: App init's boot health check (a restored session,
+   * `app-restarted` / `page-reloaded`) and `LoginPage.handleSignedIn` (every fresh sign-in, with
+   * the method when the login flow knows it).
+   *
+   * Runs `completePodSetup` (the SAME completion, survey `not-seen`, with the Setup line) when
+   * this device holds a `podSetupPending` marker for the active family AND the signed-in member
+   * is the one who created the pod. The marker is only ever written on the creating owner's
+   * device (`createNewFile`), so no other device can send it.
+   *
+   * ⚠️ IT CANNOT RACE THE WIZARD, for three reasons:
+   *   - the boot health check never runs in a page load that shows the post-write wizard (a
+   *     podless boot returns before it, and the pod is written later in that same page);
+   *   - the wizard emits `signed-in` only after its own `completePodSetup`, which has latched
+   *     the family and cleared the marker;
+   *   - and, belt and braces, `membersStepActive` (true from the pod write until the wizard's
+   *     completion) makes this a logged skip.
+   *
+   * ⚠️ IT CANNOT CLOBBER THE LOGIN REGISTER. `completePodSetup` is started un-awaited and
+   * reaches `pendingRegistryWrite` synchronously, so the caller's `ensureRegistered(true)`,
+   * called next, queues behind the completion write exactly as on the wizard path.
+   *
+   * Never throws and never delays entry: the completion runs in the background. Returns true
+   * when the completion took over the OPEN create attempt (the one the marker names), so
+   * `handleSignedIn` leaves it for the completion to end as `done` instead of `superseded`.
+   */
+  function finishPendingPodSetup(via: SetupReturnVia): boolean {
+    const skipped = (detail: string, level: 'debug' | 'info' = 'info'): false => {
+      logEvent({
+        level,
+        surface: 'onboarding',
+        message: 'late-complete',
+        context: { action: 'skipped', detail, kind: via },
+      });
+      return false;
+    };
+    try {
+      if (membersStepActive.value) return skipped('wizard-active');
+      const familyId = useFamilyContextStore().activeFamilyId;
+      const memberId = useAuthStore().currentUser?.memberId;
+      if (!familyId || !memberId) return skipped('no-session');
+      // The wizard's own entry into the app lands here: its completion already ran.
+      if (completedSetupFamilyId === familyId) return skipped('already-done', 'debug');
+      // A marker for another family is under another key, so it reads as `missing` here.
+      // `debug`: every ordinary open passes this line.
+      const read = readPodSetupPending(familyId);
+      if (read.kind === 'missing') return skipped('no-marker', 'debug');
+      if (read.kind !== 'ok') return skipped(read.kind); // corrupt | expired, removed by the read
+      const marker = read.value;
+      // A shared device: someone else in the family signed in. Kept for the creator.
+      if (marker.memberId !== memberId) return skipped('other-member');
+      const ownsAttempt =
+        marker.attemptId !== null && currentCreateAttempt()?.id === marker.attemptId;
+      logEvent({
+        level: 'info',
+        surface: 'onboarding',
+        message: 'late-complete',
+        context: {
+          action: 'started',
+          detail: marker.step,
+          kind: via,
+          ...(marker.attemptId ? { create_attempt_id: marker.attemptId } : {}),
+        },
+      });
+      // `completePodSetup` never rejects (its body is caught); the catch is belt and braces.
+      void completePodSetup({
+        survey: { kind: 'not-seen' },
+        late: { leftAt: marker.step, via, attemptId: marker.attemptId },
+      }).catch((e: unknown) => reportLateFailure(e, via));
+      return ownsAttempt;
+    } catch (e) {
+      reportLateFailure(e, via);
+      return false;
+    }
+  }
+
+  function reportLateFailure(e: unknown, via: SetupReturnVia): void {
+    reportError({
+      surface: 'onboarding',
+      message: `late-complete failed: ${e instanceof Error ? e.message : String(e)}`,
+      error: e,
+      severity: 'warning',
+      context: { action: 'late-complete', detail: 'failed', kind: via },
+    });
+  }
+
+  /**
+   * The wizard's post-write step shown (kit, members, survey), recorded on the device marker so
+   * a late completion says where the person left. A no-op with no marker. Never throws.
+   */
+  function notePodSetupStep(step: PodSetupStep): void {
+    const familyId = useFamilyContextStore().activeFamilyId;
+    if (familyId) notePodSetupStepFor(familyId, step);
   }
 
   /**
@@ -3855,9 +4021,9 @@ export const useSyncStore = defineStore('sync', () => {
    *
    * #128: the "Family pod created!" Slack post is NOT here any more. It moved to
    * `completePodSetup`, which runs after the kit, members and survey steps, so it can carry
-   * the survey answer and the member count. A create abandoned between this write and
-   * setup completion therefore posts nothing; the registry `createdAt` and the
-   * `resumeSetup` `create-ok` firehose line still record the pod.
+   * the survey answer and the member count. A create left between this write and setup
+   * completion (a reload, an app restart) posts on its next signed-in open on this device
+   * instead, through the `podSetupPending` marker set below (`finishPendingPodSetup`).
    */
   async function createNewFile(
     _podFileName: string,
@@ -4172,6 +4338,13 @@ export const useSyncStore = defineStore('sync', () => {
       markFamilyJustCreated();
       // #128: no Slack post and no `clearAttribution` here; both moved to `completePodSetup`
       // (see the docblock above). The tag stays in the stash for that Slack line.
+      // The pod exists and its setup is not complete until `completePodSetup` runs: mark it on
+      // this device, so a reload or a restart before then still completes it on the next
+      // signed-in open (`finishPendingPodSetup`). Only on the creating device, and never for the
+      // demo seed, which never completes. Never throws.
+      if (!suppressRemote) {
+        markPodSetupPending(familyId, memberId, currentCreateAttempt()?.id ?? null);
+      }
 
       return { ok: true, kit: { kitId: kit.kitId, code: kit.code } };
     } catch (e) {
@@ -8144,6 +8317,8 @@ export const useSyncStore = defineStore('sync', () => {
     createNewFile,
     registerSignupStart,
     completePodSetup,
+    finishPendingPodSetup,
+    notePodSetupStep,
     abandonSignupStart,
     clearSessionPassword,
     getExportedFamilyKey,

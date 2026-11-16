@@ -38,6 +38,7 @@ import {
 } from '@/components/login/resumePaths';
 import { reportError } from '@/utils/errorReporter';
 import { endCreateAttempt } from '@/services/telemetry/onboardingAttempt';
+import type { SignInVia } from '@/utils/podSetupPending';
 import { hasPendingKeptRecipe, KEPT_RECIPE_DESTINATION } from '@/utils/recipeKeepStash';
 import { setPreAuthIdle } from '@/utils/appUpdateSignals';
 import LoginSlowNotice from '@/components/login/LoginSlowNotice.vue';
@@ -157,7 +158,7 @@ onBeforeUnmount(() => setPreAuthIdle(false));
 // renders whatever state the machine is in; every routing decision lives in
 // loginFlow.ts + useLoginFlow, not here.
 const flow = useLoginFlow({
-  onSignedIn: (destination) => handleSignedIn(destination),
+  onSignedIn: (destination, via) => handleSignedIn(destination, via),
   onExit: () => {
     // BACK out of the person picker / recovery — same destinations the old
     // pick-bean/biometric back handlers used.
@@ -829,11 +830,23 @@ async function handleLinkReady(payload: {
   activeView.value = 'welcome';
 }
 
-function handleSignedIn(destination: string) {
-  // Any sign-in that lands here closes an open create attempt (#128): a no-op on the create
-  // path, which has already ended it in `completePodSetup`, but a create abandoned earlier in
-  // this browser must not tag a loaded or joined pod's events for up to 24 h.
-  endCreateAttempt('superseded');
+/**
+ * @param via How the login flow proved the person, when it knows (the other surfaces emit only
+ *   a destination).
+ */
+function handleSignedIn(destination: string, via?: SignInVia) {
+  // FIRST, before the attempt end and the login register below: a pod whose setup was left
+  // unfinished in the wizard (a reload at the recovery kit) is completed now, in the background.
+  // It starts its registry write synchronously, so `ensureRegistered(true)` queues behind it, and
+  // it reports whether it took over the open create attempt (to end it as `done`). A no-op on
+  // the wizard's own entry, which completed already. Never throws, never delays the route.
+  const lateCompletionOwnsAttempt = syncStore.finishPendingPodSetup(
+    via ? `signed-in-${via}` : 'signed-in'
+  );
+  // Any other sign-in that lands here closes an open create attempt (#128): a no-op on the
+  // create path, which has already ended it in `completePodSetup`, but a create abandoned earlier
+  // in this browser must not tag a loaded or joined pod's events for up to 24 h.
+  if (!lateCompletionOwnsAttempt) endCreateAttempt('superseded');
   // Single canonical arm-and-register point for EVERY entry path — create,
   // load, join, reconnect. SetupProgressModal no longer calls these (it used to,
   // causing a duplicate registry write on every create); they live here so the

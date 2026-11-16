@@ -215,6 +215,11 @@ export async function deleteLocalFamily(familyId: string): Promise<CacheClearRes
   const { clearEntitlementCache } = await import('@/services/billing/entitlementCache');
   clearEntitlementCache(familyId);
 
+  // 5c. Clear the "setup never completed" marker: a family forgotten on this device must not
+  // finish its setup from here later. Never throws; logs its own failure.
+  const { clearPodSetupPending } = await import('@/utils/podSetupPending');
+  clearPodSetupPending(familyId, 'family-forgotten');
+
   // 6. Remove from local registry
   const db = await getRegistryDatabase();
   await db.delete('families', familyId);

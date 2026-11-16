@@ -314,3 +314,34 @@ describe('useLoginFlow — only a recovery KIT may reset a PIN', () => {
     expect(h.resetCalls).toBe(0);
   });
 });
+
+/**
+ * 2026-11-16: `onSignedIn` names how the person proved, so a setup finished late can say it
+ * ("signed in with recovery kit"). A kit opener outranks the prove that follows it.
+ */
+describe('useLoginFlow: onSignedIn names the sign-in method', () => {
+  beforeEach(() => {
+    h.stageCalls = 0;
+    h.stageImpl = null;
+    h.pendingEncryptedFile = null;
+    h.envelope = null;
+    h.members = [];
+    h.activeFamilyId = null;
+    vi.clearAllMocks();
+  });
+
+  it('a kit session that resets the PIN signs in as recovery-kit', async () => {
+    setActivePinia(createPinia());
+    const onSignedIn = vi.fn();
+    const flow = useLoginFlow({ onSignedIn, onExit: vi.fn() });
+    await pickInto(flow, 'A');
+    flow.recoveryOpenedBy.value = 'kit';
+    h.members = [PERSON]; // the kit opened the pod
+    await flow.onResetPin('123456');
+    for (let i = 0; i < 20; i++) await nextTick();
+    await Promise.resolve();
+
+    expect(flow.state.value.kind).toBe('done');
+    expect(onSignedIn).toHaveBeenCalledWith(expect.any(String), 'recovery-kit');
+  });
+});

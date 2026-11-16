@@ -966,6 +966,42 @@ describe('pod creation: full end-to-end flow', () => {
       expect(vi.mocked(registryService.registerFamilyOrThrow)).toHaveBeenCalled();
     });
 
+    // 2026-11-16: the "setup never completed" marker, so a reload after the write still
+    // completes on the next signed-in open. Set on a real create, never for the demo seed.
+    it('marks the setup pending on this device for the creating member, with the open attempt', async () => {
+      const { podSetupPendingKey, readPodSetupPending } = await import('@/utils/podSetupPending');
+      const attempt = await import('@/utils/createAttemptState');
+      attempt.setCreateAttempt({ id: 'att-create-1', startedAt: Date.now(), step: 'pin' });
+      localStorage.removeItem(podSetupPendingKey('fam-test-1'));
+      try {
+        const result = await createPod();
+
+        expect(result.ok).toBe(true);
+        const read = readPodSetupPending('fam-test-1');
+        expect(read.kind).toBe('ok');
+        expect(read.kind === 'ok' && read.value).toEqual(
+          expect.objectContaining({
+            memberId: useAuthStore().currentUser!.memberId,
+            attemptId: 'att-create-1',
+            step: 'kit',
+          })
+        );
+      } finally {
+        attempt.setCreateAttempt(null);
+        localStorage.removeItem(podSetupPendingKey('fam-test-1'));
+      }
+    });
+
+    it('never marks a setup pending for the demo seed', async () => {
+      const { podSetupPendingKey } = await import('@/utils/podSetupPending');
+      localStorage.removeItem(podSetupPendingKey('fam-test-1'));
+
+      const result = await createPod({ suppressRemoteSideEffects: true });
+
+      expect(result.ok).toBe(true);
+      expect(localStorage.getItem(podSetupPendingKey('fam-test-1'))).toBeNull();
+    });
+
     it('posts NO Slack line on a real create — that moved to completePodSetup (#128)', async () => {
       const { slackNotify } = await import('@/utils/slackNotify');
 

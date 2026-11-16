@@ -24,6 +24,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - On the Beanie Wall's Choreboard, finished times of day are now listed in the order of the day (morning, afternoon, evening, anytime) at the bottom of each lane, under a "Done" line, so what is finished and what is still to do are easy to tell apart.
 - A chore's picture is now re-picked when the chore is renamed to something different, and kept on a small edit.
 
+### Fixed
+
+- A family that left setup early is now counted as having finished creating its pod.
+
 ## 2026-11-15
 
 ### Added
