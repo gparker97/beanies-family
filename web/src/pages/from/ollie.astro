@@ -1,0 +1,292 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { APP_URL } from '@beanies/brand/nav';
+import { PRICES, TRIAL_DAYS } from '../../lib/pricing';
+// Caveat — the CIG handwritten accent face, imported per-page (same pattern as /from/maple).
+import '@fontsource-variable/caveat';
+import '../../styles/switch-page.css';
+import TrustFreeTrial from '../../components/TrustFreeTrial.astro';
+import ProofNote from '../../components/ProofNote.astro';
+import { proofQuote } from '../../lib/proof';
+
+const MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
+---
+
+<BaseLayout
+  title="ollie alternative - switching to beanies.family"
+  description="ollie, the family ai assistant, shut down on november 6, 2026. beanies.family keeps the calendar, to-dos, meals and lists, and reads only the emails you choose to share. your data lives in your own encrypted file."
+  canonicalPath="/from/ollie"
+  lcpImage={MASCOT}
+>
+  <div class="welcome-page">
+    <header class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <Breadcrumbs
+            items={[
+              { label: 'home', href: '/' },
+              { label: 'switching', href: '/from' },
+              { label: 'from ollie', href: '/from/ollie' },
+            ]}
+          />
+          <p class="kicker kicker-pill"><i aria-hidden="true">💬</i> switching from ollie</p>
+          <h1>ollie stopped texting back,<br /><em>but you're welcome here.</em></h1>
+          <p class="sub">
+            Ollie shut down on November 6, 2026, and the family group chat went a bit quiet. So we're
+            rolling out the welcome mat. beanies.family keeps the stuff Ollie helped with - the calendar,
+            to-dos, meals and lists - and when an email from school lands, you share just that one email and
+            it becomes an activity or a to-do. No assistant reading your whole inbox. And your data lives with
+            <em>you</em>, on <em>your</em> storage, so it can't vanish on a date someone else picked.
+          </p>
+          <div class="btns">
+            <a
+              href={APP_URL}
+              data-cta="CTA: Create Pod"
+              data-cta-loc="welcome-ollie-hero"
+              class="btn btn-primary">start counting beans 🫘</a
+            >
+            <a href="#moving-guide" class="btn btn-ghost">the short version ↓</a>
+          </div>
+          <ul class="trust">
+            <li>🔒 end-to-end encrypted</li>
+            <li>📂 your file, your storage</li>
+            <li>🚫 no ads, ever</li>
+            <TrustFreeTrial />
+          </ul>
+        </div>
+
+        <div class="scene" aria-hidden="true">
+          <div class="doorframe">
+            <div class="door">
+              <span class="door-glow"></span>
+              <img class="door-mascot" src={MASCOT} width="150" height="150" alt="" decoding="async" />
+            </div>
+          </div>
+          <div class="mat"><span>oh hi, ollie friends 👋</span></div>
+          <div class="path">
+            <span class="leaf">💬</span>
+            <span class="bean b1"></span><span class="bean b2"></span>
+            <span class="bean b3"></span><span class="bean b4"></span>
+          </div>
+        </div>
+
+        <div class="hero-proof"><ProofNote quote={proofQuote('aherndon-replaced-apps')} stem="left" tilt={-1.4} mascot loc="welcome-ollie-hero" /></div>
+      </div>
+    </header>
+
+    <section id="moving-guide" class="section">
+      <div class="wrap">
+        <p class="section-label">the short version</p>
+        <h2 class="section-title">the facts, for those in a hurry</h2>
+        <div class="handout">
+          <h3>💬 → 🫘 the ollie moving guide</h3>
+          <div class="facts">
+            <p class="fact">
+              <b>what happened</b>Ollie announced on October 30, 2026 that it was closing, and the service
+              shut down on November 6, 2026.
+            </p>
+            <p class="fact">
+              <b>what you still have</b>Anything Ollie put on your Google or Apple calendar is still on that
+              calendar. Your school emails are still in your inbox. That's your starting point.
+            </p>
+            <p class="fact">
+              <b>where beanies keeps your data</b>In one encrypted file on your own storage (Google Drive
+              or local). Not on my servers. I don't have servers with your data on them.
+            </p>
+            <p class="fact">
+              <b>what it costs</b>{TRIAL_DAYS} days of everything, free, magic beans included. Then it's
+              {PRICES.USD.basicYearly} a year for the whole app, or {PRICES.USD.fullMonthly} a month with
+              magic beans. <a href="/pricing">Here's the whole plan</a>, and no ads for life is the beanies
+              guarantee.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tight">
+      <div class="wrap">
+        <p class="section-label">side by side</p>
+        <h2 class="section-title">ollie vs beanies, honestly</h2>
+        <p class="section-subtitle">
+          Ollie was a texting assistant and beanies is an app, so they're not the same shape. Here's where
+          they overlap, and where they don't.
+        </p>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">feature</span></th>
+                <th scope="col" class="mk">💬 ollie</th>
+                <th scope="col" class="mk">🫘 beanies</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">you text it like a person</th><td class="good">✓</td><td class="meh">no, it's an app</td></tr>
+              <tr><th scope="row">school email → calendar</th><td class="good">scanned your inbox</td><td class="good">you share the one email</td></tr>
+              <tr><th scope="row">shared family calendar</th><td class="good">your google / apple one</td><td class="good">✓ (plus google calendar)</td></tr>
+              <tr><th scope="row">meal planning &amp; recipes</th><td class="good">✓</td><td class="good">✓</td></tr>
+              <tr><th scope="row">to-dos &amp; lists</th><td class="good">✓</td><td class="good">✓</td></tr>
+              <tr><th scope="row">family finances &amp; budgets</th><td class="meh">no</td><td class="good">✓</td></tr>
+              <tr><th scope="row">where your data lives</th><td class="meh">their servers</td><td class="good">your storage</td></tr>
+              <tr><th scope="row">shutdown risk to your data</th><td class="warn">shut down nov 6</td><td class="good">it's your file, so none</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-fade section-fade-to-story"></div>
+    <section class="section letter">
+      <div class="wrap narrow">
+        <p class="section-label">the part where i'm honest</p>
+        <h2 class="section-title">ollie had the right idea</h2>
+        <p>
+          Ollie called itself privacy-first, and I think it meant it. Families are drowning in school emails
+          and forgotten permission slips, and a helper that turns the chaos into a calendar is a genuinely
+          good idea. I'm sorry it didn't make it.
+        </p>
+        <p>
+          But here's the thing that bugs me about the whole "AI chief of staff" approach: to be helpful, the
+          assistant has to read <em>everything</em>. Every email, about anything, from anyone. That's a lot
+          of trust to hand over, and as Ollie just showed, the company holding it can be gone in a week.
+        </p>
+        <blockquote class="pull">
+          "having a comprehensive set of awesome family organization and finance planning related features
+          while also being fully private are two things that are no longer mutually exclusive." - me,
+          <a href="https://dadmag.substack.com/p/vibe-coding-dad-of-three" rel="noopener">in an actual interview</a>,
+          sounding smarter than usual
+        </blockquote>
+        <p>
+          beanies flips it around. You decide which email matters, you share that one, and the rest of your
+          inbox stays yours. Same help, a lot less snooping.
+        </p>
+      </div>
+    </section>
+    <div class="section-fade section-fade-to-dark"></div>
+
+    <section class="section dark">
+      <div class="wrap">
+        <p class="section-label section-label-light">have your cake, and eat it too</p>
+        <h2 class="section-title">helpful doesn't have to mean nosy</h2>
+        <p class="section-subtitle">
+          the bit most AI assistants ask you to give up, and the bit you don't have to give up here.
+        </p>
+        <div class="cakegrid">
+          <div class="cakecard">
+            <h3>✨ you pick what it reads</h3>
+            <p>
+              Share an email, a screenshot, a PDF or a link from your phone's share sheet (or just paste the
+              text), and <span class="em">magic beans</span> turns it into an activity, a trip, a recipe or a
+              to-do. It reads that one thing, once. It never has a key to your inbox.
+            </p>
+          </div>
+          <div class="cakecard">
+            <h3>🙈 encrypted means encrypted</h3>
+            <p>
+              beanies encrypts your family's data <span class="em">before it leaves your device</span>, with
+              your key. I can't read it, sell it, or lose it, because I never had it in the first place.
+            </p>
+          </div>
+          <div class="cakecard">
+            <h3>📂 one file, yours</h3>
+            <p>
+              Everything lives in a single encrypted <span class="em">.beanpod</span> file on your Google
+              Drive or device. If beanies ever went away, your file wouldn't. That's kinda the whole point.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <p class="section-label">moving day</p>
+        <h2 class="section-title">three boxes and you're in</h2>
+        <div class="boxes">
+          <div class="box">
+            <span class="tape">box #1</span>
+            <span class="emoji" aria-hidden="true">📦</span>
+            <h3>set up your pod</h3>
+            <p>
+              Create your family pod in about two minutes: pick a PIN, save your Recovery Kit, add your
+              beans. No password. No account on my servers.
+            </p>
+          </div>
+          <div class="box">
+            <span class="tape">box #2</span>
+            <span class="emoji" aria-hidden="true">🚚</span>
+            <h3>bring your calendar along</h3>
+            <p>
+              The events Ollie added are still on your Google Calendar, so connect it, run the one-time import, and they come with you.
+              Then invite the family.
+            </p>
+          </div>
+          <div class="box">
+            <span class="tape">box #3</span>
+            <span class="emoji" aria-hidden="true">🎉</span>
+            <h3>share the next school email</h3>
+            <p>
+              Next time one lands, share it to beanies and watch it turn into an activity. That's the bit you
+              used to text Ollie for. You're home.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tight">
+      <div class="wrap">
+        <p class="section-label">fair questions</p>
+        <h2 class="section-title">things ollie folks actually ask</h2>
+        <details open>
+          <summary>okay but what if YOU shut down?</summary>
+          <p>
+            No matter what happens to beanies.family in the future, your data is <em>always</em> yours. It
+            belongs to you, and it's sitting on your own device or storage. Which is kind of the whole point.
+          </p>
+        </details>
+        <details>
+          <summary>can i still text it?</summary>
+          <p>
+            No, beanies is an app (web, iPhone and Android), not a phone number. But it sits in your share
+            sheet, so getting a school email or a screenshot into it is two taps from wherever you're
+            looking at it.
+          </p>
+        </details>
+        <details>
+          <summary>does the AI read my email?</summary>
+          <p>
+            Only the one you share with it, when you share it. beanies never connects to your inbox, so
+            there's nothing for it to scan in the background.
+          </p>
+        </details>
+        <details>
+          <summary>what does it cost?</summary>
+          <p>
+            Every family gets {TRIAL_DAYS} days of everything first, free, no card needed. After that it's
+            {PRICES.USD.basicYearly} a year for beanies basic, or {PRICES.USD.fullMonthly} a month with
+            magic beans, and if you'd rather host it yourself, it's free and open source, forever.
+            <a href="/pricing">The whole plan is here</a>. What there won't be, ever: ads. Or anybody
+            reading your family's data besides you, and your family.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section class="final">
+      <p class="kicker">the welcome mat is out</p>
+      <h2 class="final-title">every. bean. <em>counts.</em></h2>
+      <p class="section-subtitle">even the ones arriving from ollie.</p>
+      <a
+        href={APP_URL}
+        data-cta="CTA: Create Pod"
+        data-cta-loc="welcome-ollie-footer"
+        class="btn btn-primary">start counting beans 🫘</a
+      >
+      <p class="signoff">peace out, my beans.<br /><span class="g">greg</span></p>
+      <p class="ps">ps. stuck mid-move? come yell at me (nicely) on the <a href="/discord">discord</a>.</p>
+    </section>
+  </div>
+</BaseLayout>

@@ -8,6 +8,7 @@ lastUpdated: 2026-09-18
 relatedPosts:
   - getting-down-to-brass-tacks
   - maple-alternative
+  - ollie-alternative
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
   - made-a-wish-to-become-a-real-boy

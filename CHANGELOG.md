@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- A "switching from Ollie" page on the website (`/from/ollie`) for families whose Ollie assistant shut down, and Ollie now leads the switching hub.
 - Stars and Rewards for the Choreboard: each chore a child ticks can now earn a star. It is off until a grown-up turns it on.
 - An optional weekly reward with a bar, and special rewards on top of it (for this week or saved up over several weeks, for all kids or chosen children), can now be set up, with chore values and fair pricing in full weeks.
 - Grown-ups can now give bonus stars or take stars away, with a reason the child sees.
