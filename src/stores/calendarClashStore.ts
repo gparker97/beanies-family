@@ -45,6 +45,7 @@ import type { EventTime } from '@/services/calendar/CalendarClient';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useCalendarViewStore } from '@/stores/calendarViewStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { calendarInUse } from '@/utils/calendar/connectEligibility';
 import type { CalendarConnection } from '@/types/models';
 
 const FLAG = 'calendarClashNudge';
@@ -63,17 +64,6 @@ interface BusyCacheEntry {
 interface LastRequest {
   windowKey: string;
   occurrences: ActivityOccurrence[];
-}
-
-/** The Google calendar ids a connection pushes to. `'primary'` (the default) is
- *  the account's own calendar, whose Google id is the account email. Lowercased:
- *  an email-shaped id compares case-insensitively. */
-function destinationIdsOf(connection: CalendarConnection): string[] {
-  const dest = connection.destinationCalendarId || 'primary';
-  const ids = [dest.toLowerCase()];
-  if (dest === 'primary' && connection.accountEmail)
-    ids.push(connection.accountEmail.toLowerCase());
-  return ids;
 }
 
 export const useCalendarClashStore = defineStore('calendarClash', () => {
@@ -200,15 +190,21 @@ export const useCalendarClashStore = defineStore('calendarClash', () => {
    * cover the planner window (screen window widened by a period each side), so no
    * request is made here. A viewed calendar that IS a connection's destination is
    * skipped: it is already a source, and counting it twice would quiet it under a
-   * second acknowledgement key. Transparent ("free") and beanies-owned events are
-   * dropped exactly as for a connection.
+   * second acknowledgement key. "Is a connection's destination" is the one rule
+   * (`calendarInUse`, the `'primary'` alias resolved on both sides), counting a
+   * `disconnecting` connection too, because this store reads every connection as a
+   * source. The add step and both stores' guards keep the pair from being created,
+   * but a flag-off or older device cannot, so the skip must hold for an existing
+   * pair. Transparent ("free") and beanies-owned events are dropped exactly as for
+   * a connection.
    */
   function viewedSources(
     connections: CalendarConnection[],
     beanieEventIds: ReadonlySet<string>
   ): BusySource[] {
     if (!viewStore.isActive) return [];
-    const destinations = new Set(connections.flatMap(destinationIdsOf));
+    const accountEmail = new Map(viewStore.accounts.map((a) => [a.id, a.accountEmail] as const));
+    const uses = { connections, viewed: [] };
     const eventsByCalendar = new Map<string, EventTime[]>();
     for (const e of viewStore.events) {
       const list = eventsByCalendar.get(e.viewedCalendarId);
@@ -216,7 +212,12 @@ export const useCalendarClashStore = defineStore('calendarClash', () => {
       else eventsByCalendar.set(e.viewedCalendarId, [e]);
     }
     return viewStore.calendars
-      .filter((cal) => !destinations.has(cal.calendarId.toLowerCase()))
+      .filter(
+        (cal) =>
+          calendarInUse(cal.calendarId, accountEmail.get(cal.viewAccountId), uses, {
+            countDisconnecting: true,
+          }) !== 'sync'
+      )
       .map((cal) => ({
         sourceId: cal.id,
         source: 'viewed' as const,

@@ -38,12 +38,13 @@ import {
 const CAL_API_BASE = 'https://www.googleapis.com/calendar/v3';
 const REQUEST_TIMEOUT_MS = 15_000;
 const RETRY_BACKOFF_MS = [500, 1500] as const; // → up to 3 attempts on transient/429
-/** Safety cap on event-list paging: 20 × 250 = 5000 events >> any ≤42-day window.
- *  Structural guard against a non-terminating nextPageToken — never fires in practice. */
+
 /** The Google event types a view-only read asks for. Focus time, working location and
  *  birthdays are left out on purpose. */
 const VIEW_EVENT_TYPES = ['default', 'outOfOffice', 'fromGmail'] as const;
 
+/** Safety cap on event-list paging: 20 × 250 = 5000 events >> any ≤42-day window.
+ *  Structural guard against a non-terminating nextPageToken — never fires in practice. */
 const MAX_EVENT_PAGES = 20;
 
 /** Access-token expiry skew — refresh a little early so a request never races expiry. */
@@ -443,7 +444,36 @@ export function createGoogleTokenProvider(
 interface RawResponse {
   status: number;
   ok: boolean;
+  /**
+   * The body, parsed. Bounded by the SAME deadline as the request that produced it
+   * (see `attempt` in `createAuthedFetch`): a body that stalls rejects with a
+   * `transient` CalendarApiError instead of hanging its caller.
+   */
   json: () => Promise<unknown>;
+}
+
+/** The `name` of a body-read timeout (a literal, so a minified build still matches it). */
+const BODY_TIMEOUT_NAME = 'CalendarBodyTimeout';
+
+/**
+ * Read a response body before `deadline` (epoch ms). A stall past it rejects with a
+ * `transient` CalendarApiError, the same kind a timed-out fetch becomes, so every
+ * caller's existing failure path handles it (the view store marks the window stale
+ * and frees its in-flight marker; a reconcile counts a transient). Any other failure
+ * (a body that is not JSON) propagates unchanged.
+ */
+function readBodyBy(res: Response, deadline: number): Promise<unknown> {
+  return withTimeout(
+    res.json(),
+    Math.max(0, deadline - Date.now()),
+    'Google Calendar response body timed out',
+    BODY_TIMEOUT_NAME
+  ).catch((e: unknown) => {
+    if (e instanceof Error && e.name === BODY_TIMEOUT_NAME) {
+      throw new CalendarApiError('transient', e.message);
+    }
+    throw e;
+  });
 }
 
 /**
@@ -461,6 +491,13 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
   ): Promise<RawResponse> {
     const attempt = async (): Promise<RawResponse> => {
       const token = await tokenProvider.getAccessToken(connectionId);
+      // ONE deadline for the whole request: the headers AND the body. Before, only
+      // the fetch was bounded, and a 200 whose body stalled hung its caller forever
+      // (the view store's in-flight marker with it, so that calendar never read
+      // again while it looked healthy). Per attempt, so the retry policy below is
+      // unchanged: a body is read by the caller after `authedFetch` returns, and a
+      // stall there is a transient failure of the call, not a retried attempt.
+      const deadline = Date.now() + REQUEST_TIMEOUT_MS;
       const res = await withTimeout(
         fetch(`${CAL_API_BASE}${path}`, {
           ...init,
@@ -473,7 +510,7 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
         REQUEST_TIMEOUT_MS,
         'Google Calendar request timed out'
       );
-      return { status: res.status, ok: res.ok, json: () => res.json() };
+      return { status: res.status, ok: res.ok, json: () => readBodyBy(res, deadline) };
     };
 
     let lastErr: CalendarApiError | null = null;
@@ -516,17 +553,11 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
       let detail = '';
       let reason: string | undefined;
       try {
-        // ⚠️ Its OWN timeout. `withTimeout` in `attempt()` covers only the fetch;
-        // `json()` is a deferred closure over a body that may never finish
-        // arriving. This read now sits IN FRONT of the 401 one-shot re-mint, so a
-        // response whose headers land but whose body stalls would otherwise hang
-        // the re-mint, the authedFetch promise, and — reconcile awaiting
-        // connections in turn — the whole poll, indefinitely.
-        const body = await withTimeout(
-          res.json(),
-          REQUEST_TIMEOUT_MS,
-          'Google Calendar error body timed out'
-        );
+        // ⚠️ Bounded: `res.json()` shares the attempt's deadline (`readBodyBy`). This
+        // read sits IN FRONT of the 401 one-shot re-mint, so an unbounded body that
+        // stalls would hang the re-mint, the authedFetch promise, and — reconcile
+        // awaiting connections in turn — the whole poll, indefinitely.
+        const body = await res.json();
         ({ reason, detail } = extractGoogleError(body));
       } catch {
         // Body absent or not JSON — the status alone will have to do.

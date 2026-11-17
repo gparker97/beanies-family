@@ -16,9 +16,9 @@
  * Disconnect sits in the synced card's action row, and the synced heading carries a
  * "(push only)" help link, with the flag off too.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { reactive, nextTick, ref } from 'vue';
-import { mount, flushPromises } from '@vue/test-utils';
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils';
 import CalendarSyncSettings from '../CalendarSyncSettings.vue';
 import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
@@ -47,6 +47,8 @@ const CONNECTION = {
   accountEmail: 'a@b.com',
   status: 'ok',
   destinationCalendarId: 'primary',
+  grantedScopes: [] as string[],
+  destinationCalendarName: undefined as string | undefined,
 };
 const mockStore = reactive({
   connections: [{ ...CONNECTION }] as Array<typeof CONNECTION>,
@@ -54,9 +56,7 @@ const mockStore = reactive({
   syncNow,
   disconnect,
   reconnect: vi.fn(),
-  listCalendarsFor: vi.fn(
-    async (): Promise<Array<{ id: string; summary: string; primary: boolean }>> => []
-  ),
+  resolveDestinationName: vi.fn(async (): Promise<string | null> => null),
 });
 vi.mock('@/stores/calendarSyncStore', () => ({ useCalendarSyncStore: () => mockStore }));
 // The Reconnect button is now offered only to whoever can actually complete the
@@ -93,6 +93,10 @@ const useCalendarViewStore = vi.fn(() => viewStore);
 vi.mock('@/stores/calendarViewStore', () => ({
   useCalendarViewStore: () => useCalendarViewStore(),
 }));
+
+// The stores are shared reactive mocks: a drawer left mounted by an earlier test
+// would keep watching them and react to (and count against) the next test.
+enableAutoUnmount(afterEach);
 
 function mountDrawer(props: { open: boolean } = { open: true }) {
   return mount(CalendarSyncSettings, {
@@ -151,15 +155,12 @@ beforeEach(() => {
   viewStore.pendingViewConnect = null;
   mockStore.connections = [{ ...CONNECTION }];
   mockStore.pendingConnect = null;
-  mockStore.listCalendarsFor.mockResolvedValue([]);
+  mockStore.resolveDestinationName.mockResolvedValue(null);
 });
 
 describe('CalendarSyncSettings — connection card and add button', () => {
   it('shows the destination calendar’s name as fixed text, with no calendar picker', async () => {
-    mockStore.listCalendarsFor.mockResolvedValue([
-      { id: 'a@b.com', summary: 'Family', primary: true },
-      { id: 'work', summary: 'Work', primary: false },
-    ]);
+    mockStore.resolveDestinationName.mockResolvedValue('Family');
     const wrapper = mountDrawer();
     await flushPromises();
 
@@ -168,7 +169,62 @@ describe('CalendarSyncSettings — connection card and add button', () => {
     );
     expect(wrapper.find('select').exists()).toBe(false);
     expect(wrapper.text()).toContain('a@b.com');
-    expect(mockStore.listCalendarsFor).toHaveBeenCalledTimes(1);
+    expect(mockStore.resolveDestinationName).toHaveBeenCalledTimes(1);
+  });
+
+  // Review round 3, T7.
+  it('T7: a stored name is shown with no lookup at all', async () => {
+    mockStore.connections = [{ ...CONNECTION, destinationCalendarName: 'Kids' }];
+    const wrapper = mountDrawer();
+    await flushPromises();
+    expect(syncedRow(wrapper, 'c1').get('[data-testid="calendar-card-name"]').text()).toBe('Kids');
+    expect(mockStore.resolveDestinationName).not.toHaveBeenCalled();
+  });
+
+  it('T7: an unreadable non-primary calendar is never titled "Primary calendar"', async () => {
+    mockStore.connections = [
+      { ...CONNECTION, destinationCalendarId: 'kids@group.calendar.google.com' },
+      { ...CONNECTION, id: 'c2', destinationCalendarId: 'a@b.com' },
+    ];
+    const wrapper = mountDrawer();
+    await flushPromises();
+    expect(syncedRow(wrapper, 'c1').get('[data-testid="calendar-card-name"]').text()).toBe(
+      'calendarSync.calendarNameUnavailable'
+    );
+    // The account's primary under its real id still reads "Primary calendar".
+    expect(syncedRow(wrapper, 'c2').get('[data-testid="calendar-card-name"]').text()).toBe(
+      'calendarSync.primaryCalendar'
+    );
+  });
+
+  it('T7: a failed lookup is tried again after a reconnect, never on every tick', async () => {
+    mockStore.connections = [{ ...CONNECTION, status: 'needs_reconnect' }];
+    const wrapper = mountDrawer();
+    await flushPromises();
+    expect(mockStore.resolveDestinationName).toHaveBeenCalledTimes(1);
+
+    // An unrelated change to the record: no second lookup.
+    mockStore.connections = [{ ...CONNECTION, status: 'needs_reconnect' }];
+    await flushPromises();
+    expect(mockStore.resolveDestinationName).toHaveBeenCalledTimes(1);
+
+    // Reconnected: tried again, and the name it finds is shown.
+    mockStore.resolveDestinationName.mockResolvedValue('Family');
+    mockStore.connections = [{ ...CONNECTION, status: 'ok' }];
+    await flushPromises();
+    expect(mockStore.resolveDestinationName).toHaveBeenCalledTimes(2);
+    expect(syncedRow(wrapper, 'c1').get('[data-testid="calendar-card-name"]').text()).toBe(
+      'Family'
+    );
+  });
+
+  it('T7: nothing is looked up (or written back) while the drawer is closed', async () => {
+    const wrapper = mountDrawer({ open: false });
+    await flushPromises();
+    expect(mockStore.resolveDestinationName).not.toHaveBeenCalled();
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    expect(mockStore.resolveDestinationName).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to "Primary calendar" when the name cannot be read', async () => {

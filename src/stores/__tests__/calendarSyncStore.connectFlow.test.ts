@@ -459,3 +459,232 @@ describe('shared revoke guard on disconnect and reconnect', () => {
     expect(store.connections).toHaveLength(2);
   });
 });
+
+// ── Review round 3 ──────────────────────────────────────────────────────────
+
+describe('T2: confirmConnect uses the one already-used rule, viewed calendars included', () => {
+  async function viewed(calendarId: string, accountEmail = 'grandma@example.com') {
+    const { createViewedCalendar } =
+      await import('@/services/automerge/repositories/calendarViewRepository');
+    const account = await viewAccount(accountEmail);
+    return createViewedCalendar({
+      viewAccountId: account.id,
+      calendarId,
+      name: 'Viewed',
+      accessRole: 'reader',
+      detailLevel: 'details',
+      color: '#6b7280',
+      inBriefing: false,
+      inWidgets: false,
+    });
+  }
+
+  it('refuses a calendar the family already views (any account), so it is never synced and viewed', async () => {
+    await viewed('kids@group.calendar.google.com');
+    const store = useCalendarSyncStore();
+    await store.beginConnect();
+
+    expect(await store.confirmConnect('kids@group.calendar.google.com')).toEqual({
+      status: 'failed',
+      reason: 'already-connected',
+    });
+    expect(store.connections).toHaveLength(0);
+    const refusal = h.logEvent.mock.calls.find(
+      ([e]) => e.context?.action === 'confirm-connect' && e.context?.detail === 'already-viewed'
+    );
+    expect(refusal).toBeDefined();
+  });
+
+  it("refuses the fallback 'primary' row when that account's primary is viewed under its real id", async () => {
+    // Old code compared viewed ids raw, so 'primary' never matched 'mum@example.com'.
+    await viewed('mum@example.com');
+    const store = useCalendarSyncStore();
+    await store.beginConnect();
+
+    expect(await store.confirmConnect('primary')).toEqual({
+      status: 'failed',
+      reason: 'already-connected',
+    });
+  });
+
+  it('the add step reads the same records (calendarUses), viewed calendars included', async () => {
+    await viewed('kids@group.calendar.google.com');
+    const store = useCalendarSyncStore();
+    expect(store.calendarUses.viewed).toEqual([
+      { calendarId: 'kids@group.calendar.google.com', accountEmail: 'grandma@example.com' },
+    ]);
+  });
+});
+
+describe('T7: the destination name is stored when chosen', () => {
+  it('confirmConnect stores the name the add step listed', async () => {
+    const store = useCalendarSyncStore();
+    await store.beginConnect();
+    await store.confirmConnect('kids@group.calendar.google.com', 'Kids');
+    expect(store.connections[0]).toMatchObject({ destinationCalendarName: 'Kids' });
+  });
+
+  it('a stored name is returned without any Google read', async () => {
+    const store = useCalendarSyncStore();
+    await store.beginConnect();
+    await store.confirmConnect('kids@group.calendar.google.com', 'Kids');
+    listedWith = [];
+    expect(await store.resolveDestinationName(store.connections[0]!.id)).toBe('Kids');
+    expect(listedWith).toEqual([]);
+  });
+
+  it('a legacy connection resolves its name from the list and writes it back (with the real primary id)', async () => {
+    const legacy = await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'rt-legacy',
+      grantedScopes: [OWNED, LIST],
+      status: 'ok',
+    });
+    const store = useCalendarSyncStore();
+    expect(await store.resolveDestinationName(legacy.id)).toBe('Mum');
+    expect(await getCalendarConnectionById(legacy.id)).toMatchObject({
+      destinationCalendarName: 'Mum',
+      destinationCalendarId: 'mum@example.com',
+    });
+  });
+
+  it('a legacy connection whose list cannot be read gets null and nothing is written', async () => {
+    const legacy = await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'kids@group.calendar.google.com',
+      refreshToken: 'rt-legacy',
+      grantedScopes: [OWNED], // no list scope
+      status: 'needs_reconnect',
+    });
+    const store = useCalendarSyncStore();
+    expect(await store.resolveDestinationName(legacy.id)).toBeNull();
+    expect((await getCalendarConnectionById(legacy.id))?.destinationCalendarName).toBeUndefined();
+  });
+});
+
+/**
+ * T5 + T9: a teardown leaves events only to a HEALTHY sibling on the same calendar,
+ * and every attempt emits one summary event (success and partial).
+ */
+describe('T5/T9: finishDisconnect and its siblings', () => {
+  async function setup(siblingStatus: 'ok' | 'needs_reconnect' | 'error' | 'disconnecting') {
+    const activity = await createActivity(activityInput());
+    const { createCalendarEventLink } =
+      await import('@/services/automerge/repositories/calendarRepository');
+    const { deterministicEventId } = await import('@/utils/calendar/deterministicEventId');
+    const eventId = deterministicEventId(activity.id);
+    const make = (status: 'ok' | 'needs_reconnect' | 'error' | 'disconnecting', rt: string) =>
+      createCalendarConnection({
+        provider: 'google',
+        accountEmail: 'mum@example.com',
+        destinationCalendarId: 'kids@group.calendar.google.com',
+        refreshToken: rt,
+        grantedScopes: [OWNED],
+        status,
+      });
+    const doomed = await make('ok', 'rt-doomed');
+    const sibling = await make(siblingStatus, 'rt-sibling');
+    for (const c of [doomed, sibling]) {
+      await createCalendarEventLink({
+        connectionId: c.id,
+        activityId: activity.id,
+        googleEventId: eventId,
+        lastPushedHash: 'h',
+        lastPushedAt: new Date().toISOString(),
+      });
+    }
+    const deleted: string[] = [];
+    setCalendarClientForTesting(
+      makeCalendarClientStub({
+        async deleteEvent(_credential, _calendar, id) {
+          deleted.push(id);
+        },
+      })
+    );
+    return { doomed, eventId, deleted };
+  }
+
+  it('a healthy (ok) sibling owns the shared events: they are forgotten, not deleted', async () => {
+    const { doomed, eventId, deleted } = await setup('ok');
+    const store = useCalendarSyncStore();
+    expect(await store.disconnect(doomed.id)).toBe(true);
+    expect(deleted).not.toContain(eventId);
+    const done = h.logEvent.mock.calls.find(([e]) => e.context?.action === 'disconnect-teardown');
+    expect(done?.[0].context).toEqual({
+      action: 'disconnect-teardown',
+      detail: 'complete',
+      count: 1,
+      kind: 'left-to-live-sibling',
+    });
+  });
+
+  it.each(['needs_reconnect', 'error', 'disconnecting'] as const)(
+    'a %s sibling is no owner: the events are deleted as before',
+    async (status) => {
+      const { doomed, eventId, deleted } = await setup(status);
+      const store = useCalendarSyncStore();
+      expect(await store.disconnect(doomed.id)).toBe(true);
+      expect(deleted).toContain(eventId);
+      const done = h.logEvent.mock.calls.find(([e]) => e.context?.action === 'disconnect-teardown');
+      expect(done?.[0].context).toEqual({
+        action: 'disconnect-teardown',
+        detail: 'complete',
+        count: 1,
+      });
+    }
+  );
+
+  it('T9: failed deletes are reported ONCE per attempt with counts and a kind, never ids', async () => {
+    const activity = await createActivity(activityInput());
+    const second = await createActivity(activityInput());
+    const { createCalendarEventLink } =
+      await import('@/services/automerge/repositories/calendarRepository');
+    const { CalendarApiError } = await import('@/services/calendar/CalendarClient');
+    const doomed = await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'kids@group.calendar.google.com',
+      refreshToken: 'rt-dead',
+      grantedScopes: [OWNED],
+      status: 'ok',
+    });
+    for (const a of [activity, second]) {
+      await createCalendarEventLink({
+        connectionId: doomed.id,
+        activityId: a.id,
+        googleEventId: `evt-secret-${a.id}`,
+        lastPushedHash: 'h',
+        lastPushedAt: new Date().toISOString(),
+      });
+    }
+    setCalendarClientForTesting(
+      makeCalendarClientStub({
+        async deleteEvent() {
+          throw new CalendarApiError('auth', 'dead grant', 401);
+        },
+      })
+    );
+    const store = useCalendarSyncStore();
+    h.reportError.mockClear();
+
+    expect(await store.disconnect(doomed.id)).toBe(false);
+
+    const reports = h.reportError.mock.calls.filter(
+      ([e]) => e.context?.action === 'disconnect-teardown'
+    );
+    expect(reports).toHaveLength(1);
+    expect(reports[0]![0]).toMatchObject({
+      surface: 'calendar-sync',
+      severity: 'warning',
+      context: { action: 'disconnect-teardown', detail: 'partial', count: 2, error_code: 'auth' },
+    });
+    const text = JSON.stringify(reports.map(([e]) => [e.message, e.context]));
+    expect(text).not.toContain('evt-secret');
+    expect(text).not.toContain('kids@group');
+    expect(text).not.toContain('mum@example.com');
+    expect(await getCalendarConnectionById(doomed.id)).toBeTruthy();
+  });
+});

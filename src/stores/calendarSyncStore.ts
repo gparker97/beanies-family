@@ -102,11 +102,16 @@ import {
   revokeCalendarGrantGuarded as revokeSharedGuarded,
   type CalendarRevokeTrigger,
 } from '@/services/calendar/guardedRevoke';
-import { generateUUID } from '@/utils/id';
 import { MAX_INFLIGHT } from '@/utils/calendar/limits';
 import { hasCalendarListScope } from '@/utils/calendar/grantScopes';
 import { isPositivelyDifferentAccount } from '@/utils/calendar/grantGuard';
-import { isSameDestination, syncIneligibility } from '@/utils/calendar/connectEligibility';
+import {
+  calendarInUse,
+  isSameDestination,
+  type CalendarUses,
+} from '@/utils/calendar/connectEligibility';
+import { readCalendarUses } from '@/services/calendar/calendarUses';
+import { abandonPendingConsent, holdConsent } from '@/services/calendar/pendingConsent';
 import {
   calendarReturnPath,
   parseCalendarResumeIntent,
@@ -133,7 +138,8 @@ export type ConfirmConnectResult =
 export type ResumeConnectResult = BeginConnectResult | CalendarConnectResult;
 
 /** Where `finalizeConnected` writes: an existing connection (reconnect), or a new one on a chosen calendar. */
-type FinalizeTarget = { connectionId: string } | { destinationCalendarId: string };
+type FinalizeTarget =
+  { connectionId: string } | { destinationCalendarId: string; destinationCalendarName?: string };
 
 /**
  * The one-row list shown when the account's calendars cannot be listed. Its empty
@@ -1466,6 +1472,11 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // The chosen calendar; a vanished reconnect target keeps today's `'primary'`.
       destinationCalendarId:
         'destinationCalendarId' in target ? target.destinationCalendarId : 'primary',
+      // Its name as Google listed it in the add step, so the card can show it
+      // without a list read (which needs a live token and the list scope).
+      ...('destinationCalendarName' in target && target.destinationCalendarName
+        ? { destinationCalendarName: target.destinationCalendarName }
+        : {}),
       refreshToken: result.refreshToken,
       grantedScopes: result.grantedScopes,
       status: 'ok',
@@ -1548,6 +1559,17 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     return held && held.kind === 'sync' ? { accountEmail: held.accountEmail } : null;
   });
 
+  /**
+   * Every calendar the family already uses (sync destinations and view-only
+   * calendars, any account), the input of the add step's row rule and of the
+   * confirm guard below. Read from the projection (`readCalendarUses`), never from
+   * the view store.
+   */
+  const calendarUses = computed<CalendarUses>(() => {
+    void docVersion.value;
+    return readCalendarUses();
+  });
+
   /** `consent-outcome` on every exit of a fresh connect, success included, so rates are measurable. */
   function logConsentOutcome(detail: string, stage?: 'popup' | 'redirect'): void {
     logEvent({
@@ -1563,21 +1585,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     result: CalendarConnectResult,
     stage: 'popup' | 'redirect'
   ): BeginConnectResult {
-    if (result.status === 'redirecting') return result;
-    if (result.status !== 'connected') {
-      logConsentOutcome(result.code, stage);
-      return result;
-    }
-    pendingCredential.set({
-      id: `pending-${generateUUID()}`,
-      kind: 'sync',
-      accountEmail: result.email,
-      refreshToken: result.refreshToken,
-      grantedScopes: result.grantedScopes,
-    });
-    logTokenLifecycle({ grant: 'calendar', op: 'mint', outcome: 'ok', trigger: 'connect' });
-    logConsentOutcome('consented', stage);
-    return { status: 'pending' };
+    return holdConsent('sync', result, stage, logConsentOutcome);
   }
 
   /**
@@ -1657,9 +1665,13 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
    * Write the pending credential as a new connection on the chosen calendar, then
    * reconcile onto it. The slot is cleared only once the record exists, so a failed
    * write leaves the add step able to try again. A failed write is `critical`: the
-   * member's action failed.
+   * member's action failed. `destinationCalendarName` is the name Google listed for
+   * it (absent for the fallback primary row, which has none).
    */
-  async function confirmConnect(destinationCalendarId: string): Promise<ConfirmConnectResult> {
+  async function confirmConnect(
+    destinationCalendarId: string,
+    destinationCalendarName?: string
+  ): Promise<ConfirmConnectResult> {
     const held = pendingCredential.peek();
     if (!held || held.kind !== 'sync') {
       logEvent({
@@ -1670,15 +1682,20 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       });
       return { status: 'failed', reason: 'no-pending' };
     }
-    // The add step disables these rows; this is the store's own guard against two
-    // connections pushing every activity into one calendar.
-    const chosen = { id: destinationCalendarId, summary: '', primary: false };
-    if (syncIneligibility(chosen, held.accountEmail, connections.value) === 'already-connected') {
+    // The add step disables these rows; this is the store's own guard (the same rule,
+    // `calendarInUse`) against two connections pushing every activity into one
+    // calendar, or one calendar being both synced and viewed. Read fresh from the
+    // projection, not the computed, so a record that synced in a moment ago counts.
+    const use = calendarInUse(destinationCalendarId, held.accountEmail, readCalendarUses());
+    if (use !== null) {
       logEvent({
         level: 'warn',
         surface: 'calendar-sync',
         message: 'calendar confirm refused: calendar already connected',
-        context: { action: 'confirm-connect', detail: 'already-connected' },
+        context: {
+          action: 'confirm-connect',
+          detail: use === 'sync' ? 'already-connected' : 'already-viewed',
+        },
       });
       return { status: 'failed', reason: 'already-connected' };
     }
@@ -1690,7 +1707,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
           refreshToken: held.refreshToken,
           grantedScopes: held.grantedScopes,
         },
-        { destinationCalendarId },
+        { destinationCalendarId, destinationCalendarName },
         { countMint: false }
       );
     } catch (e) {
@@ -1716,12 +1733,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
    * A no-op when nothing is pending, so every close path may call it.
    */
   function abandonConnect(): void {
-    const held = pendingCredential.peek();
-    if (!held || held.kind !== 'sync') return;
-    pendingCredential.clear();
-    getCalendarClient().invalidateConnection(held.id);
-    revokeCalendarGrantGuarded(held.refreshToken, held.accountEmail ?? undefined, 'abandon');
-    logConsentOutcome('abandoned');
+    abandonPendingConsent('sync', logConsentOutcome);
   }
 
   /**
@@ -1820,34 +1832,77 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const client = getCalendarClient();
     const calendarId = connection.destinationCalendarId || 'primary';
     const links = await getCalendarEventLinksForConnection(connectionId);
-    // A LIVE connection to the same calendar (connected again while this teardown was
-    // stuck, which the add step allows: see `isConnectedDestination`) links the same
-    // deterministic event ids. Those events are its now: this teardown forgets its
-    // own links to them and never deletes them, or it would delete the new
-    // connection's events and the two would fight on every reconcile.
+    // THE NEW-OWNER RULE. A HEALTHY (`status: 'ok'`) connection to the same calendar
+    // (connected again while this teardown was stuck, which the add step allows: see
+    // `calendarInUse`) links the same deterministic event ids. Those events are its
+    // now: this teardown forgets its own links to them and never deletes them, or it
+    // would delete the live connection's events and the two would fight on every
+    // reconcile.
+    //
+    // ONLY `ok`. A sibling that is `needs_reconnect` or `error` cannot push (or is
+    // failing to), so it is no owner: leaving the events for it would leave every
+    // event on Google while reporting a clean disconnect. They are deleted as
+    // before, which is safe either way: a sibling that recovers re-creates its
+    // missing events on its next verify reconcile (`verifyExisting`). A
+    // `disconnecting` sibling is tearing down too, and owns nothing.
     const ownedElsewhere = new Set<string>();
     for (const other of connections.value) {
-      if (other.id === connectionId || other.status === 'disconnecting') continue;
+      if (other.id === connectionId || other.status !== 'ok') continue;
       if (!isSameDestination(other, connection)) continue;
       for (const link of await getCalendarEventLinksForConnection(other.id)) {
         ownedElsewhere.add(link.googleEventId);
       }
     }
 
-    let allCleared = true;
+    let failed = 0;
+    let forgotten = 0;
+    let firstError: unknown = null;
     const tasks = links.map((link) => async () => {
       try {
         // Cleans up what beanies made, never what the family already had: an
         // imported link deletes nothing remotely and is simply forgotten.
-        if (!ownedElsewhere.has(link.googleEventId)) {
-          await deleteRemoteEventForLink(client, connectionId, calendarId, link);
-        }
+        if (ownedElsewhere.has(link.googleEventId)) forgotten++;
+        else await deleteRemoteEventForLink(client, connectionId, calendarId, link);
         await removeCalendarEventLinkById(connectionId, link.activityId);
-      } catch {
-        allCleared = false; // keep the link; stays 'disconnecting', retried next open
+      } catch (e) {
+        // Keep the link; the connection stays 'disconnecting' and is retried on the
+        // next open. Counted here, reported once below for the whole attempt.
+        failed++;
+        firstError ??= e;
       }
     });
     await runPooled(tasks, MAX_INFLIGHT);
+
+    const allCleared = failed === 0;
+    // ONE summary event per teardown attempt (never one per event), on the success
+    // path too, so the failure RATE is measurable. Counts and a classified kind only:
+    // never a calendar id, event id or email.
+    if (allCleared) {
+      logEvent({
+        level: 'info',
+        surface: 'calendar-sync',
+        message: 'calendar disconnect teardown complete',
+        context: {
+          action: 'disconnect-teardown',
+          detail: 'complete',
+          count: links.length,
+          ...(forgotten > 0 ? { kind: 'left-to-live-sibling' } : {}),
+        },
+      });
+    } else {
+      reportError({
+        surface: 'calendar-sync',
+        message: '[calendarSync] disconnect teardown left events behind; it will retry',
+        error: firstError,
+        severity: 'warning',
+        context: {
+          action: 'disconnect-teardown',
+          detail: 'partial',
+          count: failed,
+          error_code: firstError instanceof CalendarApiError ? firstError.kind : 'unknown',
+        },
+      });
+    }
 
     if (allCleared) {
       invalidGrantCounters.delete(connectionId);
@@ -1866,38 +1921,95 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     return allCleared;
   }
 
-  /** A connection's calendars, so its card can show the destination's name. Falls back
-   *  to a primary-only option if the calendarlist scope was dropped under granular
-   *  consent (no silent empty list). */
-  async function listCalendarsFor(connectionId: string): Promise<CalendarSummary[]> {
-    const connection = await getCalendarConnectionById(connectionId);
-    if (!connection) return [];
-    // Fallback option mirrors the stored id, so the card can still name it. (F9)
-    const fallback = primaryOnly(connection.destinationCalendarId || 'primary');
-    if (!hasCalendarListScope(connection.grantedScopes)) return fallback;
+  /**
+   * A connection's calendar list from Google, or `null` when it cannot be read (the
+   * list scope was dropped under granular consent, or the read failed; a failure is
+   * reported). Never throws for a Google failure.
+   */
+  async function readCalendarList(
+    connection: CalendarConnection
+  ): Promise<CalendarSummary[] | null> {
+    if (!hasCalendarListScope(connection.grantedScopes)) return null;
     try {
-      const calendars = await getCalendarClient().listCalendars(connectionId);
-      // CalendarList returns the primary calendar's REAL id (the account email),
-      // never the literal alias 'primary' — so a connection still defaulting to
-      // 'primary' wouldn't match any option and the picker shows blank. Normalize
-      // it to the concrete primary id (same calendar → no event churn) so the
-      // default reflects as selected.
-      if (connection.destinationCalendarId === 'primary') {
-        const primary = calendars.find((c) => c.primary);
-        if (primary)
-          await updateCalendarConnection(connectionId, { destinationCalendarId: primary.id });
-      }
-      return calendars;
+      return await getCalendarClient().listCalendars(connection.id);
     } catch (e) {
       reportError({
         surface: 'calendar-sync',
         message: '[calendarSync] listCalendars failed',
         error: e,
         severity: 'warning',
-        context: { connectionId },
+        context: {
+          action: 'list-calendars',
+          error_code: e instanceof CalendarApiError ? e.kind : 'unknown',
+        },
       });
-      return fallback;
+      return null;
     }
+  }
+
+  /** A connection's calendars (the import chooser). Falls back to a primary-only option if the
+   *  calendarlist scope was dropped under granular consent or the read failed (no silent empty
+   *  list). */
+  async function listCalendarsFor(connectionId: string): Promise<CalendarSummary[]> {
+    const connection = await getCalendarConnectionById(connectionId);
+    if (!connection) return [];
+    const calendars = await readCalendarList(connection);
+    // Fallback option mirrors the stored id, so the chooser can still name it. (F9)
+    if (!calendars) return primaryOnly(connection.destinationCalendarId || 'primary');
+    // CalendarList returns the primary calendar's REAL id (the account email),
+    // never the literal alias 'primary' — so a connection still defaulting to
+    // 'primary' wouldn't match any option. Normalize it to the concrete primary id
+    // (same calendar → no event churn).
+    if (connection.destinationCalendarId === 'primary') {
+      const primary = calendars.find((c) => c.primary);
+      if (primary)
+        await updateCalendarConnection(connectionId, { destinationCalendarId: primary.id });
+    }
+    return calendars;
+  }
+
+  /**
+   * The destination calendar's name for its settings card, or `null` when it cannot
+   * be known right now.
+   *
+   * A connection made in the add step stores the name it was chosen under
+   * (`destinationCalendarName`), and that is returned without any Google read. Only a
+   * LEGACY connection (made before the field existed) needs the list read; once it
+   * resolves, the name is written back so the next open needs no read, and a
+   * `'primary'` alias is normalized to the real id in the same write.
+   *
+   * ⚠️ Called only from the settings drawer while a member has it open: a write from
+   * a person's own action, never an unattended one (#124, `takeAutoWrite`). Nothing
+   * is written when the read fails or finds no match.
+   */
+  async function resolveDestinationName(connectionId: string): Promise<string | null> {
+    const connection = await getCalendarConnectionById(connectionId);
+    if (!connection) return null;
+    if (connection.destinationCalendarName) return connection.destinationCalendarName;
+    const calendars = await readCalendarList(connection);
+    if (!calendars) return null;
+    const destination = connection.destinationCalendarId || 'primary';
+    const match =
+      destination === 'primary'
+        ? calendars.find((c) => c.primary)
+        : calendars.find((c) => c.id.toLowerCase() === destination.toLowerCase());
+    if (!match?.summary) return null;
+    try {
+      await updateCalendarConnection(connectionId, {
+        destinationCalendarName: match.summary,
+        ...(destination === 'primary' ? { destinationCalendarId: match.id } : {}),
+      });
+    } catch (e) {
+      // The name is still shown; it is simply read again on the next open.
+      reportError({
+        surface: 'calendar-sync',
+        message: "[calendarSync] saving a connection's calendar name failed",
+        error: e,
+        severity: 'warning',
+        context: { action: 'destination-name', error_code: 'write_failed' },
+      });
+    }
+    return match.summary;
   }
 
   /** Manual "Sync now" — full verify reconcile, bypassing the freshness skip. */
@@ -1988,6 +2100,8 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     resumeRedirectConnect,
     disconnect,
     listCalendarsFor,
+    resolveDestinationName,
+    calendarUses,
     syncNow,
     start,
     stop,

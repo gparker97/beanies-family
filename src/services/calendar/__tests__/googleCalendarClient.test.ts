@@ -428,3 +428,66 @@ describe('googleCalendarClient listInstances — renders in the requested zone (
     expect(url.searchParams.get('timeZone')).toBe('Asia/Singapore');
   });
 });
+
+/**
+ * Review round 3, T6: a 200 whose BODY never finishes arriving used to hang its
+ * caller forever (only the fetch and the error body had a timeout), and with it the
+ * view store's in-flight marker, so that calendar never read again while it looked
+ * healthy. The body now shares the request's deadline and a stall is `transient`.
+ */
+describe('googleCalendarClient — a stalled response body (T6)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function stalledOk(): Response {
+    return { status: 200, ok: true, json: () => new Promise(() => {}) } as unknown as Response;
+  }
+
+  it("a 200 whose body never resolves rejects as 'transient' within the request deadline", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(stalledOk());
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createGoogleCalendarClient(makeTokenProvider().provider);
+
+    const p = client.listCalendars('conn-1');
+    const assertion = expect(p).rejects.toMatchObject({ kind: 'transient' });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await assertion;
+    // The body read is the caller's, after authedFetch returned: never a retried attempt.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('the same for every paged read (the view read included)', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stalledOk()));
+    const client = createGoogleCalendarClient(makeTokenProvider().provider);
+
+    const p = client.listEventTimes(
+      'conn-1',
+      'primary',
+      '2026-06-10T00:00:00Z',
+      '2026-06-11T00:00:00Z'
+    );
+    const assertion = expect(p).rejects.toBeInstanceOf(CalendarApiError);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await assertion;
+  });
+
+  it('a body that arrives in time is returned as before', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(200, { items: [{ id: 'a@b.com', summary: 'A', primary: true }] })
+        )
+    );
+    const client = createGoogleCalendarClient(makeTokenProvider().provider);
+    expect(await client.listCalendars('conn-1')).toEqual([
+      { id: 'a@b.com', summary: 'A', primary: true, accessRole: undefined },
+    ]);
+  });
+});

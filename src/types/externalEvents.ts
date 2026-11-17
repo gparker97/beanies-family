@@ -11,6 +11,11 @@
 export interface ExternalEvent {
   /** Google's event id (an expanded instance has its own). Memory only; never logged. */
   id: string;
+  /**
+   * Google's recurring-series id of an expanded instance, so the beanies-origin test
+   * (`isBeaniesOrigin`) can run again after the read. Memory only; never logged.
+   */
+  seriesId?: string;
   /** The `ViewedCalendar` record this came from. */
   viewedCalendarId: string;
   /** The viewed calendar's name, shown as the event's source. */
@@ -31,6 +36,12 @@ export interface ExternalEvent {
   htmlLink?: string;
   /** Times only: the title and location were not shown or not available. */
   busyOnly: boolean;
+  /**
+   * Google marked it private, and its details show only because it was made from an
+   * email on a calendar the account owns (`isOwnEmailEvent`). `restripForCalendar`
+   * drops them if that ever stops being true.
+   */
+  detailsNeedOwner?: true;
   /** The owner marked it "free" (`transparency: 'transparent'`); a missing value is busy. */
   transparent: boolean;
 }

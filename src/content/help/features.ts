@@ -65,7 +65,7 @@ const VIEW_ANOTHER_CALENDAR_ARTICLE: HelpArticle = {
     {
       type: 'paragraph',
       content:
-        'Each calendar has a detail setting in <strong>Settings → Google Calendar</strong>. <strong>Show Details</strong> shows the title, time and place. <strong>Show as Busy Only</strong> shows just the time and the calendar’s name, which suits a work calendar. A calendar that was shared with you as <strong>busy times only</strong> always shows as busy, and the setting is locked. An event the owner marked private also shows as busy only. Events Google added from an email, such as a dinner booking or a flight, show their details on a calendar you own, even though Google marks them private by default.',
+        'Each calendar has a detail setting in <strong>Settings → Google Calendar</strong>. <strong>Show Details</strong> shows the title, time and place. <strong>Show as Busy Only</strong> shows just the time and the calendar’s name, which suits a work calendar. A calendar that was shared with you as <strong>busy times only</strong> always shows as busy, and the setting is locked. An event the owner marked private also shows as busy only. Events Google added from an email, such as a dinner booking or a flight, show their details only on a calendar you own, even though Google marks them private by default. On a calendar someone shared with you, even with permission to make changes, they show as busy only.',
     },
     { type: 'heading', content: 'The two switches and color', level: 2, id: 'color-and-switches' },
     {

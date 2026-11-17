@@ -15,11 +15,15 @@ import {
   normalizeViewEvents,
   indexByDate,
   widenByPeriod,
-  stateFromError,
+  classifyReadFailure,
   pickDefaultColor,
   dedupeViewedCalendars,
   standingRange,
   rangeToIsoWindow,
+  rangeToMsSpan,
+  restripForCalendar,
+  mergeWindowEvents,
+  isBeaniesOrigin,
   worseState,
   VIEW_CALENDAR_PALETTE,
   type NormalizeCalendar,
@@ -111,17 +115,53 @@ describe('normalizeViewEvents', () => {
     expect(events[0]).not.toHaveProperty('location');
   });
 
-  it('an event Google made from an email keeps its details though Google marks it private', () => {
+  it('an event Google made from an email keeps its details on a calendar the account OWNS', () => {
     // Google's default for these, not the owner's choice (greg, 2026-11-17).
     for (const visibility of ['private', 'confidential']) {
       const { events } = normalizeViewEvents(
         [timed({ visibility, eventType: 'fromGmail' })],
-        CAL,
+        { ...CAL, accessRole: 'owner' },
         NO_IDS
       );
       expect(events[0]!.busyOnly).toBe(false);
       expect(events[0]!.title).toBe('School pickup');
+      expect(events[0]!.detailsNeedOwner).toBe(true);
     }
+  });
+
+  // Review round 3, T1: Google returns a private event's details to any account that
+  // may change the calendar, so a partner's calendar shared with "make changes"
+  // access would show their email-made dinners to the whole family.
+  it.each(['writer', 'reader'] as const)(
+    'T1: an email-made private event is stripped on a %s calendar even when Google sent its title',
+    (accessRole) => {
+      const { events } = normalizeViewEvents(
+        [timed({ visibility: 'private', eventType: 'fromGmail' })],
+        { ...CAL, accessRole },
+        NO_IDS
+      );
+      expect(events[0]!.busyOnly).toBe(true);
+      expect(events[0]).not.toHaveProperty('title');
+      expect(events[0]).not.toHaveProperty('location');
+    }
+  );
+
+  it('T1: restripForCalendar drops owner-only details once the calendar is not owned', () => {
+    const { events } = normalizeViewEvents(
+      [timed({ visibility: 'private', eventType: 'fromGmail' }), timed({ id: 'plain' })],
+      { ...CAL, accessRole: 'owner' },
+      NO_IDS
+    );
+    const [emailMade, plain] = events as [ExternalEvent, ExternalEvent];
+    expect(restripForCalendar(emailMade, { detailLevel: 'details', accessRole: 'owner' })).toBe(
+      emailMade
+    );
+    const writer = restripForCalendar(emailMade, { detailLevel: 'details', accessRole: 'writer' });
+    expect(writer).toMatchObject({ busyOnly: true });
+    expect(writer).not.toHaveProperty('title');
+    expect(writer).not.toHaveProperty('location');
+    // An ordinary event on the same calendar is untouched (same object).
+    expect(restripForCalendar(plain, { detailLevel: 'details', accessRole: 'writer' })).toBe(plain);
   });
 
   it.each([
@@ -349,25 +389,27 @@ describe('windows', () => {
   });
 });
 
-describe('stateFromError', () => {
+describe('classifyReadFailure', () => {
   it.each([
-    ['forbidden', 'unavailable'],
-    ['not_found', 'unavailable'],
-    ['rate_limited', 'stale'],
-    ['transient', 'stale'],
-    ['auth', 'stale'],
-    ['invalid', 'stale'],
-    ['unknown', 'stale'],
-  ] as const)('%s -> %s', (kind, state) => {
-    expect(stateFromError(new CalendarApiError(kind, 'x', 403))).toBe(state);
+    ['forbidden', 'refused'],
+    ['not_found', 'refused'],
+    ['rate_limited', 'other'],
+    ['transient', 'other'],
+    ['auth', 'other'],
+    ['invalid', 'other'],
+    ['unknown', 'other'],
+  ] as const)('%s -> %s', (kind, cls) => {
+    expect(classifyReadFailure(new CalendarApiError(kind, 'x', 403))).toBe(cls);
   });
 
-  it('a throttling 403 (classified rate_limited) is stale, never unavailable', () => {
-    expect(stateFromError(new CalendarApiError('rate_limited', 'HTTP 403', 403))).toBe('stale');
+  it('a throttling 403 (classified rate_limited) is never a refusal', () => {
+    expect(classifyReadFailure(new CalendarApiError('rate_limited', 'HTTP 403', 403))).toBe(
+      'other'
+    );
   });
 
-  it('a plain Error is stale', () => {
-    expect(stateFromError(new Error('network'))).toBe('stale');
+  it('a plain Error is other', () => {
+    expect(classifyReadFailure(new Error('network'))).toBe('other');
   });
 });
 
@@ -418,5 +460,91 @@ describe('dedupeViewedCalendars', () => {
       { id: 'm', calendarId: 'shared@x', createdAt: '2026-11-17T09:00:00.000Z' },
     ];
     expect(dedupeViewedCalendars(list).map((c) => c.id)).toEqual(['m']);
+  });
+});
+
+describe('T3: isBeaniesOrigin (the selector re-runs it)', () => {
+  it('matches an event by its own id or its series id', () => {
+    const ids = new Set(['bpushed', 'bseries']);
+    expect(isBeaniesOrigin({ id: 'bpushed' }, ids)).toBe(true);
+    expect(isBeaniesOrigin({ id: 'x_1', seriesId: 'bseries' }, ids)).toBe(true);
+    expect(isBeaniesOrigin({ id: 'theirs', seriesId: 'other' }, ids)).toBe(false);
+  });
+
+  it('normalization keeps the series id so the test can run after the read', () => {
+    const { events } = normalizeViewEvents(
+      [timed({ id: 'inst', recurringEventId: 'series-1' })],
+      CAL,
+      NO_IDS
+    );
+    expect(events[0]!.seriesId).toBe('series-1');
+  });
+});
+
+/**
+ * Review round 3, T8: the two windows used to merge standing-first, so a stale
+ * standing copy beat a fresher screen copy, and an event the fresher read no longer
+ * returned was resurrected from the staler window.
+ */
+describe('T8: mergeWindowEvents', () => {
+  const DAY = { startYmd: '2026-11-20', endYmd: '2026-11-20' };
+  const WEEK = { startYmd: '2026-11-16', endYmd: '2026-11-22' };
+  function ev(id: string, h: number, day = 20): ExternalEvent {
+    return {
+      id,
+      viewedCalendarId: 'vc-1',
+      calendarName: 'Grandma',
+      color: '#6b7280',
+      allDay: false,
+      startMs: new Date(2026, 10, day, h).getTime(),
+      endMs: new Date(2026, 10, day, h + 1).getTime(),
+      startYmd: `2026-11-${day}`,
+      endYmd: `2026-11-${day}`,
+      title: id,
+      busyOnly: false,
+      transparent: false,
+    };
+  }
+  function win(events: ExternalEvent[], eventsAt: number, range = WEEK, complete = true) {
+    return { events, eventsAt, complete, span: rangeToMsSpan(range) };
+  }
+
+  it('the fresher copy of a moved event wins, whichever window it is in', () => {
+    const standing = win([ev('a', 9)], 100);
+    const screen = win([ev('a', 14)], 200, DAY);
+    const merged = mergeWindowEvents([standing, screen]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.startMs).toBe(new Date(2026, 10, 20, 14).getTime());
+    // And the other way round.
+    const older = mergeWindowEvents([win([ev('a', 9)], 300), win([ev('a', 14)], 200, DAY)]);
+    expect(older[0]!.startMs).toBe(new Date(2026, 10, 20, 9).getTime());
+  });
+
+  it('a deleted event is not resurrected from the staler window inside the fresher span', () => {
+    const standing = win([ev('gone', 10), ev('kept', 11, 21)], 100);
+    const screen = win([], 200, DAY); // fresher, complete, covers the 20th only
+    expect(mergeWindowEvents([standing, screen]).map((e) => e.id)).toEqual(['kept']);
+  });
+
+  it('a truncated fresher read wins by id but never hides what it did not return', () => {
+    const standing = win([ev('a', 10), ev('b', 12)], 100);
+    const screen = win([ev('a', 15)], 200, DAY, false);
+    const merged = mergeWindowEvents([standing, screen]);
+    expect(merged.map((e) => [e.id, new Date(e.startMs).getHours()])).toEqual([
+      ['a', 15],
+      ['b', 12],
+    ]);
+  });
+
+  it('an equal age keeps the given order (standing first) and still shows each event once', () => {
+    const merged = mergeWindowEvents([win([ev('a', 9)], 0), win([ev('a', 14)], 0, DAY)]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.startMs).toBe(new Date(2026, 10, 20, 9).getTime());
+  });
+
+  it("uses Google's exclusive bounds: an event ending exactly at the span start is outside it", () => {
+    const touching = { ...ev('edge', 23, 19), endMs: new Date(2026, 10, 20).getTime() };
+    const merged = mergeWindowEvents([win([touching], 100), win([], 200, DAY)]);
+    expect(merged.map((e) => e.id)).toEqual(['edge']);
   });
 });

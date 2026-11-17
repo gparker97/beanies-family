@@ -1276,3 +1276,189 @@ describe('calendarViewStore: second review round', () => {
     expect(reported?.[0]).toMatchObject({ severity: 'warning', surface: 'calendar-view' });
   });
 });
+
+describe('calendarViewStore: third review round', () => {
+  it('T2: refuses to add a calendar that is a live sync destination, the primary alias resolved', async () => {
+    // A legacy connection stores 'primary'; the calendar listed for viewing is that
+    // account's primary under its real id. Old code checked viewed ids only.
+    await createCalendarConnection({
+      provider: 'google',
+      accountEmail: EMAIL,
+      destinationCalendarId: 'primary',
+      refreshToken: 'r',
+      grantedScopes: [],
+      status: 'ok',
+    });
+    const store = useCalendarViewStore();
+    await store.beginViewConnect();
+    const result = await store.addViewedCalendar({
+      viewAccountId: 'pending',
+      calendar: { id: EMAIL, summary: EMAIL, primary: true, accessRole: 'owner' },
+    });
+    expect(result).toEqual({ status: 'failed', reason: 'already-added' });
+    expect(await getAllViewedCalendars()).toHaveLength(0);
+    const refusal = h.logEvent.mock.calls.find(
+      ([e]) => e.context?.action === 'add' && e.context?.detail === 'already-synced'
+    );
+    expect(refusal).toBeDefined();
+  });
+
+  it('T2: a disconnecting connection does not block viewing that calendar', async () => {
+    await createCalendarConnection({
+      provider: 'google',
+      accountEmail: EMAIL,
+      destinationCalendarId: CAL_ID,
+      refreshToken: 'r',
+      grantedScopes: [],
+      status: 'disconnecting',
+    });
+    const store = useCalendarViewStore();
+    await store.beginViewConnect();
+    const result = await store.addViewedCalendar({
+      viewAccountId: 'pending',
+      calendar: { id: CAL_ID, summary: CAL_NAME, primary: false, accessRole: 'reader' },
+    });
+    expect(result.status).toBe('added');
+  });
+
+  it('T2+T3: a calendar both synced and viewed never shows a pushed event twice, even when the activity arrives after the read', async () => {
+    // The pair can exist (a flag-off or older device cannot refuse it).
+    await createCalendarConnection({
+      provider: 'google',
+      accountEmail: EMAIL,
+      destinationCalendarId: CAL_ID,
+      refreshToken: 'r',
+      grantedScopes: [],
+      status: 'ok',
+    });
+    const account = await seedAccount();
+    await seedCalendar(account.id);
+    // The activity must keep a known id (its pushed copy's id is derived from it).
+    const { createAutomergeRepository } = await import('@/services/automerge/automergeRepository');
+    const activities = createAutomergeRepository('activities');
+    const { deterministicEventId } = await import('@/utils/calendar/deterministicEventId');
+    const activityId = '6f1c2a3b-4d5e-4f60-8a9b-0c1d2e3f4a5b';
+    const pushedId = deterministicEventId(activityId);
+    reader.mockResolvedValue({
+      events: [eventToday('theirs'), eventToday(pushedId)],
+      truncated: false,
+    });
+    const store = useCalendarViewStore();
+    await store.refresh();
+    // The activity has not synced to this device yet, so the pushed copy shows.
+    expect(store.events.map((e) => e.id).sort()).toEqual([pushedId, 'theirs'].sort());
+    const reads = reader.mock.calls.length;
+
+    // It arrives by sync: hidden at once, with no re-read.
+    await activities.createWithId(activityId, {
+      title: 'Soccer practice',
+      date: today,
+      recurrence: 'none',
+      category: 'sports',
+      feeSchedule: 'none',
+      reminderMinutes: 0,
+      isActive: true,
+      createdBy: 'm0',
+    } as unknown as Parameters<typeof activities.createWithId>[1]);
+    await nextTick();
+    expect(store.events.map((e) => e.id)).toEqual(['theirs']);
+    expect(reader.mock.calls.length).toBe(reads);
+  });
+
+  it('T3: an event imported after the read (a new event link) stops showing at once; an unrelated doc change keeps the array', async () => {
+    const account = await seedAccount();
+    await seedCalendar(account.id);
+    reader.mockResolvedValue({
+      events: [eventToday('theirs'), eventToday('imported-later')],
+      truncated: false,
+    });
+    const store = useCalendarViewStore();
+    await store.refresh();
+    const before = store.events;
+    expect(before).toHaveLength(2);
+
+    // Unrelated: a link for some other event changes the id set but no shown event.
+    const { createCalendarEventLink } =
+      await import('@/services/automerge/repositories/calendarRepository');
+    await createCalendarEventLink({
+      connectionId: 'c1',
+      activityId: 'a-unrelated',
+      googleEventId: 'some-other-event',
+      lastPushedHash: 'h',
+      lastPushedAt: new Date().toISOString(),
+    });
+    await nextTick();
+    expect(store.events).toBe(before);
+
+    await createCalendarEventLink({
+      connectionId: 'c1',
+      activityId: 'a-imported',
+      googleEventId: 'imported-later',
+      lastPushedHash: 'h',
+      lastPushedAt: new Date().toISOString(),
+    });
+    await nextTick();
+    expect(store.events.map((e) => e.id)).toEqual(['theirs']);
+  });
+
+  it('T8: a fresher screen read wins over a stale standing copy, and a deleted event is not resurrected', async () => {
+    const account = await seedAccount();
+    await seedCalendar(account.id);
+    const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+    const moved = {
+      ...eventToday('moves'),
+      start: { dateTime: new Date(y, m - 1, d, 18).toISOString() },
+      end: { dateTime: new Date(y, m - 1, d, 19).toISOString() },
+    };
+    // Standing (read first): both events, 'moves' at 15:00.
+    reader.mockResolvedValueOnce({
+      events: [eventToday('moves'), eventToday('deleted')],
+      truncated: false,
+    });
+    const store = useCalendarViewStore();
+    await store.refresh();
+    expect(store.events).toHaveLength(2);
+
+    // Later, the screen window over today: 'moves' is now at 18:00, 'deleted' is gone.
+    later(60_000);
+    reader.mockResolvedValueOnce({ events: [moved], truncated: false });
+    store.setScreenWindow({ startYmd: today, endYmd: today });
+    await store.refresh();
+
+    expect(store.events.map((e) => e.id)).toEqual(['moves']);
+    expect(new Date(store.events[0]!.startMs).getHours()).toBe(18);
+  });
+
+  it('T8: a failed read keeps its old events with their OLD age, so they never beat a fresher window', async () => {
+    const account = await seedAccount();
+    await seedCalendar(account.id);
+    const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+    const standingMin = new Date(`${addDaysYmd(today, -1)}T00:00:00`).toISOString();
+    const moved = {
+      ...eventToday('a'),
+      start: { dateTime: new Date(y, m - 1, d, 20).toISOString() },
+      end: { dateTime: new Date(y, m - 1, d, 21).toISOString() },
+    };
+    let standingFails = false;
+    reader.mockImplementation(async (_acc, _cal, min) => {
+      if (min !== standingMin) return { events: [moved], truncated: false }; // screen: 20:00
+      if (standingFails) throw new CalendarApiError('rate_limited', 'HTTP 403', 403);
+      return { events: [eventToday('a')], truncated: false }; // standing: 15:00
+    });
+    const store = useCalendarViewStore();
+    await store.refresh(); // standing only
+    later(60_000);
+    store.setScreenWindow({ startYmd: today, endYmd: today });
+    await store.refresh(); // screen, fresher
+    expect(store.events.map((e) => new Date(e.startMs).getHours())).toEqual([20]);
+
+    // The standing window is read again and fails: its 15:00 copy is kept, but as the
+    // OLD read it is, so it does not beat the screen window's newer copy.
+    later(120_000);
+    standingFails = true;
+    reader.mockClear();
+    await store.refresh({ force: true });
+    expect(reader).toHaveBeenCalled();
+    expect(store.events.map((e) => new Date(e.startMs).getHours())).toEqual([20]);
+  });
+});

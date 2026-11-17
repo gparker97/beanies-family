@@ -20,13 +20,19 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
 // A reactive stand-in so the clash store's watcher on `events` fires.
 interface ViewStoreStandIn {
   isActive: boolean;
+  accounts: Array<{ id: string; accountEmail: string }>;
   calendars: ViewedCalendar[];
   events: readonly ExternalEvent[];
 }
 const viewStoreRef = vi.hoisted(() => ({ current: null as ViewStoreStandIn | null }));
 vi.mock('@/stores/calendarViewStore', async () => {
   const { reactive } = await import('vue');
-  const state = reactive<ViewStoreStandIn>({ isActive: false, calendars: [], events: [] });
+  const state = reactive<ViewStoreStandIn>({
+    isActive: false,
+    accounts: [],
+    calendars: [],
+    events: [],
+  });
   viewStoreRef.current = state;
   return { useCalendarViewStore: () => state };
 });
@@ -370,6 +376,22 @@ describe('calendarClashStore (#34)', () => {
       const store = useCalendarClashStore();
       await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], occ());
       expect(store.clashFor('a1', '2026-06-10')).toBeUndefined();
+    });
+
+    // Review round 3, T2: the pair "synced AND viewed" can still exist (a flag-off or
+    // older device cannot refuse it), so the skip must hold for a connection whose
+    // teardown is stuck too: this store reads EVERY connection as a source.
+    it('T2: skips a viewed calendar equal to a disconnecting connection (still a source here)', async () => {
+      const conn = await makeConnection();
+      const { updateCalendarConnection } =
+        await import('@/services/automerge/repositories/calendarRepository');
+      await updateCalendarConnection(conn.id, { status: 'disconnecting' });
+      setCalendarClientForTesting(makeClient(vi.fn(async () => overlappingEvents())));
+      setViewed([viewedCalendar('vc-1', { calendarId: 'mum@example.com' })], [viewEvent('vc-1')]);
+      const store = useCalendarClashStore();
+      await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], occ());
+      // One clash, from the connection: the viewed copy is not a second source.
+      expect(store.clashFor('a1', '2026-06-10')?.sourceId).toBe(conn.id);
     });
 
     it('skips a viewed calendar equal to an explicit destination calendar id', async () => {

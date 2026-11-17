@@ -16,6 +16,11 @@
 //    calendar are stripped in `normalizeViewEvents` BEFORE they enter the cache, by
 //    the calendar's setting at COMMIT time, and stripped again by its CURRENT
 //    setting in the `events` selector, which every output derives from.
+//  - Beanies-origin events (pushed, adopted, imported) are dropped when a read
+//    commits AND again in the `events` selector, against the id set of the
+//    activities and event links as they are NOW (`beaniesIds`, recomputed only when
+//    one of those two collections changes), so an event that becomes beanies-origin
+//    after its read never shows twice.
 //  - Exactly two fetch windows per viewed calendar: `standing` (yesterday to +35
 //    days, for surfaces with no on-screen period) and `screen` (set by one page host
 //    through `useExternalEvents().setScreenWindow`). Each is fetched on its own, so
@@ -57,11 +62,20 @@
 //  R7. A client-side refusal (kind `invalid`: the pair is not viewed, or Google
 //      rejected the request shape) is a programming error: reported, and it leaves
 //      no cached entry, never a network `stale`.
+//  R8. An entry's `eventsAt` / `complete` / `span` describe the read its `events`
+//      came from, and only a successful read sets them: a failed read keeps the
+//      previous ones with the previous events, and an entry whose events were
+//      cleared (needs_reconnect, unavailable) claims nothing (`eventsAt: 0`,
+//      `complete: false`). The `events` selector merges the two windows by
+//      `mergeWindowEvents`: the fresher copy of an event wins, and a fresher
+//      complete read that no longer returns an event inside its span is never
+//      contradicted by a staler window. `markDue` and re-stripping touch none of
+//      the three (they change `fetchedAt` and the event fields only).
 
 import { defineStore } from 'pinia';
 import { computed, shallowRef, watch } from 'vue';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
-import { list as projectionList } from '@/services/automerge/projection';
+import { collectionRef, list as projectionList } from '@/services/automerge/projection';
 import { isFlagEnabled } from '@/config/flags';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
@@ -93,6 +107,9 @@ import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
 import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { pendingCredential } from '@/services/calendar/pendingCredential';
 import { revokeCalendarGrantGuarded } from '@/services/calendar/guardedRevoke';
+import { abandonPendingConsent, holdConsent } from '@/services/calendar/pendingConsent';
+import { readCalendarUses } from '@/services/calendar/calendarUses';
+import { calendarInUse } from '@/utils/calendar/connectEligibility';
 import {
   createCalendarViewAccount,
   getCalendarViewAccountById,
@@ -114,22 +131,23 @@ import {
   dedupeViewedCalendars,
   healthAfterRead,
   indexByDate,
+  isBeaniesOrigin,
   isRefusal,
   isBusyOnlyCalendar,
-  isViewedCalendarId as isAddedCalendar,
+  mergeWindowEvents,
   normalizeViewEvents,
   pickDefaultColor,
   rangeToIsoWindow,
+  rangeToMsSpan,
   restripForCalendar,
   spanKeyOf,
   standingRange,
   worseState,
 } from '@/utils/calendar/externalEvents';
 import { localToday } from '@/utils/date';
-import { generateUUID } from '@/utils/id';
 import type { CalendarViewAccount, ViewedCalendar, ViewedCalendarAccessRole } from '@/types/models';
 import type { ExternalEvent, ViewCalendarState, YmdRange } from '@/types/externalEvents';
-import type { CalendarHealth } from '@/utils/calendar/externalEvents';
+import type { CalendarHealth, MsSpan } from '@/utils/calendar/externalEvents';
 
 const FLAG = 'viewOnlyCalendars';
 const SURFACE = 'calendar-view';
@@ -146,9 +164,21 @@ const WINDOWS: readonly ViewWindow[] = ['standing', 'screen'];
 interface CacheEntry {
   spanKey: string;
   events: ExternalEvent[];
+  /** When this window was last read (success or failure); `0` = due. Drives the TTL only. */
   fetchedAt: number;
+  /** When `events` were read from Google; `0` = they claim nothing (R8). */
+  eventsAt: number;
+  /** That read returned every event of its span (not truncated) (R8). */
+  complete: boolean;
+  /** The span `events` were read for (R8). */
+  span: MsSpan;
   /** This window's own outcome. Never `unavailable`: that is the calendar's (R6). */
   state: ViewCalendarState;
+}
+
+/** The R8 fields of an entry whose events claim nothing (none read, or cleared). */
+function claimsNothing(span: MsSpan): Pick<CacheEntry, 'eventsAt' | 'complete' | 'span'> {
+  return { eventsAt: 0, complete: false, span };
 }
 
 /** The current read of one (calendar, window). Compared by identity (R1, R2). */
@@ -372,12 +402,17 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
 
   // ── Reads ─────────────────────────────────────────────────────────────────
 
-  /** The beanies-origin ids right now (activities + every event link). */
-  function currentBeaniesIds(): Set<string> {
-    if (!isDocLoaded()) return new Set();
-    return beaniesEventIds(
-      projectionList('activities').map((a) => a.id),
-      projectionList('calendarEventLinks'),
+  /**
+   * The beanies-origin ids right now (activities + every event link). Recomputed only
+   * when the `activities` or `calendarEventLinks` collection changes (their own
+   * projection refs, not the doc-wide `docVersion`), and lazily: nothing reads it
+   * while the store is inactive. Keeps the previous set when the ids are the same,
+   * so an activity's title edit does not re-run the `events` selector.
+   */
+  const beaniesIds = computed<ReadonlySet<string>>((prev) => {
+    const next = beaniesEventIds(
+      collectionRef('activities').value.keys(),
+      collectionRef('calendarEventLinks').value.values() as Iterable<{ googleEventId: string }>,
       (activityId, error) => {
         if (invalidIdsReported.has(activityId)) return;
         invalidIdsReported.add(activityId);
@@ -390,12 +425,9 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
         });
       }
     );
-  }
-
-  /** Has the family already added this Google calendar (any account, duplicates included)? */
-  function isViewedCalendarId(calendarId: string): boolean {
-    return isAddedCalendar(calendarId, rawCalendars.value);
-  }
+    if (prev && prev.size === next.size && [...next].every((id) => prev.has(id))) return prev;
+    return next;
+  });
 
   function windowRange(win: ViewWindow): YmdRange | null {
     return win === 'standing' ? standingRange(localToday()) : screenWindow.value;
@@ -449,7 +481,7 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
         const key = cacheKey(cal.id, win);
         const entry = entries.get(key);
         if (entry && entry.events.length > 0) {
-          entries.set(key, { ...entry, events: [] });
+          entries.set(key, { ...entry, events: [], ...claimsNothing(entry.span) });
           changed = true;
         }
       }
@@ -529,6 +561,7 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
           spanKey: read.spanKey,
           events: [],
           fetchedAt: Date.now(),
+          ...claimsNothing(rangeToMsSpan(range)),
           state: 'needs_reconnect',
         });
         markUnhealthy('needs_reconnect', cal);
@@ -575,15 +608,15 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     const { cal } = live;
 
     if (failure !== null) {
-      commitFailure(client, live.account, cal, win, read, key, failure);
+      commitFailure(client, live.account, cal, win, read, key, range, failure);
       return;
     }
 
     try {
-      commitSuccess(cal, win, read, key, raw, beaniesIds);
+      commitSuccess(cal, win, read, key, range, raw, beaniesIds);
     } catch (e) {
       // Normalizing should never throw; if it does, it is a failed read like any other.
-      commitFailure(client, live.account, cal, win, read, key, e);
+      commitFailure(client, live.account, cal, win, read, key, range, e);
     }
   }
 
@@ -593,6 +626,7 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     win: ViewWindow,
     read: InflightRead,
     key: string,
+    range: YmdRange,
     raw: { events: CalendarViewEvent[]; truncated: boolean },
     beaniesIds: () => ReadonlySet<string>
   ): void {
@@ -605,10 +639,14 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     // Health first: a recovery marks the calendar's entries due, and this window's own
     // entry is then replaced by the fresh one below rather than read twice.
     recordHealth(cal, 'ok');
+    const now = Date.now();
     putEntry(key, {
       spanKey: read.spanKey,
       events,
-      fetchedAt: Date.now(),
+      fetchedAt: now,
+      eventsAt: now,
+      complete: !raw.truncated,
+      span: rangeToMsSpan(range),
       state: raw.truncated ? 'truncated' : 'ok',
     });
     logOutcome(cal, win, raw.truncated ? 'partial' : 'ok', events.length);
@@ -648,6 +686,7 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     win: ViewWindow,
     read: InflightRead,
     key: string,
+    range: YmdRange,
     e: unknown
   ): void {
     const errorCode = e instanceof CalendarApiError ? e.kind : 'unknown';
@@ -682,7 +721,12 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
       state = 'stale';
       events = health.value.get(cal.id)?.unavailable ? [] : (prev?.events ?? []);
     }
-    putEntry(key, { spanKey: read.spanKey, events, fetchedAt: Date.now(), state });
+    // R8: kept events keep the claims of the read they came from; none claim nothing.
+    const claims =
+      events.length > 0 && prev
+        ? { eventsAt: prev.eventsAt, complete: prev.complete, span: prev.span }
+        : claimsNothing(rangeToMsSpan(range));
+    putEntry(key, { spanKey: read.spanKey, events, fetchedAt: Date.now(), ...claims, state });
     const shown = calendarState(cal.id) ?? state;
     if (gate(failureGates, key)(`${errorCode}|${shown}`)) {
       reportError({
@@ -716,8 +760,8 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     const tasks: Array<() => Promise<void>> = [];
     let standingInBatch = false;
     const now = Date.now();
-    let ids: ReadonlySet<string> | null = null;
-    const beaniesIds = (): ReadonlySet<string> => (ids ??= currentBeaniesIds());
+    // Read once per batch on the first commit that needs it (the computed caches it).
+    const ids = (): ReadonlySet<string> => beaniesIds.value;
     for (const win of WINDOWS) {
       const range = windowRange(win);
       if (!range) continue;
@@ -732,7 +776,7 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
         // skips it, and a read of an older span still running is superseded.
         const read: InflightRead = { spanKey };
         inflight.set(key, read);
-        tasks.push(() => fetchOne(cal.id, win, range, read, beaniesIds));
+        tasks.push(() => fetchOne(cal.id, win, range, read, ids));
       }
     }
     if (tasks.length === 0) return;
@@ -768,37 +812,35 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
   // ── Selectors ───────────────────────────────────────────────────────────────
 
   /**
-   * Every event of every healthy-enough calendar, both windows merged without
-   * duplicates. THE output boundary: every other selector, and through them search,
-   * the widgets, the briefing and the clash nudge, derive from this. Keeps its
-   * previous array when nothing changed (see the contract above).
+   * Every event of every healthy-enough calendar, its two windows merged by
+   * `mergeWindowEvents` (R8: each event once, the fresher copy winning). THE output
+   * boundary: every other selector, and through them search, the widgets, the
+   * briefing and the clash nudge, derive from this. Keeps its previous array when
+   * nothing changed (see the contract above).
    */
   const events = computed<readonly ExternalEvent[]>((prev) => {
     if (!isActive.value) return EMPTY;
+    const ownIds = beaniesIds.value;
     const out: ExternalEvent[] = [];
-    const seen = new Set<string>();
     for (const cal of calendars.value) {
       // An orphaned calendar (its account removed elsewhere) shows nothing, and an
       // unavailable one shows nothing in ANY window (R6).
       if (!accountsById.value.has(cal.viewAccountId)) continue;
       if (health.value.get(cal.id)?.unavailable) continue;
-      for (const win of WINDOWS) {
-        const entry = cache.value.get(cacheKey(cal.id, win));
-        if (!entry) continue;
-        for (const e of entry.events) {
-          const id = `${cal.id}|${e.id}`;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          // The calendar's CURRENT setting strips details here too, so a switch to
-          // busy only hides titles at once, whatever the cache holds.
-          const shown = restripForCalendar(e, cal);
-          // Color and name are display-only and change without a refetch.
-          out.push(
-            shown.color === cal.color && shown.calendarName === cal.name
-              ? shown
-              : { ...shown, color: cal.color, calendarName: cal.name }
-          );
-        }
+      const windows = WINDOWS.flatMap((win) => cache.value.get(cacheKey(cal.id, win)) ?? []);
+      for (const e of mergeWindowEvents(windows)) {
+        // Beanies-origin by the CURRENT activities and links: an activity pushed from
+        // another device, or an event imported since this read, never shows twice.
+        if (isBeaniesOrigin(e, ownIds)) continue;
+        // The calendar's CURRENT setting strips details here too, so a switch to
+        // busy only hides titles at once, whatever the cache holds.
+        const shown = restripForCalendar(e, cal);
+        // Color and name are display-only and change without a refetch.
+        out.push(
+          shown.color === cal.color && shown.calendarName === cal.name
+            ? shown
+            : { ...shown, color: cal.color, calendarName: cal.name }
+        );
       }
     }
     if (out.length === 0) return EMPTY;
@@ -1069,21 +1111,7 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     result: CalendarConnectResult,
     stage: 'popup' | 'redirect'
   ): ViewConnectResult {
-    if (result.status === 'redirecting') return result;
-    if (result.status !== 'connected') {
-      logConsentOutcome(result.code, stage);
-      return result;
-    }
-    pendingCredential.set({
-      id: `pending-${generateUUID()}`,
-      kind: 'view',
-      accountEmail: result.email,
-      refreshToken: result.refreshToken,
-      grantedScopes: result.grantedScopes,
-    });
-    logTokenLifecycle({ grant: 'calendar', op: 'mint', outcome: 'ok', trigger: 'connect' });
-    logConsentOutcome('consented', stage);
-    return { status: 'pending' };
+    return holdConsent('view', result, stage, logConsentOutcome);
   }
 
   /**
@@ -1244,16 +1272,7 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
    * view consent is pending, so every close path may call it.
    */
   function abandonViewConnect(): void {
-    const held = pendingCredential.peek();
-    if (!held || held.kind !== 'view') return;
-    pendingCredential.clear();
-    getCalendarClient().invalidateConnection(held.id);
-    revokeCalendarGrantGuarded({
-      refreshToken: held.refreshToken,
-      accountEmail: held.accountEmail,
-      trigger: 'abandon',
-    });
-    logConsentOutcome('abandoned');
+    abandonPendingConsent('view', logConsentOutcome);
   }
 
   // ── Actions: CRUD ───────────────────────────────────────────────────────────
@@ -1269,16 +1288,24 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     input: AddViewedCalendarInput
   ): Promise<AddViewedCalendarResult> {
     if (!isFlagEnabled(FLAG)) return { status: 'failed', reason: 'not-enabled' };
-    if (isViewedCalendarId(input.calendar.id)) {
+    const held = input.viewAccountId === 'pending' ? pendingCredential.peek() : null;
+    // The add step disables these rows; this is the store's own guard, by the same
+    // rule (`calendarInUse`) over the same records read fresh from the doc, so one
+    // calendar is never both synced and viewed, or viewed twice.
+    const accountEmail =
+      input.viewAccountId === 'pending'
+        ? held?.accountEmail
+        : accountsById.value.get(input.viewAccountId)?.accountEmail;
+    const use = calendarInUse(input.calendar.id, accountEmail, readCalendarUses());
+    if (use !== null) {
       logEvent({
         level: 'warn',
         surface: SURFACE,
         message: 'view calendar add refused: already added',
-        context: { action: 'add', detail: 'already-added' },
+        context: { action: 'add', detail: use === 'view' ? 'already-added' : 'already-synced' },
       });
       return { status: 'failed', reason: 'already-added' };
     }
-    const held = input.viewAccountId === 'pending' ? pendingCredential.peek() : null;
     if (input.viewAccountId === 'pending' && (!held || held.kind !== 'view')) {
       logEvent({
         level: 'warn',

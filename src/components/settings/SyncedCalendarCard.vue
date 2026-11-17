@@ -15,6 +15,7 @@ import { computed } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import CalendarCardShell from '@/components/settings/CalendarCardShell.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { isAccountPrimary } from '@/utils/calendar/connectEligibility';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CalendarConnection } from '@/types/models';
 
@@ -23,7 +24,11 @@ export type SyncedCalendarAction = 'reconnect' | 'sync' | 'import' | 'disconnect
 const props = withDefaults(
   defineProps<{
     connection: CalendarConnection;
-    /** The destination calendar's Google name; empty falls back to "Primary calendar". */
+    /**
+     * A LEGACY connection's calendar name, resolved from Google's list by the drawer
+     * (empty while unknown). A connection that stores its name
+     * (`destinationCalendarName`) shows that instead. See `title` below.
+     */
     calendarName: string;
     /** Whoever can finish the account-bound sign-in (`canViewerRepair`). */
     canRepair: boolean;
@@ -60,12 +65,27 @@ const needsAttention = computed(
   () => props.connection.status === 'needs_reconnect' || props.connection.status === 'error'
 );
 const busy = computed(() => props.busyAction !== null);
+
+/**
+ * The card's title: the stored name, else the name the drawer resolved, else what
+ * can truthfully be said. "Primary calendar" ONLY for the account's own primary
+ * calendar; any other calendar whose name cannot be read says so instead.
+ */
+const title = computed(() => {
+  const name = props.connection.destinationCalendarName || props.calendarName;
+  if (name) return name;
+  return t(
+    isAccountPrimary(props.connection)
+      ? 'calendarSync.primaryCalendar'
+      : 'calendarSync.calendarNameUnavailable'
+  );
+});
 </script>
 
 <template>
   <CalendarCardShell
     v-model:open="open"
-    :name="calendarName || t('calendarSync.primaryCalendar')"
+    :name="title"
     :account="connection.accountEmail"
     :status-label="t(statusKey)"
     :status-tone="needsAttention ? 'attention' : 'neutral'"

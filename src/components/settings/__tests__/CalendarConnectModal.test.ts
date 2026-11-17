@@ -31,7 +31,22 @@ const CALENDARS = [
 ];
 
 const store = reactive({
-  connections: [] as Array<{ id: string; accountEmail: string; destinationCalendarId: string }>,
+  connections: [] as Array<{
+    id: string;
+    accountEmail: string;
+    destinationCalendarId: string;
+    status?: 'ok' | 'disconnecting';
+  }>,
+  /** What the real store reads from the doc: every connection and every viewed calendar. */
+  get calendarUses() {
+    return {
+      connections: this.connections.map((c) => ({ status: 'ok' as const, ...c })),
+      viewed: viewStore.calendars.map((c) => ({
+        calendarId: c.calendarId,
+        accountEmail: undefined,
+      })),
+    };
+  },
   pendingConnect: null as { accountEmail: string | null } | null,
   beginConnect: vi.fn(),
   listPendingCalendars: vi.fn(),
@@ -161,8 +176,43 @@ describe('CalendarConnectModal', () => {
     expect(row(wrapper, 'me@example.com').text()).toContain(
       'calendarSync.connect.reason.alreadyConnected'
     );
-    // The first eligible calendar is preselected instead.
-    expect((row(wrapper, 'kids').get('input').element as HTMLInputElement).checked).toBe(true);
+    // Review round 3, T4: never another calendar in the primary's place (it used to
+    // preselect the first eligible one, here a writable "Kids", so one tap pushed
+    // every family activity into it). Nothing is chosen, and Connect waits.
+    for (const id of ['kids', 'family']) {
+      expect((row(wrapper, id).get('input').element as HTMLInputElement).checked).toBe(false);
+    }
+    expect(wrapper.get('[data-testid="save"]').attributes('disabled')).toBeDefined();
+    await wrapper.get('[data-testid="save"]').trigger('click');
+    expect(store.confirmConnect).not.toHaveBeenCalled();
+
+    await row(wrapper, 'family').get('input').setValue(true);
+    expect(wrapper.get('[data-testid="save"]').attributes('disabled')).toBeUndefined();
+    await wrapper.get('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.confirmConnect).toHaveBeenCalledWith('family', 'Family');
+  });
+
+  it('T4: with the primary eligible it is preselected (the usual destination)', async () => {
+    store.pendingConnect = { accountEmail: 'me@example.com' };
+    const wrapper = mountModal();
+    await flushPromises();
+    expect((row(wrapper, 'me@example.com').get('input').element as HTMLInputElement).checked).toBe(
+      true
+    );
+  });
+
+  it('T2: a fallback primary row is already connected when that primary is viewed', async () => {
+    flags.viewOnly = true;
+    viewStore.calendars = [{ id: 'v1', calendarId: 'me@example.com' }];
+    store.listPendingCalendars.mockResolvedValue([{ id: 'primary', summary: '', primary: true }]);
+    store.pendingConnect = { accountEmail: 'me@example.com' };
+    const wrapper = mountModal();
+    await flushPromises();
+    expect(row(wrapper, 'primary').text()).toContain(
+      'calendarSync.connect.reason.alreadyConnected'
+    );
+    expect(wrapper.get('[data-testid="save"]').attributes('disabled')).toBeDefined();
   });
 
   it('confirms with the chosen calendar id, toasts and closes', async () => {
@@ -175,7 +225,7 @@ describe('CalendarConnectModal', () => {
     await wrapper.get('[data-testid="save"]').trigger('click');
     await flushPromises();
 
-    expect(store.confirmConnect).toHaveBeenCalledWith('kids');
+    expect(store.confirmConnect).toHaveBeenCalledWith('kids', 'Kids');
     expect(showToast).toHaveBeenCalledWith(
       'success',
       'calendarSync.toast.connected.title',
@@ -193,7 +243,7 @@ describe('CalendarConnectModal', () => {
     await wrapper.get('[data-testid="save"]').trigger('click');
     await flushPromises();
 
-    expect(store.confirmConnect).toHaveBeenCalledWith('me@example.com');
+    expect(store.confirmConnect).toHaveBeenCalledWith('me@example.com', undefined);
     expect(showToast).toHaveBeenCalledWith(
       'error',
       'calendarSync.toast.connectFailed.title',

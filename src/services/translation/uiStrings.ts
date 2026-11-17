@@ -13201,6 +13201,12 @@ const STRING_DEFS = {
       'connect a google calendar and your family beans are pushed to it automatically. beanies stays your source of truth. edits always happen here.',
   },
   'calendarSync.primaryCalendar': { en: 'Primary calendar', beanie: 'primary calendar' },
+  // A synced calendar whose name cannot be read right now (never "Primary calendar"
+  // unless it is the account's primary).
+  'calendarSync.calendarNameUnavailable': {
+    en: 'Calendar name unavailable',
+    beanie: 'calendar name unavailable',
+  },
   // #34 clash nudge — toggle and the activity indicator.
   'calendarSync.clashNudge.title': {
     en: 'Warn me about clashes with my other calendars',

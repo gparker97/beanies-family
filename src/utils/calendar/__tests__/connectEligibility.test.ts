@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { syncIneligibility, viewIneligibility } from '../connectEligibility';
+import {
+  calendarInUse,
+  isAccountPrimary,
+  syncIneligibility,
+  viewIneligibility,
+  viewedCalendarRefs,
+} from '../connectEligibility';
 import { encodeCalendarResumeIntent, parseCalendarResumeIntent } from '../resumeIntent';
 
 const primary = { id: 'me@example.com', summary: 'Me', primary: true };
@@ -192,9 +198,8 @@ describe('calendar resume intent', () => {
 
 describe('view-only calendars in the add step', () => {
   it('a calendar the family already views is already connected for syncing too', () => {
-    expect(syncIneligibility(secondary, 'me@example.com', [], [secondary.id])).toBe(
-      'already-connected'
-    );
+    const viewed = [{ calendarId: secondary.id, accountEmail: 'grandma@example.com' }];
+    expect(syncIneligibility(secondary, 'me@example.com', [], viewed)).toBe('already-connected');
   });
 
   it.each(['reader', 'freeBusyReader', 'writer', 'owner'])(
@@ -205,9 +210,8 @@ describe('view-only calendars in the add step', () => {
   );
 
   it('refuses a calendar already viewed on any account, or already synced to', () => {
-    expect(viewIneligibility(secondary, 'me@example.com', [], [secondary.id])).toBe(
-      'already-connected'
-    );
+    const viewed = [{ calendarId: secondary.id, accountEmail: 'grandma@example.com' }];
+    expect(viewIneligibility(secondary, 'me@example.com', [], viewed)).toBe('already-connected');
     const connections = [
       { accountEmail: 'me@example.com', destinationCalendarId: 'primary', status: 'ok' as const },
     ];
@@ -219,5 +223,98 @@ describe('view-only calendars in the add step', () => {
     // Dad's own primary is a different calendar.
     const dadsPrimary = { id: 'dad@example.com', summary: 'Dad', primary: true };
     expect(viewIneligibility(dadsPrimary, 'dad@example.com', connections, [])).toBeNull();
+  });
+});
+
+/**
+ * Review round 3, T2: ONE rule for "already used", resolving the `'primary'` alias on
+ * BOTH sides, for sync destinations AND viewed calendars. Before, the viewed half
+ * compared raw ids, so the add step's fallback row `{ id: 'primary' }` (a list that
+ * could not be read) was offered for syncing although the family already views that
+ * account's primary calendar under its real id.
+ */
+describe('T2: calendarInUse, the one already-used rule', () => {
+  const MOM = 'mom@example.com';
+  const fallbackRow = { id: 'primary', summary: '', primary: true };
+  const viewedMomPrimary = [{ calendarId: MOM, accountEmail: 'dad@example.com' }];
+
+  it("a fallback 'primary' row matches a viewed calendar whose id is that account's email", () => {
+    expect(calendarInUse('primary', MOM, { connections: [], viewed: viewedMomPrimary })).toBe(
+      'view'
+    );
+    expect(syncIneligibility(fallbackRow, MOM, [], viewedMomPrimary)).toBe('already-connected');
+    expect(viewIneligibility(fallbackRow, MOM, [], viewedMomPrimary)).toBe('already-connected');
+  });
+
+  it('an id differing only in case is the same calendar', () => {
+    expect(
+      calendarInUse('Mom@Example.com', 'x@example.com', {
+        connections: [],
+        viewed: viewedMomPrimary,
+      })
+    ).toBe('view');
+  });
+
+  it('the fallback row of an UNKNOWN account still fails open against viewed calendars', () => {
+    expect(
+      calendarInUse('primary', null, { connections: [], viewed: viewedMomPrimary })
+    ).toBeNull();
+    expect(
+      calendarInUse('primary', 'unknown', { connections: [], viewed: viewedMomPrimary })
+    ).toBeNull();
+  });
+
+  it("a viewed record stored under the alias resolves with ITS OWN account's email", () => {
+    const viewed = [{ calendarId: 'primary', accountEmail: MOM }];
+    expect(calendarInUse(MOM, 'dad@example.com', { connections: [], viewed })).toBe('view');
+    expect(
+      calendarInUse('dad@example.com', 'dad@example.com', { connections: [], viewed })
+    ).toBeNull();
+  });
+
+  it('a live sync destination wins the answer over a viewed record of the same calendar', () => {
+    const connections = [
+      { accountEmail: MOM, destinationCalendarId: 'primary', status: 'ok' as const },
+    ];
+    expect(calendarInUse(MOM, MOM, { connections, viewed: viewedMomPrimary })).toBe('sync');
+  });
+
+  it('a disconnecting connection is not in use, unless the reader counts it (the clash store)', () => {
+    const connections = [
+      { accountEmail: MOM, destinationCalendarId: 'primary', status: 'disconnecting' as const },
+    ];
+    expect(calendarInUse(MOM, MOM, { connections, viewed: [] })).toBeNull();
+    expect(calendarInUse(MOM, MOM, { connections, viewed: [] }, { countDisconnecting: true })).toBe(
+      'sync'
+    );
+  });
+
+  it('viewedCalendarRefs pairs each viewed calendar with its account email', () => {
+    expect(
+      viewedCalendarRefs(
+        [
+          { calendarId: 'a', viewAccountId: 'acc1' },
+          { calendarId: 'b', viewAccountId: 'gone' },
+        ],
+        [{ id: 'acc1', accountEmail: MOM }]
+      )
+    ).toEqual([
+      { calendarId: 'a', accountEmail: MOM },
+      { calendarId: 'b', accountEmail: undefined },
+    ]);
+  });
+});
+
+describe('T7: isAccountPrimary (only the primary is ever titled "Primary calendar")', () => {
+  it.each([
+    ['primary', 'me@example.com', true],
+    ['', 'me@example.com', true],
+    ['primary', 'unknown', true],
+    ['Me@Example.com', 'me@example.com', true],
+    ['kids@group.calendar.google.com', 'me@example.com', false],
+    ['dad@example.com', 'me@example.com', false],
+    ['me@example.com', 'unknown', false],
+  ])('destination %s on %s -> %s', (destinationCalendarId, accountEmail, expected) => {
+    expect(isAccountPrimary({ destinationCalendarId, accountEmail })).toBe(expected);
   });
 });

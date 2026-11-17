@@ -1686,6 +1686,17 @@ export interface CalendarConnection {
   accountEmail: string;
   /** Destination calendar id within the account. 'primary' by default. */
   destinationCalendarId: string;
+  /**
+   * The destination calendar's name as Google listed it when it was chosen in the add
+   * step, so its settings card can name it without a live Google read (which fails on
+   * a dead token or a grant without the list scope). Written whole by beanies, never
+   * typed by a person.
+   *
+   * Absent on connections made before this field existed (and for the add step's
+   * fallback primary row, which has no name); the settings drawer then resolves it
+   * from the calendar list and writes it back. Older builds ignore it.
+   */
+  destinationCalendarName?: string;
   /** Long-lived OAuth refresh token (lives in the encrypted .beanpod). */
   refreshToken: string;
   /** Scopes actually granted (granular consent can drop some, e.g. freebusy / calendarlist). */

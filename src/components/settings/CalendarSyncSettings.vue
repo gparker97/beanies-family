@@ -214,26 +214,29 @@ async function onImport(connection: CalendarConnection) {
   }
 }
 /**
- * connectionId → the destination calendar's Google name, resolved once per
- * connection. `''` means "no name to show", and the template falls back to the
- * localized "Primary calendar".
+ * connectionId → a LEGACY connection's calendar name, resolved from Google's list
+ * (`resolveDestinationName`, which also writes it back). A connection made in the add
+ * step stores its name (`destinationCalendarName`) and needs no read; the card prefers
+ * that, and decides what an unknown name reads as (`SyncedCalendarCard`'s `title`).
  */
 const destinationNames = ref<Record<string, string>>({});
-/** Ids already asked for, so the deep watch below cannot start a second lookup. */
-const requestedNames = new Set<string>();
+/**
+ * One attempt per connection per (status, grant): a read that failed because the
+ * token was dead or the grant lacked the list scope is tried again once a reconnect
+ * changes either, never on every reactive tick.
+ */
+const nameAttempts = new Set<string>();
+
+function nameAttemptKey(connection: CalendarConnection): string {
+  return `${connection.id}|${connection.status}|${[...connection.grantedScopes].sort().join(' ')}`;
+}
 
 async function resolveDestinationName(connection: CalendarConnection): Promise<void> {
-  requestedNames.add(connection.id);
-  const destination = connection.destinationCalendarId || 'primary';
-  let name = '';
   try {
-    // Never throws for a Google failure (it falls back to a primary-only row); a
-    // doc read failing is the only thing that lands below.
-    const calendars = await store.listCalendarsFor(connection.id);
-    const match =
-      calendars.find((c) => c.id === destination) ??
-      (destination === 'primary' ? calendars.find((c) => c.primary) : undefined);
-    name = match?.summary ?? '';
+    // Never throws for a Google failure (it returns null); a doc read failing is the
+    // only thing that lands below.
+    const name = await store.resolveDestinationName(connection.id);
+    if (name) destinationNames.value = { ...destinationNames.value, [connection.id]: name };
   } catch (e) {
     reportError({
       surface: 'calendar-sync',
@@ -243,14 +246,20 @@ async function resolveDestinationName(connection: CalendarConnection): Promise<v
       context: { action: 'destination-name' },
     });
   }
-  destinationNames.value = { ...destinationNames.value, [connection.id]: name };
 }
 
+// Only while the drawer is OPEN: the drawer stays mounted on the Settings page, and
+// a legacy name resolved here is written back to the doc, which must come from a
+// member looking at it, never from merely visiting Settings.
 watch(
-  () => store.connections,
+  () => (props.open ? store.connections : []),
   (connections) => {
     for (const c of connections) {
-      if (!requestedNames.has(c.id)) void resolveDestinationName(c);
+      if (c.destinationCalendarName || destinationNames.value[c.id]) continue;
+      const key = nameAttemptKey(c);
+      if (nameAttempts.has(key)) continue;
+      nameAttempts.add(key);
+      void resolveDestinationName(c);
     }
   },
   { immediate: true, deep: true }

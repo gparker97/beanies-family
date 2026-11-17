@@ -5903,6 +5903,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'calendarSync.intro':
     '连接一个 Google 日历，家庭活动就会自动推送过去。beanies 始终是唯一的数据来源，修改都在这里进行。',
   'calendarSync.primaryCalendar': '主日历',
+  'calendarSync.calendarNameUnavailable': '暂时无法显示日历名称',
   'calendarSync.clashNudge.title': '与我的其他日历冲突时提醒我',
   'calendarSync.clashNudge.hint': 'beanies 只读取你的日程在什么时间，绝不读取具体内容。',
   'calendarSync.clashNudge.label': '冲突提醒',

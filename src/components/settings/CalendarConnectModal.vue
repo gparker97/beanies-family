@@ -127,8 +127,8 @@ const REASON_KEYS: Record<SyncIneligibility, UIStringKey> = {
 };
 
 const viewAccounts = computed(() => viewStore?.accounts ?? []);
-/** Google ids of every view-only calendar (any account): already connected for both roles. */
-const viewedIds = computed(() => (viewStore?.calendars ?? []).map((c) => c.calendarId));
+/** How many view-only calendars the family has (the title reads "another" when any). */
+const viewedCount = computed(() => viewStore?.calendars.length ?? 0);
 
 /** The account the listed calendars belong to. */
 const listAccountEmail = computed<string | null>(() => {
@@ -137,23 +137,19 @@ const listAccountEmail = computed<string | null>(() => {
   return viewAccounts.value.find((a) => a.id === listSource.value)?.accountEmail ?? null;
 });
 
-/** Why this calendar cannot be chosen for the current role, or `null`. */
+/**
+ * Why this calendar cannot be chosen for the current role, or `null`. "Already
+ * connected" is the one rule (`calendarInUse`) over every calendar the family uses
+ * (`store.calendarUses`, read from the doc), the same input the stores' confirm
+ * guards read, so a row offered here is never refused on confirm.
+ */
 function ineligibility(calendar: CalendarSummary): SyncIneligibility | null {
+  const { connections, viewed } = store.calendarUses;
   switch (role.value) {
     case 'sync':
-      return syncIneligibility(
-        calendar,
-        listAccountEmail.value,
-        store.connections,
-        viewedIds.value
-      );
+      return syncIneligibility(calendar, listAccountEmail.value, connections, viewed);
     case 'view':
-      return viewIneligibility(
-        calendar,
-        listAccountEmail.value,
-        store.connections,
-        viewedIds.value
-      );
+      return viewIneligibility(calendar, listAccountEmail.value, connections, viewed);
   }
 }
 
@@ -164,7 +160,7 @@ const hasEligible = computed(() => rows.value.some((r) => r.reason === null));
 
 const title = computed(() =>
   t(
-    store.connections.length > 0 || viewedIds.value.length > 0
+    store.connections.length > 0 || viewedCount.value > 0
       ? 'calendarSync.action.connectAnother'
       : 'calendarSync.action.connect'
   )
@@ -239,17 +235,18 @@ function selectRole(next: ConnectRole): void {
 }
 
 /**
- * Show a listed account's calendars. Sync preselects the primary calendar when it is
- * eligible (the usual destination). View only preselects nothing: the calendar worth
- * viewing is someone else's, never the member's own primary, so the choice is theirs.
+ * Show a listed account's calendars. Sync preselects the account's primary calendar
+ * ONLY when it is eligible (the usual destination). Never another calendar in its
+ * place: Google lists shared and team calendars too, and one tap on a preselected
+ * one would push every family activity into someone else's calendar. When the
+ * primary is not eligible nothing is preselected and "Connect Calendar" waits for
+ * the member's choice. View only preselects nothing: the calendar worth viewing is
+ * someone else's, never the member's own primary, so the choice is theirs.
  */
 function showList(list: CalendarSummary[]): void {
   calendars.value = list;
-  const eligible = rows.value.filter((r) => r.reason === null);
-  selectedId.value =
-    role.value === 'sync'
-      ? ((eligible.find((r) => r.calendar.primary) ?? eligible[0])?.calendar.id ?? null)
-      : null;
+  const primary = rows.value.find((r) => r.calendar.primary && r.reason === null);
+  selectedId.value = role.value === 'sync' ? (primary?.calendar.id ?? null) : null;
   step.value = 'choose';
 }
 
@@ -308,10 +305,13 @@ async function onContinue(): Promise<void> {
 async function onConfirm(): Promise<void> {
   const chosen = selectedId.value;
   if (!chosen) return;
+  // Its name as Google listed it, stored on the connection so the settings card can
+  // name it without a live read. The fallback primary row has none (empty summary).
+  const name = calendars.value.find((c) => c.id === chosen)?.summary || undefined;
   const owner = claimBusy();
   confirming = true;
   try {
-    const result = await store.confirmConnect(chosen);
+    const result = await store.confirmConnect(chosen, name);
     if (result.status === 'connected') {
       showToast(
         'success',

@@ -47,38 +47,65 @@ export function isBusyOnlyCalendar(
 }
 
 /**
+ * May an event whose details show only by the email-created exception (see
+ * `isKeptPrivate`) keep them on this calendar? Only when the connected Google
+ * account OWNS the calendar.
+ */
+function ownsCalendar(calendar: Pick<ViewedCalendar, 'accessRole'>): boolean {
+  return calendar.accessRole === 'owner';
+}
+
+/**
  * An already-normalized event, re-stripped for its calendar's CURRENT setting: when
  * the calendar is now busy only, the title and location go at once, without waiting
- * for a refetch that might fail (or for a concurrent merge to be noticed). The same
- * object comes back when there is nothing to strip, so identity stays stable.
+ * for a refetch that might fail (or for a concurrent merge to be noticed). An event
+ * shown only by the email-created exception (`detailsNeedOwner`) is stripped too
+ * once the calendar is no longer one the account owns. The same object comes back
+ * when there is nothing to strip, so identity stays stable.
  */
 export function restripForCalendar(
   event: ExternalEvent,
   calendar: Pick<ViewedCalendar, 'detailLevel' | 'accessRole'>
 ): ExternalEvent {
-  if (!isBusyOnlyCalendar(calendar)) return event;
+  const strip =
+    isBusyOnlyCalendar(calendar) || (event.detailsNeedOwner === true && !ownsCalendar(calendar));
+  if (!strip) return event;
   if (event.busyOnly && event.title === undefined && event.location === undefined) return event;
-  const { title: _title, location: _location, ...rest } = event;
+  const { title: _title, location: _location, detailsNeedOwner: _owner, ...rest } = event;
   return { ...rest, busyOnly: true };
 }
 
 /** Visibilities Google uses for an event its owner wants kept to themselves. */
 const PRIVATE_VISIBILITIES = new Set(['private', 'confidential']);
 
+/** Did Google mark this event private or confidential? */
+function isMarkedPrivate(raw: CalendarViewEvent): boolean {
+  return raw.visibility !== undefined && PRIVATE_VISIBILITIES.has(raw.visibility);
+}
+
 /**
- * Did the owner choose to keep this event to themselves?
+ * A private event that keeps its details only because Google made it from an email
+ * (`eventType: 'fromGmail'`: a dinner booking, a flight) and the connected account
+ * OWNS the calendar. Google marks those private by default, so on the family's own
+ * calendar the mark is not a choice, and hiding them made a family's own dinner read
+ * as "Busy" (found in testing; greg's decision, 2026-11-17: "on a view-only calendar
+ * that the connected Google account owns").
  *
- * `private` / `confidential` normally means yes. The exception is an event Google made
- * from an email (`eventType: 'fromGmail'`: a dinner booking, a flight): Google marks
- * those private by default, so the mark is not a choice, and hiding them made a
- * family's own dinner read as "Busy" (found in testing; greg's decision, 2026-11-17).
- * Google only returns such an event's title to an account that owns the calendar, so
- * this never reveals anything on a calendar someone else shared: there the title is
- * absent and the no-title rule below still applies.
+ * ONLY `accessRole: 'owner'`. Google returns a private event's details to any account
+ * that may change the calendar (`writer` too), so a partner's email-created dinner
+ * shared with "make changes" access would otherwise be shown to the whole family.
  */
-function isKeptPrivate(raw: CalendarViewEvent): boolean {
-  if (raw.visibility === undefined || !PRIVATE_VISIBILITIES.has(raw.visibility)) return false;
-  return raw.eventType !== 'fromGmail';
+function isOwnEmailEvent(raw: CalendarViewEvent, calendar: NormalizeCalendar): boolean {
+  return raw.eventType === 'fromGmail' && ownsCalendar(calendar);
+}
+
+/**
+ * Did the owner choose to keep this event to themselves? `private` / `confidential`
+ * means yes, except an email-created event on a calendar the account owns
+ * (`isOwnEmailEvent`).
+ */
+function isKeptPrivate(raw: CalendarViewEvent, calendar: NormalizeCalendar): boolean {
+  return isMarkedPrivate(raw) && !isOwnEmailEvent(raw, calendar);
 }
 
 /**
@@ -90,7 +117,7 @@ function isKeptPrivate(raw: CalendarViewEvent): boolean {
  * event simply has no title (the spike's busy-only shape has no `summary`).
  */
 function isBusyOnly(raw: CalendarViewEvent, calendar: NormalizeCalendar): boolean {
-  return isBusyOnlyCalendar(calendar) || isKeptPrivate(raw) || !raw.summary;
+  return isBusyOnlyCalendar(calendar) || isKeptPrivate(raw, calendar) || !raw.summary;
 }
 
 /** Local `YYYY-MM-DD` of an absolute instant. */
@@ -111,6 +138,22 @@ function ymdOfMs(ms: number): string {
  * `transparent` is true only for `transparency: 'transparent'`; a missing value is
  * busy (a free/busy calendar returns no `transparency` at all).
  */
+/**
+ * Did beanies itself put this event on the calendar (pushed, adopted or imported)?
+ * Its own id or its series id is in `beaniesIds` (`beaniesEventIds`). The one test,
+ * used when a read commits AND by the store's `events` selector, so an event that
+ * becomes beanies-origin after its read (an activity pushed from another device
+ * arrives by sync later) stops showing at once.
+ */
+export function isBeaniesOrigin(
+  event: { id: string; seriesId?: string },
+  beaniesIds: ReadonlySet<string>
+): boolean {
+  return (
+    beaniesIds.has(event.id) || (event.seriesId !== undefined && beaniesIds.has(event.seriesId))
+  );
+}
+
 export function normalizeViewEvents(
   raw: readonly CalendarViewEvent[],
   calendar: NormalizeCalendar,
@@ -121,10 +164,7 @@ export function normalizeViewEvents(
   let malformed = 0;
   for (const item of raw) {
     if (item.status === 'cancelled') continue;
-    if (
-      beaniesIds.has(item.id) ||
-      (item.recurringEventId !== undefined && beaniesIds.has(item.recurringEventId))
-    ) {
+    if (isBeaniesOrigin({ id: item.id, seriesId: item.recurringEventId }, beaniesIds)) {
       droppedAsBeanies++;
       continue;
     }
@@ -162,7 +202,11 @@ export function normalizeViewEvents(
     if (!busyOnly) {
       event.title = item.summary;
       if (item.location) event.location = item.location;
+      // Shown only by the owner exception: `restripForCalendar` drops the details if
+      // the calendar ever stops being one the account owns.
+      if (isMarkedPrivate(item)) event.detailsNeedOwner = true;
     }
+    if (item.recurringEventId !== undefined) event.seriesId = item.recurringEventId;
     if (item.htmlLink) event.htmlLink = item.htmlLink;
     events.push(event);
   }
@@ -256,6 +300,77 @@ export function rangeToIsoWindow(range: YmdRange): { timeMinIso: string; timeMax
   };
 }
 
+/** An inclusive local-date range as the `[startMs, endMs)` instants it covers (`rangeToIsoWindow`'s span). */
+export function rangeToMsSpan(range: YmdRange): MsSpan {
+  return {
+    startMs: parseLocalDate(range.startYmd).getTime(),
+    endMs: parseLocalDate(addDaysYmd(range.endYmd, 1)).getTime(),
+  };
+}
+
+/** A half-open span of instants, `[startMs, endMs)`. */
+export interface MsSpan {
+  startMs: number;
+  endMs: number;
+}
+
+/** One window's cached events, as the merge reads them. */
+export interface WindowEvents {
+  events: readonly ExternalEvent[];
+  /** When `events` were read from Google (0 = never or nothing to claim). A failed read keeps the previous value. */
+  eventsAt: number;
+  /** That read returned EVERY event of its span (it was not cut short by the page cap). */
+  complete: boolean;
+  /** The span that read asked Google for. */
+  span: MsSpan;
+}
+
+/**
+ * Would a read of `span` have returned this event? Google's own test for
+ * `timeMin` / `timeMax`: the event ends after the span starts and starts before it
+ * ends (both bounds exclusive).
+ */
+function readWouldInclude(event: Pick<ExternalEvent, 'startMs' | 'endMs'>, span: MsSpan): boolean {
+  return event.startMs < span.endMs && event.endMs > span.startMs;
+}
+
+/**
+ * One calendar's events from its windows (standing and screen), each event once.
+ *
+ * THE MERGE RULE. The windows are taken freshest first (by `eventsAt`; a tie keeps
+ * the given order, standing first):
+ *  1. A fresher window's copy of an event wins over a staler copy of the same id, so
+ *     a moved or edited event shows as it is now, never at its old time.
+ *  2. A staler window's event is DROPPED when a fresher COMPLETE read's span covers
+ *     its time and that read did not return it. Google returns every event that
+ *     overlaps the span it is asked for, so its absence there means the event was
+ *     deleted or moved away after the staler read; resurrecting it would show a
+ *     deleted event until the staler window's next poll.
+ *  3. Otherwise it is kept: no fresher read has looked at its time.
+ *
+ * A truncated read (`complete: false`) still wins by id (rule 1) but never drops
+ * anything (rule 2): what it did not return may simply be past the page cap.
+ */
+export function mergeWindowEvents(windows: readonly WindowEvents[]): ExternalEvent[] {
+  const ordered = windows
+    .map((w, i) => ({ w, i }))
+    .sort((a, b) => b.w.eventsAt - a.w.eventsAt || a.i - b.i)
+    .map(({ w }) => w);
+  const out: ExternalEvent[] = [];
+  const seen = new Set<string>();
+  const fresherComplete: MsSpan[] = [];
+  for (const win of ordered) {
+    for (const e of win.events) {
+      if (seen.has(e.id)) continue;
+      if (fresherComplete.some((span) => readWouldInclude(e, span))) continue;
+      seen.add(e.id);
+      out.push(e);
+    }
+    if (win.complete) fresherComplete.push(win.span);
+  }
+  return out;
+}
+
 /** The cache key of a range: two reads of the same span are the same read. */
 export function spanKeyOf(range: YmdRange): string {
   return `${range.startYmd}|${range.endYmd}`;
@@ -263,21 +378,27 @@ export function spanKeyOf(range: YmdRange): string {
 
 // ── Health ──────────────────────────────────────────────────────────────────
 
+/** What a failed read says about a calendar: Google refused it, or something else went wrong. */
+export type ReadFailureClass = 'refused' | 'other';
+
 /**
- * The cache state a failed read leaves, from the classified `CalendarApiError.kind`
- * and NEVER the raw HTTP status: Google throttles with 403, which the client already
- * classifies as `rate_limited`, so a throttle must not wipe a calendar's events.
+ * Classify a failed read from the classified `CalendarApiError.kind`, NEVER the raw
+ * HTTP status: Google throttles with 403, which the client already classifies as
+ * `rate_limited`, so a throttle must not count against a calendar.
  *
- * `forbidden` / `not_found` mean the owner stopped sharing (or deleted the calendar):
- * `unavailable`. Everything else, including a single `auth`, is `stale` and keeps
- * the last good events. `needs_reconnect` is decided by the caller from the token
- * provider's permanent-failure latch, not here.
+ * `forbidden` / `not_found` are a refusal (the owner may have stopped sharing, or
+ * deleted the calendar). Everything else, including a single `auth`, is `other`.
+ * A refusal is only a STRIKE: the calendar's sharing health (`healthAfterRead`)
+ * turns unavailable after `REFUSALS_BEFORE_UNAVAILABLE` of them. No cache entry ever
+ * holds `unavailable` (that state belongs to the calendar, R6 in the store); a
+ * failed read leaves its entry `stale`, and `needs_reconnect` is decided by the
+ * caller from the token provider's permanent-failure latch.
  */
-export function stateFromError(err: unknown): Extract<ViewCalendarState, 'unavailable' | 'stale'> {
+export function classifyReadFailure(err: unknown): ReadFailureClass {
   if (err instanceof CalendarApiError && (err.kind === 'forbidden' || err.kind === 'not_found')) {
-    return 'unavailable';
+    return 'refused';
   }
-  return 'stale';
+  return 'other';
 }
 
 /**
@@ -318,7 +439,7 @@ export const HEALTHY: Readonly<CalendarHealth> = Object.freeze({
 
 /** Is this failure a refusal (the owner stopped sharing, or the calendar is gone)? */
 export function isRefusal(err: unknown): boolean {
-  return stateFromError(err) === 'unavailable';
+  return classifyReadFailure(err) === 'refused';
 }
 
 /**
@@ -357,20 +478,6 @@ export function worseState(
   if (a === null) return b;
   if (b === null) return a;
   return STATE_SEVERITY[a] >= STATE_SEVERITY[b] ? a : b;
-}
-
-// ── The read guard ──────────────────────────────────────────────────────────
-
-/**
- * May this Google calendar be read? Only when the family added it. The view grant
- * (`calendar.events.readonly`) can read every calendar on the account, so this is
- * the line that keeps beanies to the calendars a member chose.
- */
-export function isViewedCalendarId(
-  calendarId: string,
-  viewed: readonly Pick<ViewedCalendar, 'calendarId'>[]
-): boolean {
-  return viewed.some((c) => c.calendarId === calendarId);
 }
 
 // ── Settings defaults ───────────────────────────────────────────────────────

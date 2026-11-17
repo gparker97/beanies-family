@@ -35,6 +35,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - A family that left setup early is now counted as having finished creating its pod.
 - Travel segment titles are now built from the segment's details everywhere they appear, so imported trips no longer show a document's own headings on the calendar.
 - Disconnecting one of two calendars on the same Google account no longer cuts off the other.
+- A connected calendar's name is now shown correctly in Google Calendar settings even when Google can't be reached.
+- Connecting another calendar no longer pre-selects a shared calendar when the main one is already connected.
+- Disconnecting a duplicate calendar connection now removes its events from Google.
 
 ## 2026-11-15
 
