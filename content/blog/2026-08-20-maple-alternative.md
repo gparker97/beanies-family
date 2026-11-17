@@ -5,7 +5,7 @@ date: 2026-08-20
 updatedDate: 2026-08-20
 category: review
 coverEmoji: 🍁
-coverImage: /blog/maple-alternative-infographic.webp
+coverImage: /blog/maple-alternative-hero.webp
 excerpt: 'maple shuts down on december 31, 2026 and deletes every account. here is how to get your family data out, and where to land next.'
 subtitle: 'a (genuinely shocking) announcement that one of the largest (and most well funded) family apps is being retired. what are the alternatives?'
 featured: false

@@ -4,7 +4,7 @@ slug: ollie-alternative
 date: 2026-11-17
 category: review
 coverEmoji: 💬
-coverImage: /blog/ollie-alternative-infographic.webp
+coverImage: /blog/ollie-alternative-hero.webp
 excerpt: "ollie shut down on november 6 and maple follows on december 31. here's a private family app that keeps your calendar and reads only the emails you share."
 subtitle: 'i used to use ollie or maple - what can i use now to organize my family?'
 featured: false
