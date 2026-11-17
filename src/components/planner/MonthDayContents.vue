@@ -9,7 +9,8 @@
  * `PHONE_DAY_ROW_CAPS`) it shows what fits plus the two "+N" counts; without (the
  * popover) it shows everything.
  *
- * Order: birthdays and holidays (inline, so `allDaySurfaces.test.ts` sees them), trips
+ * Order: birthdays, holidays and all-day view-only events (inline, so
+ * `allDaySurfaces.test.ts` sees them), trips
  * and all-day bars, the all-day "+N" right after the bars it counts, then timed items
  * and travel segments by start time, then one "+N more" for the hidden timeline. An
  * empty day says "Nothing planned"; this is the only place that line is drawn.
@@ -30,6 +31,7 @@ import type { MonthDayCellData } from '@/utils/monthCells';
 import type { DayCaps } from '@/constants/calendarCaps';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import type { HolidayOccurrence } from '@/types/models';
+import type { ExternalEvent } from '@/types/externalEvents';
 import {
   DEFAULT_CELL_CHIPS,
   MONTH_CELL_CHIPS,
@@ -37,6 +39,7 @@ import {
 } from '@/components/planner/monthCellChipsKey';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
+import ExternalChip from '@/components/planner/ExternalChip.vue';
 import MonthDayItem from '@/components/planner/MonthDayItem.vue';
 
 const props = withDefaults(
@@ -57,6 +60,8 @@ const emit = defineEmits<{
   'holiday-click': [holiday: HolidayOccurrence];
   /** A derived birthday was tapped; the parent opens the read-only drawer. */
   'birthday-click': [birthday: BirthdayOccurrence];
+  /** A view-only external event was tapped; the host opens its read-only details. */
+  'external-click': [event: ExternalEvent];
   /** The capped timeline's "+N more" was pressed. */
   more: [];
 }>();
@@ -108,6 +113,13 @@ const moreLabel = computed(() =>
         class="block w-full"
         @click.stop="emit('holiday-click', extra.holiday!)"
       />
+      <ExternalChip
+        v-else-if="extra.kind === 'external' && extra.external"
+        :event="extra.external"
+        :date="extra.ymd"
+        data-day-item
+        @open="(e) => emit('external-click', e)"
+      />
     </template>
 
     <MonthDayItem
@@ -118,6 +130,7 @@ const moreLabel = computed(() =>
       @view-activity="(id, date) => emit('view-activity', id, date)"
       @vacation-click="(vid) => emit('vacation-click', vid)"
       @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
+      @external-click="(e) => emit('external-click', e)"
     />
     <span
       v-if="c.hidden.allDay > 0"
@@ -135,6 +148,7 @@ const moreLabel = computed(() =>
       @view-activity="(id, date) => emit('view-activity', id, date)"
       @vacation-click="(vid) => emit('vacation-click', vid)"
       @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
+      @external-click="(e) => emit('external-click', e)"
     />
     <component
       :is="interactive ? 'button' : 'span'"

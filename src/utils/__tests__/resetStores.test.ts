@@ -49,6 +49,9 @@ vi.mock('@/stores/calendarSyncStore', () => ({ useCalendarSyncStore: () => ({ st
 vi.mock('@/stores/calendarClashStore', () => ({
   useCalendarClashStore: () => ({ stop: vi.fn() }),
 }));
+vi.mock('@/stores/calendarViewStore', () => ({
+  useCalendarViewStore: () => ({ stop: vi.fn() }),
+}));
 vi.mock('@/config/flags', () => ({ isFlagEnabled: () => false }));
 
 describe('resetAllAppStores', () => {
@@ -93,5 +96,19 @@ describe('resetAllAppStores', () => {
     resetAllAppStores();
     expect(draft.useChoreAddDraft().rows).toEqual([]);
     expect(draft.useChoreAddDraft().sets).toEqual([]);
+  });
+
+  it('clears the pending calendar credential, so an unconfirmed consent cannot reach the next session', async () => {
+    const { pendingCredential } = await import('@/services/calendar/pendingCredential');
+    const { resetAllAppStores } = await import('@/utils/resetStores');
+    pendingCredential.set({
+      id: 'pending-1',
+      kind: 'view',
+      accountEmail: 'me@example.com',
+      refreshToken: 'rt',
+      grantedScopes: [],
+    });
+    resetAllAppStores();
+    expect(pendingCredential.peek()).toBeNull();
   });
 });

@@ -37,7 +37,7 @@ import {
 } from '@/composables/usePollWhileVisible';
 import { getAllActivities } from '@/services/automerge/repositories/activityRepository';
 import { getGoogleAccountEmail } from '@/services/google/googleAuth';
-import { revokeGrant, logTokenLifecycle } from '@/services/google/googleRevoke';
+import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import {
   getCalendarConnectionById,
   createCalendarConnection,
@@ -56,9 +56,9 @@ import {
   type CalendarConnectResult,
   type CalendarConnectSuccess,
   type CalendarConnectFailure,
+  type CalendarConnectRedirecting,
 } from '@/services/calendar/calendarAuth';
 import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
-import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
 import {
   getCalendarClient,
   setCalendarClientForTesting,
@@ -97,8 +97,52 @@ import { logEvent } from '@/services/telemetry';
 import { createChangeGate, type ChangeGate } from '@/services/telemetry/emitPolicy';
 import type { CalendarConnection, CalendarEventLink, FamilyActivity } from '@/types/models';
 import { shareableOrigin } from '@/utils/shareableOrigin';
+import { pendingCredential } from '@/services/calendar/pendingCredential';
+import {
+  revokeCalendarGrantGuarded as revokeSharedGuarded,
+  type CalendarRevokeTrigger,
+} from '@/services/calendar/guardedRevoke';
+import { generateUUID } from '@/utils/id';
+import { MAX_INFLIGHT } from '@/utils/calendar/limits';
+import { hasCalendarListScope } from '@/utils/calendar/grantScopes';
+import { isPositivelyDifferentAccount } from '@/utils/calendar/grantGuard';
+import { isSameDestination, syncIneligibility } from '@/utils/calendar/connectEligibility';
+import {
+  calendarReturnPath,
+  parseCalendarResumeIntent,
+  type CalendarResumeIntent,
+} from '@/utils/calendar/resumeIntent';
 
 const FLAG = 'googleCalendarSync';
+
+/**
+ * Result of starting a FRESH sync connect (view-only calendars plan 2026-11-17, A2).
+ * A consent no longer writes a record: on success the credential waits in the
+ * in-memory `pendingCredential` slot (`pending`) until the member picks a calendar
+ * in the add step and confirms it.
+ */
+export type BeginConnectResult =
+  { status: 'pending' } | CalendarConnectRedirecting | CalendarConnectFailure;
+
+/** Result of confirming the chosen calendar for the pending credential. */
+export type ConfirmConnectResult =
+  | { status: 'connected' }
+  | { status: 'failed'; reason: 'no-pending' | 'already-connected' | 'write-failed' };
+
+/** What a redirect resume produced: a fresh connect's pending credential, or a reconnect's result. */
+export type ResumeConnectResult = BeginConnectResult | CalendarConnectResult;
+
+/** Where `finalizeConnected` writes: an existing connection (reconnect), or a new one on a chosen calendar. */
+type FinalizeTarget = { connectionId: string } | { destinationCalendarId: string };
+
+/**
+ * The one-row list shown when the account's calendars cannot be listed. Its empty
+ * summary makes the view render the localized "Primary calendar" label (i18n stays
+ * in the view, not the store).
+ */
+function primaryOnly(id = 'primary'): CalendarSummary[] {
+  return [{ id, summary: '', primary: true }];
+}
 
 /**
  * Outcome of a single-connection reconcile, surfaced so a user-initiated
@@ -126,8 +170,6 @@ const EDIT_DEBOUNCE_MS = 3_000;
  * That costs Google API reads only, never a doc write.
  */
 const FRESHNESS_WINDOW_MS = 120_000;
-/** Bounded concurrency over (activity × connection) work-items. */
-const MAX_INFLIGHT = 5;
 /** Device-local consecutive `invalid_grant` failures before parking the shared status. */
 const INVALID_GRANT_THRESHOLD = 2;
 
@@ -247,26 +289,6 @@ function rejectionFingerprint(hash: string, ctx: ActivityMapContext): string {
 // store). Re-export the test seam so this store's existing tests keep importing it
 // from here.
 export { setCalendarClientForTesting };
-
-/**
- * Are these two POSITIVELY different Google accounts?
- *
- * Fail-safe, deliberately asymmetric: `true` only when both sides name a real,
- * different account. An `'unknown'` sentinel or a missing email on either side
- * returns `false` — "cannot confirm a mismatch" — because refusing on
- * uncertainty would brick a connection that is otherwise repairable.
- *
- * Mirrors the shape of `calendarGrantIsSeparate`, which makes the same call for
- * the same reason on the revoke side.
- */
-function isPositivelyDifferentAccount(
-  stored: string | null | undefined,
-  consented: string | null | undefined
-): boolean {
-  if (!stored || stored === 'unknown') return false;
-  if (!consented || consented === 'unknown') return false;
-  return stored.toLowerCase() !== consented.toLowerCase();
-}
 
 function nowIso(): string {
   return toISODateString(new Date());
@@ -409,15 +431,14 @@ async function createOrResurrect(
  * The ONLY place beanies deletes a Google event.
  *
  * Refuses for a link beanies did not create (#94 import), so the guard cannot be
- * forgotten at a future fourth call site. There were three before this existed, and
- * two of them (disconnect, destination switch) would have deleted a school's event
- * from a parent's real calendar the first time anyone imported.
+ * forgotten at a future call site. There were three before this existed, and two of
+ * them (disconnect, and the since-removed destination switch) would have deleted a
+ * school's event from a parent's real calendar the first time anyone imported.
  *
  * Returns whether the remote delete actually happened. The CALLER decides what to do
- * with the link: `reconcileConnection` and `finishDisconnect` drop it either way, but
- * `setDestinationCalendar` KEEPS an imported link. Do not "simplify" this by having
- * the helper remove the link itself, or the destination switch would silently regain
- * the ability to recreate an invited event on the new calendar.
+ * with the link (`reconcileConnection` and `finishDisconnect` both drop it), so a
+ * future caller that must keep an imported link can. Do not "simplify" this by
+ * having the helper remove the link itself.
  */
 async function deleteRemoteEventForLink(
   client: CalendarClient,
@@ -1333,29 +1354,34 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   /**
    * Build the same-origin returnPath a calendar redirect lands on. It reopens the
    * Calendar settings drawer AND carries the resume intent in a `calResume` query
-   * (`connect` for a fresh connect, or a connectionId to reconnect) — so no secret
-   * and no id ever rides in the OAuth `state`. The App-level resume reads it.
+   * (see `resumeIntent.ts`), so no secret and no id ever rides in the OAuth `state`.
+   * The App-level resume reads it.
    */
-  function buildCalendarReturnPath(intent: 'connect' | string): string {
-    const params = new URLSearchParams({ open: CALENDAR_SYNC_OPEN, calResume: intent });
-    return `/settings?${params.toString()}`;
+  function buildCalendarReturnPath(intent: CalendarResumeIntent): string {
+    return calendarReturnPath(intent);
   }
 
   /**
-   * Commit a successful consent (create a new connection, or update an existing one
-   * in place) + kick a verify reconcile. Shared by the popup path (`connect`/
-   * `reconnect`) and the redirect resume so all three converge on one commit.
-   * `connectionId` present ⇒ reconnect that connection (falls back to create if it
-   * vanished — remotely healed/removed); absent ⇒ fresh connect.
+   * Commit a successful consent + kick a verify reconcile. The one write path for
+   * a calendar credential: the add step's confirm (a new connection on the CHOSEN
+   * calendar), reconnect (popup and redirect) and the unified fan-out all converge
+   * here.
+   *
+   * `{ connectionId }` updates that connection in place, falling back to a create
+   * on `'primary'` if it vanished (remotely healed or removed), exactly as before.
+   * `{ destinationCalendarId }` creates a new connection on that calendar, so the
+   * immediate reconcile below pushes to the calendar the member picked and never
+   * to `'primary'` first.
    */
   async function finalizeConnected(
     result: CalendarConnectSuccess,
-    connectionId?: string,
+    target: FinalizeTarget,
     // `countMint: false` for the unified reconnect fan-out (#62 commit 5): there
     // the calendar token is the SAME grant Drive just minted (counted once on the
     // Drive seam), so logging a calendar mint here would double-count one grant.
     opts?: { countMint?: boolean }
   ): Promise<CalendarConnectFailure | null> {
+    const connectionId = 'connectionId' in target ? target.connectionId : undefined;
     // ONE name for the fresh-connect question, read by both the mint trigger and
     // `connectedBy` below.
     //
@@ -1367,7 +1393,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const isFreshConnect = !connectionId;
     // A calendar consent just MINTED a new refresh token — count it so calendar
     // token-pressure is measurable alongside the calendar revokes (#62). Covers
-    // both connect + reconnect, popup + redirect (all converge here).
+    // reconnect, popup + redirect. A fresh connect counts its mint when the consent
+    // lands in the pending slot (`acceptConsent`), so an abandoned one is counted
+    // too, and its confirm passes `countMint: false`.
     if (opts?.countMint !== false) {
       logTokenLifecycle({
         grant: 'calendar',
@@ -1435,7 +1463,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const connection = await createCalendarConnection({
       provider: 'google',
       accountEmail: result.email ?? 'unknown',
-      destinationCalendarId: 'primary',
+      // The chosen calendar; a vanished reconnect target keeps today's `'primary'`.
+      destinationCalendarId:
+        'destinationCalendarId' in target ? target.destinationCalendarId : 'primary',
       refreshToken: result.refreshToken,
       grantedScopes: result.grantedScopes,
       status: 'ok',
@@ -1487,7 +1517,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
             refreshToken: input.refreshToken,
             grantedScopes: input.grantedScopes,
           },
-          conn.id,
+          { connectionId: conn.id },
           { countMint: false }
         );
         restored++;
@@ -1504,86 +1534,217 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     return { matched: targets.length, restored, failed };
   }
 
-  /** Run the consent flow + create a family-wide connection. Returns the auth result.
-   *  On a redirect surface (PWA/iOS/native) hands off to the redirect transport and
-   *  returns `{status:'redirecting'}` — the resume completes it post-redirect. */
-  async function connect(): Promise<CalendarConnectResult> {
+  // ── Fresh connect: consent → pending credential → choose → confirm ────────────
+  //
+  // A consent never writes a record by itself (plan 2026-11-17, A2). It used to
+  // create the connection on `'primary'` and reconcile at once, so choosing another
+  // calendar afterwards meant pushing to the wrong one first. Now the credential
+  // waits in the in-memory `pendingCredential` slot, the add step lists that
+  // account's calendars, and only `confirmConnect` writes.
+
+  /** The pending SYNC consent, for the add step. Never the token: only what the view shows. */
+  const pendingConnect = computed<{ accountEmail: string | null } | null>(() => {
+    const held = pendingCredential.peek();
+    return held && held.kind === 'sync' ? { accountEmail: held.accountEmail } : null;
+  });
+
+  /** `consent-outcome` on every exit of a fresh connect, success included, so rates are measurable. */
+  function logConsentOutcome(detail: string, stage?: 'popup' | 'redirect'): void {
+    logEvent({
+      level: 'info',
+      surface: 'calendar-sync',
+      message: 'calendar consent outcome',
+      context: { action: 'consent-outcome', kind: 'sync', detail, ...(stage ? { stage } : {}) },
+    });
+  }
+
+  /** Put a fresh consent into the pending slot (shared by popup and redirect). */
+  function acceptConsent(
+    result: CalendarConnectResult,
+    stage: 'popup' | 'redirect'
+  ): BeginConnectResult {
+    if (result.status === 'redirecting') return result;
+    if (result.status !== 'connected') {
+      logConsentOutcome(result.code, stage);
+      return result;
+    }
+    pendingCredential.set({
+      id: `pending-${generateUUID()}`,
+      kind: 'sync',
+      accountEmail: result.email,
+      refreshToken: result.refreshToken,
+      grantedScopes: result.grantedScopes,
+    });
+    logTokenLifecycle({ grant: 'calendar', op: 'mint', outcome: 'ok', trigger: 'connect' });
+    logConsentOutcome('consented', stage);
+    return { status: 'pending' };
+  }
+
+  /**
+   * Start a fresh sync connect. On a popup surface, runs the consent and returns
+   * `pending` with the credential held in memory; on a redirect surface (PWA, iOS,
+   * native) hands off and returns `redirecting`, and the resume fills the slot.
+   *
+   * ⚠️ No `await` before `connectGoogleCalendar`: the consent popup must open inside
+   * the tap's user activation.
+   */
+  async function beginConnect(): Promise<BeginConnectResult> {
     if (!isFlagEnabled(FLAG)) {
       return { status: 'failed', code: 'not_configured', message: 'Feature is not enabled.' };
     }
+    // An earlier consent nobody confirmed: revoke it BEFORE minting another, as
+    // reconnect does, because a whole-grant revoke afterwards would kill the new one.
+    abandonConnect();
     const loginHint = getGoogleAccountEmail() ?? undefined;
     if (shouldUseRedirectAuth()) {
-      await startCalendarRedirectAuth(buildCalendarReturnPath('connect'), loginHint, 'create');
+      logConsentOutcome('redirecting', 'redirect');
+      await startCalendarRedirectAuth(
+        buildCalendarReturnPath({ kind: 'connect' }),
+        loginHint,
+        'create'
+      );
       return { status: 'redirecting' };
     }
     const result = await connectGoogleCalendar({ loginHint });
-    if (result.status !== 'connected') return result;
-    await finalizeConnected(result);
-    return result;
+    return acceptConsent(result, 'popup');
   }
 
   /**
-   * Whether a LIVE Drive grant on the same Google account would die with a
-   * revoke of this calendar token. Drive + Calendar share one OAuth client, so
-   * under Google's whole-grant revoke a calendar-token revoke can also kill a
-   * co-located Drive grant ("die together", see refreshFailure.ts). When that
-   * risk exists we skip the calendar revoke — protecting the active Drive
-   * session is worth leaking one soon-to-age-out calendar token. See plan #62
-   * (revoke-breadth); if the empirical validation proves revoke is per-grant,
-   * this guard can be relaxed to always revoke.
+   * The pending account's calendars for the add step, read with the pending
+   * credential (the token provider's resolver knows its id). Falls back to a
+   * primary-only row when the list scope was not granted or the read fails, the same
+   * fallback `listCalendarsFor` uses, so the member can still connect their primary
+   * calendar. Never throws.
    */
-  function liveDriveGrantSharesAccount(accountEmail: string | undefined): boolean {
-    // ⚠️ NO `hasRefreshToken()` EARLY RETURN (removed 2026-09-08). It used to
-    // return false here — "no live Drive grant, so revoking cannot harm Drive" —
-    // but `hasRefreshToken()` inspects only THIS DEVICE's in-memory Drive token.
-    // Google's revoke is whole-grant for the (user, client_id) pair, and Drive
-    // and Calendar share a client_id, so a calendar-only device, or one where
-    // Drive was signed out or cleared on an `invalid_grant`, would revoke and
-    // kill Drive AND Calendar on every SIBLING device — each of which then
-    // reconnects and revokes in turn. That is exactly the fleet-wide ping-pong
-    // removed from both Drive seams in `googleAuth`, and it was still live here.
-    //
-    // The account comparison below already fails safe on every uncertainty, so
-    // dropping the early return simply skips more revokes. The cost is a larger
-    // token pool, which is the trade `googleAuth` already accepted deliberately.
-    //
-    // FAIL SAFE: only revoke the calendar token when we
-    // can POSITIVELY confirm it belongs to a DIFFERENT Google account (a separate
-    // grant). Any uncertainty — an 'unknown' sentinel email, or a missing email on
-    // either side — is treated as shared, so we skip the revoke and protect the
-    // live Drive session rather than risk a whole-grant revoke killing it.
-    const driveEmail = getGoogleAccountEmail();
-    if (!driveEmail || !accountEmail || accountEmail === 'unknown') return true;
-    return driveEmail === accountEmail;
+  async function listPendingCalendars(): Promise<CalendarSummary[]> {
+    const held = pendingCredential.peek();
+    if (!held || held.kind !== 'sync') return [];
+    if (!hasCalendarListScope(held.grantedScopes)) {
+      logEvent({
+        level: 'info',
+        surface: 'calendar-sync',
+        message: 'pending calendar list: no calendar-list scope, offering primary only',
+        context: { action: 'list-pending-calendars', detail: 'no-scope' },
+      });
+      return primaryOnly();
+    }
+    try {
+      const calendars = await getCalendarClient().listCalendars(held.id);
+      logEvent({
+        level: 'info',
+        surface: 'calendar-sync',
+        message: 'pending calendar list read',
+        context: { action: 'list-pending-calendars', detail: 'ok', count: calendars.length },
+      });
+      return calendars.length > 0 ? calendars : primaryOnly();
+    } catch (e) {
+      reportError({
+        surface: 'calendar-sync',
+        message: "[calendarSync] listing the pending account's calendars failed",
+        error: e,
+        severity: 'warning',
+        context: {
+          action: 'list-pending-calendars',
+          detail: 'fallback',
+          error_code: e instanceof CalendarApiError ? e.kind : 'unknown',
+        },
+      });
+      return primaryOnly();
+    }
   }
 
   /**
-   * Revoke a calendar grant, but SKIP (and log the skip) when a live Drive grant
-   * on the same account would die with it. Shared by reconnect + disconnect so the
-   * Drive-safety guard is applied identically in both places (#62).
+   * Write the pending credential as a new connection on the chosen calendar, then
+   * reconcile onto it. The slot is cleared only once the record exists, so a failed
+   * write leaves the add step able to try again. A failed write is `critical`: the
+   * member's action failed.
+   */
+  async function confirmConnect(destinationCalendarId: string): Promise<ConfirmConnectResult> {
+    const held = pendingCredential.peek();
+    if (!held || held.kind !== 'sync') {
+      logEvent({
+        level: 'warn',
+        surface: 'calendar-sync',
+        message: 'calendar confirm without a pending consent',
+        context: { action: 'confirm-connect', detail: 'no-pending' },
+      });
+      return { status: 'failed', reason: 'no-pending' };
+    }
+    // The add step disables these rows; this is the store's own guard against two
+    // connections pushing every activity into one calendar.
+    const chosen = { id: destinationCalendarId, summary: '', primary: false };
+    if (syncIneligibility(chosen, held.accountEmail, connections.value) === 'already-connected') {
+      logEvent({
+        level: 'warn',
+        surface: 'calendar-sync',
+        message: 'calendar confirm refused: calendar already connected',
+        context: { action: 'confirm-connect', detail: 'already-connected' },
+      });
+      return { status: 'failed', reason: 'already-connected' };
+    }
+    try {
+      await finalizeConnected(
+        {
+          status: 'connected',
+          email: held.accountEmail,
+          refreshToken: held.refreshToken,
+          grantedScopes: held.grantedScopes,
+        },
+        { destinationCalendarId },
+        { countMint: false }
+      );
+    } catch (e) {
+      reportError({
+        surface: 'calendar-sync',
+        message: '[calendarSync] connecting the chosen calendar failed',
+        error: e,
+        severity: 'critical',
+        context: { action: 'confirm-connect', error_code: 'write_failed' },
+      });
+      return { status: 'failed', reason: 'write-failed' };
+    }
+    if (pendingCredential.peek()?.id === held.id) pendingCredential.clear();
+    // The pending id's cached access token is no longer reachable; drop it.
+    getCalendarClient().invalidateConnection(held.id);
+    logConsentOutcome('connected');
+    return { status: 'connected' };
+  }
+
+  /**
+   * Drop an unconfirmed consent: clear the slot and revoke its token, unless
+   * something else on the same Google account would die with it (the shared guard).
+   * A no-op when nothing is pending, so every close path may call it.
+   */
+  function abandonConnect(): void {
+    const held = pendingCredential.peek();
+    if (!held || held.kind !== 'sync') return;
+    pendingCredential.clear();
+    getCalendarClient().invalidateConnection(held.id);
+    revokeCalendarGrantGuarded(held.refreshToken, held.accountEmail ?? undefined, 'abandon');
+    logConsentOutcome('abandoned');
+  }
+
+  /**
+   * Revoke a calendar grant, but SKIP (and log the skip) when anything else on the
+   * same Google account would die with it. Shared by reconnect, disconnect and
+   * abandon (#62). The guard itself lives in `services/calendar/guardedRevoke.ts`,
+   * shared with the view-only store, and covers Drive, every other calendar
+   * connection and every view account (a Google account used for both syncing and
+   * viewing holds both tokens under one grant).
+   *
+   * Before the shared guard this checked only Drive, so disconnecting one of two
+   * same-account sync connections revoked the other's live grant too.
+   *
+   * `exceptId` is the connection being disconnected or reconnected; it never counts
+   * as sharing with itself.
    */
   function revokeCalendarGrantGuarded(
     refreshToken: string | undefined,
     accountEmail: string | undefined,
-    trigger: 'reconnect' | 'disconnect'
+    trigger: CalendarRevokeTrigger,
+    exceptId?: string
   ): void {
-    if (liveDriveGrantSharesAccount(accountEmail)) {
-      logTokenLifecycle({
-        grant: 'calendar',
-        op: 'revoke',
-        outcome: 'skipped',
-        reason: 'shared-live-drive-grant',
-        trigger,
-      });
-      return;
-    }
-    // ✅ SURVIVING REVOKE 5 of 5, the only one outside googleAuth (audit 2026-09-08).
-    // Already guarded above by `liveDriveGrantSharesAccount`: Google's revoke is
-    // whole-grant per (user, client_id) and Drive shares this client_id, so this
-    // must never fire while a live Drive grant depends on the same account.
-    // Drive no longer needs the symmetric guard, because Drive no longer revokes
-    // on reconnect at all (see googleAuth.ts, both reconnect seams).
-    void revokeGrant(refreshToken, { grant: 'calendar', trigger });
+    revokeSharedGuarded({ refreshToken, accountEmail, trigger, exceptId });
   }
 
   /** Re-run consent for an EXISTING connection (e.g. after needs_reconnect): updates
@@ -1601,10 +1762,15 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // Usually a no-op — a needs_reconnect token is already dead at Google — but it
     // catches the live-token case. Guarded so it never kills a co-located live
     // Drive grant (same reasoning as disconnect); the skip is logged.
-    revokeCalendarGrantGuarded(existing?.refreshToken, existing?.accountEmail, 'reconnect');
+    revokeCalendarGrantGuarded(
+      existing?.refreshToken,
+      existing?.accountEmail,
+      'reconnect',
+      connectionId
+    );
     if (shouldUseRedirectAuth()) {
       await startCalendarRedirectAuth(
-        buildCalendarReturnPath(connectionId),
+        buildCalendarReturnPath({ kind: 'reconnect', connectionId }),
         loginHint,
         'reconnect'
       );
@@ -1612,22 +1778,30 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     }
     const result = await connectGoogleCalendar({ loginHint });
     if (result.status !== 'connected') return result;
-    return (await finalizeConnected(result, connectionId)) ?? result;
+    return (await finalizeConnected(result, { connectionId })) ?? result;
   }
 
   /**
    * Resume a calendar connect/reconnect after a redirect round-trip. Called by the
    * App-level resume when it sees a pending `calResume` intent. Redeems the
-   * one-time code (memoized), commits on success, and returns a typed result the
-   * caller toasts from. Returns `null` when there was no pending calendar code
-   * (a Drive redirect, or the user declined) — the caller shows nothing.
+   * one-time code (memoized) and returns a typed result the caller acts on:
+   *  - a fresh connect ends with the credential in the pending slot (`pending`) and
+   *    writes nothing; the settings drawer opens the add step at the calendar list;
+   *  - a reconnect commits in place, exactly as before.
+   * Returns `null` when there was no pending calendar code (a Drive redirect, or the
+   * user declined), and the caller shows nothing.
    */
-  async function resumeRedirectConnect(intent: string): Promise<CalendarConnectResult | null> {
+  async function resumeRedirectConnect(rawIntent: string): Promise<ResumeConnectResult | null> {
     if (!isFlagEnabled(FLAG)) return null;
+    const intent = parseCalendarResumeIntent(rawIntent);
+    // A view-only consent is the view store's to finish; the App-level resume routes
+    // it there. Redeeming it here would check the wrong grant's scope.
+    if (intent.kind !== 'connect' && intent.kind !== 'reconnect') return null;
     const result = await completeCalendarRedirectAuth();
-    if (!result || result.status !== 'connected') return result;
-    const connectionId = intent === 'connect' ? undefined : intent;
-    return (await finalizeConnected(result, connectionId)) ?? result;
+    if (!result) return null;
+    if (intent.kind === 'connect') return acceptConsent(result, 'redirect');
+    if (result.status !== 'connected') return result;
+    return (await finalizeConnected(result, { connectionId: intent.connectionId })) ?? result;
   }
 
   /** Remove the connection: delete its events first, then drop its token + record. */
@@ -1646,13 +1820,28 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const client = getCalendarClient();
     const calendarId = connection.destinationCalendarId || 'primary';
     const links = await getCalendarEventLinksForConnection(connectionId);
+    // A LIVE connection to the same calendar (connected again while this teardown was
+    // stuck, which the add step allows: see `isConnectedDestination`) links the same
+    // deterministic event ids. Those events are its now: this teardown forgets its
+    // own links to them and never deletes them, or it would delete the new
+    // connection's events and the two would fight on every reconcile.
+    const ownedElsewhere = new Set<string>();
+    for (const other of connections.value) {
+      if (other.id === connectionId || other.status === 'disconnecting') continue;
+      if (!isSameDestination(other, connection)) continue;
+      for (const link of await getCalendarEventLinksForConnection(other.id)) {
+        ownedElsewhere.add(link.googleEventId);
+      }
+    }
 
     let allCleared = true;
     const tasks = links.map((link) => async () => {
       try {
         // Cleans up what beanies made, never what the family already had: an
         // imported link deletes nothing remotely and is simply forgotten.
-        await deleteRemoteEventForLink(client, connectionId, calendarId, link);
+        if (!ownedElsewhere.has(link.googleEventId)) {
+          await deleteRemoteEventForLink(client, connectionId, calendarId, link);
+        }
         await removeCalendarEventLinkById(connectionId, link.activityId);
       } catch {
         allCleared = false; // keep the link; stays 'disconnecting', retried next open
@@ -1666,94 +1855,26 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // Revoke the calendar grant so a disconnect doesn't leak a live token (#62)
       // — UNLESS a live Drive grant on the same account would die with it. The
       // skip is observable, never silent.
-      revokeCalendarGrantGuarded(connection.refreshToken, connection.accountEmail, 'disconnect');
+      revokeCalendarGrantGuarded(
+        connection.refreshToken,
+        connection.accountEmail,
+        'disconnect',
+        connectionId
+      );
       await removeCalendarConnection(connectionId);
     }
     return allCleared;
   }
 
-  /**
-   * Change the destination calendar — all-or-nothing (F6). Delete the old-calendar
-   * events FIRST; only if every delete succeeds do we drop the links, switch, and
-   * re-sync. On any failure we ABORT: `destinationCalendarId` stays on the old
-   * calendar and ALL links are kept (the next reconcile resurrects any already-
-   * deleted events on the old calendar — self-healing), so nothing is orphaned.
-   */
-  async function setDestinationCalendar(
-    connectionId: string,
-    calendarId: string
-  ): Promise<{ ok: boolean }> {
-    const connection = await getCalendarConnectionById(connectionId);
-    if (!connection || connection.destinationCalendarId === calendarId) return { ok: true };
-    const client = getCalendarClient();
-    const oldCalendarId = connection.destinationCalendarId || 'primary';
-    const links = await getCalendarEventLinksForConnection(connectionId);
-
-    // Delete-only pass. Keep ALL links until we know the old calendar is fully cleared.
-    let allCleared = true;
-    let failures = 0;
-    const tasks = links.map((link) => async () => {
-      try {
-        await deleteRemoteEventForLink(client, connectionId, oldCalendarId, link);
-      } catch {
-        allCleared = false;
-        failures++;
-      }
-    });
-    await runPooled(tasks, MAX_INFLIGHT);
-
-    if (!allCleared) {
-      reportError({
-        surface: 'calendar-sync',
-        message: `[calendarSync] destination switch aborted: ${failures} old-calendar delete(s) failed`,
-        severity: 'warning',
-        context: { connectionId },
-      });
-      return { ok: false }; // destination + all links unchanged; reconcile self-heals
-    }
-
-    // Cleared → drop links, switch, re-sync onto the new calendar.
-    // IMPORTED links are KEPT (#94). Their events were never on the old calendar to
-    // begin with and were not deleted above, so dropping the link would un-suppress
-    // an invited activity and let the re-sync create the school's event on the NEW
-    // calendar.
-    //
-    // ⚠️ An ADOPTED link is DEMOTED to `external` rather than kept as-is. A link
-    // carries no calendarId — every push targets the connection's one destination —
-    // so after the switch an adopted event's real home (the OLD calendar) is no
-    // longer anywhere beanies writes. Keeping it `adopted` meant the very next
-    // verify pass looked for it on the NEW calendar, did not find it, treated that
-    // as "the organizer deleted it" (`adoptedGone`), dropped the link, and created
-    // a beanies-owned copy — leaving the family with the original on one calendar
-    // and a duplicate on the other. `external` is the honest state: the event still
-    // exists in Google where its organizer put it, and beanies stops claiming it.
-    for (const link of links) {
-      if (!beaniesMayDelete(link)) {
-        if (link.origin === 'adopted') {
-          await updateCalendarEventLink(link.id, { origin: 'external' });
-        }
-        continue;
-      }
-      await removeCalendarEventLinkById(connectionId, link.activityId);
-    }
-    await updateCalendarConnection(connectionId, { destinationCalendarId: calendarId });
-    void reconcileConnection(connectionId, { verifyExisting: true, force: true });
-    return { ok: true };
-  }
-
-  /** Calendars for the destination picker. Falls back to a primary-only option if the
-   *  calendarlist scope was dropped under granular consent (no silent empty list). */
+  /** A connection's calendars, so its card can show the destination's name. Falls back
+   *  to a primary-only option if the calendarlist scope was dropped under granular
+   *  consent (no silent empty list). */
   async function listCalendarsFor(connectionId: string): Promise<CalendarSummary[]> {
     const connection = await getCalendarConnectionById(connectionId);
     if (!connection) return [];
-    // Fallback option mirrors the stored id so the picker always shows it selected.
-    // Empty summary → the Vue layer renders the localized "Primary calendar" label
-    // (i18n stays in the view, not the store). (F9)
-    const fallback: CalendarSummary[] = [
-      { id: connection.destinationCalendarId || 'primary', summary: '', primary: true },
-    ];
-    const hasScope = connection.grantedScopes.some((s) => s.includes('calendar.calendarlist'));
-    if (!hasScope) return fallback;
+    // Fallback option mirrors the stored id, so the card can still name it. (F9)
+    const fallback = primaryOnly(connection.destinationCalendarId || 'primary');
+    if (!hasCalendarListScope(connection.grantedScopes)) return fallback;
     try {
       const calendars = await getCalendarClient().listCalendars(connectionId);
       // CalendarList returns the primary calendar's REAL id (the account email),
@@ -1857,12 +1978,15 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     connections,
     reconnectNeededConnection,
     showCalendarReconnect,
-    connect,
+    pendingConnect,
+    beginConnect,
+    listPendingCalendars,
+    confirmConnect,
+    abandonConnect,
     reconnect,
     applyUnifiedRefreshToken,
     resumeRedirectConnect,
     disconnect,
-    setDestinationCalendar,
     listCalendarsFor,
     syncNow,
     start,

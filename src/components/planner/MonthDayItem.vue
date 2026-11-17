@@ -23,9 +23,14 @@
  * (inside the cell's button) never lift; the open day row's and the desktop chips do. Trips,
  * segments, birthdays and holidays are not activities and never get a source, and neither
  * does a vacation-linked activity (it belongs to its trip).
+ *
+ * A view-only external event (`external`, plan 2026-11-17) renders `ExternalChip`: no drag
+ * source, no reveal hooks, no `data-activity-id`. Its click asks the host for the read-only
+ * details (`external-click`), never the activity drawer.
  */
 import { computed } from 'vue';
 import type { FamilyActivity } from '@/types/models';
+import type { ExternalEvent } from '@/types/externalEvents';
 import { useMonthCellChips } from '@/components/planner/monthCellChipsKey';
 import { useActivityDragAttrs } from '@/composables/drag/useActivityDragAttrs';
 import type { DayItem } from '@/utils/monthDayItems';
@@ -34,6 +39,7 @@ import MonthChip from '@/components/planner/MonthChip.vue';
 import MonthSegmentChip from '@/components/planner/MonthSegmentChip.vue';
 import TripChip from '@/components/planner/TripChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
+import ExternalChip from '@/components/planner/ExternalChip.vue';
 
 const props = withDefaults(defineProps<{ item: DayItem; run?: LaneRun }>(), {
   run: () => ({ isStart: true, isEnd: true, showLabel: true }),
@@ -43,6 +49,7 @@ const emit = defineEmits<{
   'view-activity': [activityId: string, date: string];
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
+  'external-click': [event: ExternalEvent];
 }>();
 
 const chips = useMonthCellChips();
@@ -78,6 +85,12 @@ const dragAttrs = computed(() =>
     :vacation="item.vacation"
     v-bind="run"
     @click.stop="emit('vacation-click', item.vacation.id)"
+  />
+  <ExternalChip
+    v-else-if="item.kind === 'external'"
+    :event="item.external"
+    :date="item.date"
+    @open="(e) => emit('external-click', e)"
   />
   <AllDayActivityChip
     v-else

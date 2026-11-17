@@ -27,6 +27,8 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { belongsInMemberColumn } from '@/utils/assignees';
 import { sortByTime, wallSharedAllDay } from '@/utils/wallActivities';
 import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { wallExternalItems } from '@/utils/wallExternalEvents';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
@@ -76,6 +78,8 @@ const emit = defineEmits<{
 const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
+/** Read only: the page sets the fetch window (plan 2026-11-17, C4). */
+const externalEvents = useExternalEvents();
 
 const members = computed(() => {
   const humans = familyStore.sortedHumans;
@@ -129,6 +133,19 @@ function eventsFor(memberId: string) {
  *
  * Timed events only reach the grid; the all-day ones go to the band.
  */
+/**
+ * The anchored day's timed view-only events, in EVERY lane. A view-only event belongs
+ * to nobody in the family, and the lanes' rule for an activity with no owner is "in all
+ * of them" (`belongsInMemberColumn`), so it follows the same rule rather than inventing
+ * a lane of its own: the busy time sits beside every bean's own plans. Empty unless a
+ * calendar is viewed.
+ */
+const externals = computed(() =>
+  externalEvents.isActive.value
+    ? wallExternalItems(externalEvents.timedForDate(props.anchorYmd), props.anchorYmd)
+    : []
+);
+
 const gridColumns = computed(() =>
   members.value.map((member) => ({
     key: member.id,
@@ -138,6 +155,7 @@ const gridColumns = computed(() =>
     tint: member.color,
     isToday: isToday.value,
     occurrences: eventsFor(member.id).filter((e) => !isAllDayActivity(e.activity)),
+    externals: externals.value,
   }))
 );
 /**
@@ -180,7 +198,9 @@ const allDaySpans = computed(() =>
  * and six lanes across the remaining ~920px still leave 150px each. Portrait has
  * no width to spare, so it keeps the band.
  */
-const busiest = computed(() => Math.max(0, ...members.value.map((m) => eventsFor(m.id).length)));
+const busiest = computed(() =>
+  Math.max(0, ...members.value.map((m) => eventsFor(m.id).length + externals.value.length))
+);
 
 /**
  * A face beside a name needs room. Six lanes across a landscape tablet is ~153px

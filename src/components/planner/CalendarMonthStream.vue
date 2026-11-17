@@ -22,6 +22,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useDayExtras } from '@/composables/useDayExtras';
+import { useExternalEvents } from '@/composables/useExternalEvents';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatMonthYear } from '@/utils/date';
 import {
@@ -119,6 +120,7 @@ const { extras: dayExtras } = useDayExtras(
   computed(() => streamSpan.value.startYmd),
   computed(() => streamSpan.value.endYmd)
 );
+const { eventsByDate: externalsByDate } = useExternalEvents();
 
 const renderedMonths = computed(() => {
   const list = months.value;
@@ -140,6 +142,8 @@ const renderedMonths = computed(() => {
     segments: vacationStore.travelSegmentOccurrencesInRange(spanStart, spanEnd),
     vacations: vacationStore.vacations,
     extras: dayExtras.value,
+    // Timed view-only events (read only; the page sets the fetch window).
+    externalsByDate: externalsByDate.value,
     spanStart,
     spanEnd,
   });

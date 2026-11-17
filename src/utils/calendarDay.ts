@@ -32,6 +32,7 @@
  */
 import type { HolidayOccurrence } from '@/types/models';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
+import type { ExternalEvent } from '@/types/externalEvents';
 
 /**
  * The kinds of non-activity content a day can carry.
@@ -41,7 +42,7 @@ import type { BirthdayOccurrence } from '@/utils/birthdays';
  * that stops the next one reaching only half the surfaces. `allDaySurfaces.test`
  * additionally asserts every calendar surface consults this module at all.
  */
-export type DayExtraKind = 'birthday' | 'holiday' | 'trip';
+export type DayExtraKind = 'birthday' | 'holiday' | 'external' | 'trip';
 
 /** One piece of non-activity content, already labelled for display. */
 export interface DayExtra {
@@ -62,6 +63,12 @@ export interface DayExtra {
    *  birthday drawer wants the age and the member id). Exactly one is set. */
   birthday?: BirthdayOccurrence;
   holiday?: HolidayOccurrence;
+  /**
+   * An ALL-DAY event from a view-only external calendar (plan 2026-11-17), one extra
+   * per day it covers. Memory only: it never reaches the family file. The planner
+   * surfaces draw it as an `ExternalChip`; its `label` is the title or "Busy".
+   */
+  external?: ExternalEvent;
 }
 
 /**
@@ -69,9 +76,15 @@ export interface DayExtra {
  * about which of two things on the same date comes first.
  *
  * Birthdays lead: they are about somebody in this family. A holiday is reference
- * data about the country, and a trip is already carried by its own bar.
+ * data about the country. A view-only external event is somebody else's calendar,
+ * shown for information, so it follows both. A trip is already carried by its own bar.
  */
-const KIND_ORDER: Record<DayExtraKind, number> = { birthday: 0, holiday: 1, trip: 2 };
+const KIND_ORDER: Record<DayExtraKind, number> = {
+  birthday: 0,
+  holiday: 1,
+  external: 2,
+  trip: 3,
+};
 
 /** Sort in place and return: date, then kind, then label, then id. */
 export function sortDayExtras(extras: DayExtra[]): DayExtra[] {
@@ -82,6 +95,13 @@ export function sortDayExtras(extras: DayExtra[]): DayExtra[] {
       a.label.localeCompare(b.label) ||
       a.id.localeCompare(b.id)
   );
+}
+
+/** The view-only external events among a day's extras (the planner views' all-day row). */
+export function externalExtras(extras: readonly DayExtra[] | undefined): ExternalEvent[] {
+  const out: ExternalEvent[] = [];
+  for (const e of extras ?? []) if (e.kind === 'external' && e.external) out.push(e.external);
+  return out;
 }
 
 /** Bucket by date — the shape every calendar cell and every wall column wants. */

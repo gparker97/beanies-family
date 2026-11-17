@@ -19,4 +19,5 @@ export const COMMITTED_FLAGS: Record<DevFlag, boolean> = {
   podCompaction: true,
   pricing: true,
   systemBrowserPicker: true,
+  viewOnlyCalendars: false,
 };

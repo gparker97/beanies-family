@@ -77,6 +77,26 @@ describe('overlapAckStore', () => {
     expect(s.isAcknowledged('a1', '2026-06-11', 'conn-1', 'fp-2')).toBe(false);
   });
 
+  it('an acknowledgement stored against a viewed calendar id resolves (same key slot)', async () => {
+    // As already persisted in the family file: the literal key, `connectionId` field.
+    acks['a1:2026-06-11:vc-1'] = {
+      activityId: 'a1',
+      occurrenceDate: '2026-06-11',
+      connectionId: 'vc-1',
+      fingerprint: 'fp-1',
+      acknowledgedAt: '2026-11-17T00:00:00.000Z',
+      acknowledgedBy: 'v',
+    };
+    const s = useOverlapAckStore();
+    expect(s.isAcknowledged('a1', '2026-06-11', 'vc-1', 'fp-1')).toBe(true);
+    // A different source for the same occurrence is its own acknowledgement.
+    expect(s.isAcknowledged('a1', '2026-06-11', 'conn-1', 'fp-1')).toBe(false);
+
+    s.acknowledge('a2', '2026-06-12', 'vc-1', 'fp-2');
+    await flush();
+    expect(acks['a2:2026-06-12:vc-1']).toMatchObject({ connectionId: 'vc-1', fingerprint: 'fp-2' });
+  });
+
   it('unacknowledge removes the entry (Undo re-raises)', async () => {
     const s = useOverlapAckStore();
     s.acknowledge('a1', '2026-06-11', 'conn-1', 'fp-1');

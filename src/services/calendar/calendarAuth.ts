@@ -64,6 +64,60 @@ export const CALENDAR_SCOPES = [
 const REQUIRED_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned';
 
 /**
+ * Which Google grant a calendar consent asks for (view-only calendars, plan
+ * 2026-11-17).
+ *
+ *  - `sync`: push beanies' own events to a calendar the account owns. Today's
+ *    scopes, byte-identical, and the default everywhere, so every existing call
+ *    site keeps asking for exactly what it asked for before.
+ *  - `view`: read events on calendars someone else owns and has shared with the
+ *    account. `calendar.events.readonly` is the narrowest scope that can, and it is
+ *    NOT a superset of `calendar.events.owned` (it cannot write), so a view consent
+ *    never doubles as a sync consent and the reverse.
+ *
+ * ⚠️ Production must not request `view` until Google has verified the scope (an
+ * unverified sensitive scope shows the warning screen and counts against the
+ * 100-user cap). Only the view store asks for it, and only with `viewOnlyCalendars`
+ * on (committed off until Google approves the scope).
+ *
+ * No `include_granted_scopes` for either kind: each grant stays independent of
+ * Drive and of the other kind.
+ */
+export type CalendarGrantKind = 'sync' | 'view';
+
+/** Scopes for a view-only consent. `userinfo.email` labels the account, as for sync. */
+export const VIEW_CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.events.readonly',
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+  'https://www.googleapis.com/auth/userinfo.email',
+] as const;
+
+interface CalendarGrantSpec {
+  /** Every scope the consent asks for. */
+  scopes: readonly string[];
+  /** The one scope the grant is useless without; its absence is `missing_scope`. */
+  required: string;
+  /** The `missing_scope` failure text for this kind. */
+  missingScopeMessage: string;
+}
+
+/** The scope table. One row per grant kind; the single source for consent URLs and checks. */
+export const CALENDAR_GRANTS: Readonly<Record<CalendarGrantKind, CalendarGrantSpec>> = {
+  sync: {
+    scopes: CALENDAR_SCOPES,
+    required: REQUIRED_SCOPE,
+    missingScopeMessage:
+      'Calendar access wasn’t granted. Please allow beanies to manage its own events when prompted.',
+  },
+  view: {
+    scopes: VIEW_CALENDAR_SCOPES,
+    required: 'https://www.googleapis.com/auth/calendar.events.readonly',
+    missingScopeMessage:
+      'Calendar access wasn’t granted. Please allow beanies to see the events on your calendars when prompted.',
+  },
+};
+
+/**
  * Grant-namespaced sessionStorage key for a pending CALENDAR redirect code (P2).
  * Written by OAuthCallbackPage (web bounce) / the native deep-link handler, read +
  * cleared by `completeCalendarRedirectAuth`. Defined in googleAuth alongside the
@@ -117,12 +171,17 @@ function getClientId(): string {
 // googleAuth.startRedirectAuth) used `/oauth/native`, so every native calendar
 // token exchange 400'd (`redirect_uri_mismatch`). See ADR-029.
 
-function buildCalendarAuthUrl(clientId: string, codeChallenge: string, loginHint?: string): string {
+function buildCalendarAuthUrl(
+  clientId: string,
+  codeChallenge: string,
+  loginHint?: string,
+  kind: CalendarGrantKind = 'sync'
+): string {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: getRedirectUri(),
     response_type: 'code',
-    scope: CALENDAR_SCOPES.join(' '),
+    scope: CALENDAR_GRANTS[kind].scopes.join(' '),
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
     access_type: 'offline',
@@ -186,13 +245,42 @@ const fail = (code: CalendarAuthErrorCode, message: string): CalendarConnectFail
 });
 
 /**
+ * Turn a redeemed token response into a result for one grant kind. Shared by the
+ * popup and the redirect completion so both decide `missing_scope` the same way:
+ * against the KIND's required scope (a sync consent lacking `events.owned`, or a
+ * view consent lacking `events.readonly`), checked before the refresh token, as
+ * before. Never throws (`fetchEmail` is best-effort).
+ */
+async function finishConsent(
+  tokens: TokenResponse,
+  kind: CalendarGrantKind
+): Promise<CalendarConnectSuccess | CalendarConnectFailure> {
+  const grant = CALENDAR_GRANTS[kind];
+  const grantedScopes = tokens.scope ? tokens.scope.split(' ').filter(Boolean) : [];
+  if (!grantedScopes.includes(grant.required)) {
+    return fail('missing_scope', grant.missingScopeMessage);
+  }
+  if (!tokens.refresh_token) {
+    return fail(
+      'no_refresh_token',
+      'Google didn’t grant offline access. Please try connecting again.'
+    );
+  }
+  const email = await fetchEmail(tokens.access_token);
+  return { status: 'connected', email, refreshToken: tokens.refresh_token, grantedScopes };
+}
+
+/**
  * Run the calendar consent flow for one Google account. Returns the refresh token
  * + granted scopes for the caller to persist into a CalendarConnection (Layer 5),
  * or a structured failure. Never throws — every failure is classified.
+ *
+ * `kind` picks the grant (default `'sync'`, today's scopes); see `CalendarGrantKind`.
  */
 export async function connectGoogleCalendar(
-  opts: { loginHint?: string } = {}
+  opts: { loginHint?: string; kind?: CalendarGrantKind } = {}
 ): Promise<CalendarConnectResult> {
+  const kind = opts.kind ?? 'sync';
   // POPUP transport only. Redirect surfaces (PWA/iOS/native) go through
   // `startCalendarRedirectAuth` + `completeCalendarRedirectAuth` instead — the
   // store gates on `shouldUseRedirectAuth()` and never calls this there (P2).
@@ -211,7 +299,7 @@ export async function connectGoogleCalendar(
   try {
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
-    const url = buildCalendarAuthUrl(clientId, codeChallenge, opts.loginHint);
+    const url = buildCalendarAuthUrl(clientId, codeChallenge, opts.loginHint, kind);
 
     const code = await waitForCode(popup, url);
 
@@ -222,22 +310,7 @@ export async function connectGoogleCalendar(
       clientId,
     });
 
-    const grantedScopes = tokens.scope ? tokens.scope.split(' ').filter(Boolean) : [];
-    if (!grantedScopes.includes(REQUIRED_SCOPE)) {
-      return fail(
-        'missing_scope',
-        'Calendar access wasn’t granted. Please allow beanies to manage its own events when prompted.'
-      );
-    }
-    if (!tokens.refresh_token) {
-      return fail(
-        'no_refresh_token',
-        'Google didn’t grant offline access. Please try connecting again.'
-      );
-    }
-
-    const email = await fetchEmail(tokens.access_token);
-    return { status: 'connected', email, refreshToken: tokens.refresh_token, grantedScopes };
+    return await finishConsent(tokens, kind);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.startsWith('cancelled:')) {
@@ -282,23 +355,37 @@ export function refreshCalendarToken(refreshToken: string): Promise<TokenRespons
  * The real intent (connect vs which connection to reconnect) rides in
  * `returnPath` (a `calResume` query the store builds), so no secret and no
  * connection id ever touches the OAuth `state`.
+ *
+ * `kind` picks the scopes (default `'sync'`). Both kinds share the `'calendar'`
+ * redirect grant (one code slot): the kind decides what is ASKED for here and what
+ * is REQUIRED at completion, nothing about the transport.
  */
 export function startCalendarRedirectAuth(
   returnPath: string,
   loginHint: string | undefined,
-  mode: RedirectMode
+  mode: RedirectMode,
+  kind: CalendarGrantKind = 'sync'
 ): Promise<void> {
   return startRedirectAuth(returnPath, loginHint, mode, {
     grant: 'calendar',
-    scope: CALENDAR_SCOPES.join(' '),
+    scope: CALENDAR_GRANTS[kind].scopes.join(' '),
   });
 }
 
-// Per-page-load memo. REJECT/RESOLVE-STICKY BY DESIGN: the one-time code is
-// removed on entry, so a failed exchange is unrecoverable without a fresh
-// redirect (= a new page load, which resets this module state). Mirrors
-// googleAuth's `redirectSettlePromise`.
-let calendarSettlePromise: Promise<CalendarConnectResult | null> | null = null;
+/** What redeeming the pending redirect code produced, before any per-kind check. */
+type RedirectExchange = { tokens: TokenResponse } | CalendarConnectFailure;
+
+// Per-page-load memo of the one-time code EXCHANGE. REJECT/RESOLVE-STICKY BY
+// DESIGN: the code is removed on entry, so a failed exchange is unrecoverable
+// without a fresh redirect (= a new page load, which resets this module state).
+// Mirrors googleAuth's `redirectSettlePromise`.
+//
+// The exchange is memoized separately from the per-kind result so the code is
+// redeemed exactly once whatever kind each caller passes, and each kind's
+// `missing_scope` check runs against that kind's required scope rather than
+// whichever caller happened to arrive first.
+let calendarExchangePromise: Promise<RedirectExchange | null> | null = null;
+const calendarSettlePromises = new Map<CalendarGrantKind, Promise<CalendarConnectResult | null>>();
 
 /**
  * Complete a pending calendar redirect: redeem the grant-namespaced code and
@@ -313,15 +400,27 @@ let calendarSettlePromise: Promise<CalendarConnectResult | null> | null = null;
  *    → exchange WITH the PKCE verifier.
  *  - WEB (iOS/PWA): no stash → exchange WITHOUT a verifier (the confidential
  *    proxy secures the code via client_secret; ADR-026).
+ *
+ * `kind` (default `'sync'`) is the grant the redirect was started for; the granted
+ * scopes are checked against that kind's required scope.
  */
-export function completeCalendarRedirectAuth(): Promise<CalendarConnectResult | null> {
-  if (!calendarSettlePromise) {
-    calendarSettlePromise = doCompleteCalendarRedirectAuth();
+export function completeCalendarRedirectAuth(
+  kind: CalendarGrantKind = 'sync'
+): Promise<CalendarConnectResult | null> {
+  let settled = calendarSettlePromises.get(kind);
+  if (!settled) {
+    if (!calendarExchangePromise) calendarExchangePromise = redeemCalendarRedirectCode();
+    settled = calendarExchangePromise.then((exchange) => {
+      if (!exchange) return null;
+      if ('status' in exchange) return exchange; // classified failure, kind-independent
+      return finishConsent(exchange.tokens, kind);
+    });
+    calendarSettlePromises.set(kind, settled);
   }
-  return calendarSettlePromise;
+  return settled;
 }
 
-async function doCompleteCalendarRedirectAuth(): Promise<CalendarConnectResult | null> {
+async function redeemCalendarRedirectCode(): Promise<RedirectExchange | null> {
   let code: string | null = null;
   try {
     code = sessionStorage.getItem(CALENDAR_REDIRECT_CODE_KEY);
@@ -388,21 +487,7 @@ async function doCompleteCalendarRedirectAuth(): Promise<CalendarConnectResult |
       redirectUri: getRedirectUri(),
       clientId,
     });
-    const grantedScopes = tokens.scope ? tokens.scope.split(' ').filter(Boolean) : [];
-    if (!grantedScopes.includes(REQUIRED_SCOPE)) {
-      return fail(
-        'missing_scope',
-        'Calendar access wasn’t granted. Please allow beanies to manage its own events when prompted.'
-      );
-    }
-    if (!tokens.refresh_token) {
-      return fail(
-        'no_refresh_token',
-        'Google didn’t grant offline access. Please try connecting again.'
-      );
-    }
-    const email = await fetchEmail(tokens.access_token);
-    return { status: 'connected', email, refreshToken: tokens.refresh_token, grantedScopes };
+    return { tokens };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // A redirect that returned a code but failed to exchange is a real recovery
@@ -422,5 +507,6 @@ async function doCompleteCalendarRedirectAuth(): Promise<CalendarConnectResult |
 
 /** Test-only — reset the calendar redirect-settle memo. Production never calls this. */
 export function __resetCalendarRedirectSettleForTesting(): void {
-  calendarSettlePromise = null;
+  calendarExchangePromise = null;
+  calendarSettlePromises.clear();
 }

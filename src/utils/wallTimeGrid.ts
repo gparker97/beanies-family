@@ -382,8 +382,12 @@ export const MAX_ATTEMPTS = LADDER.length + (ZOOM_STEPS.length + 1) * (DAY_WINDO
 
 // ── Result shapes ─────────────────────────────────────────────────────────
 
-export interface GridBlock {
-  occurrence: WallOccurrence;
+export interface GridBlock<T = WallOccurrence> {
+  /**
+   * The laid-out item. A `WallOccurrence` by default; with a `spanOf` option, whatever
+   * the caller laid out (the wall grid mixes activities with view-only events).
+   */
+  occurrence: T;
   /** TRUE minutes — the block's own truth, independent of how it is drawn. */
   start: number;
   end: number;
@@ -399,8 +403,8 @@ export interface GridBlock {
 }
 
 /** An occurrence that has no place on the axis, and the column it belongs to. */
-export interface PlacedOccurrence {
-  occurrence: WallOccurrence;
+export interface PlacedOccurrence<T = WallOccurrence> {
+  occurrence: T;
   column: number;
 }
 
@@ -414,8 +418,8 @@ export interface GridFold {
 
 export type GridTier = 'roomy' | 'gentle' | 'tightened' | 'floored' | 'overflow';
 
-export interface GridLayout {
-  columns: GridBlock[][];
+export interface GridLayout<T = WallOccurrence> {
+  columns: GridBlock<T>[][];
   folds: GridFold[];
   ticks: { minutes: number; y: number }[];
   yFor: (minutes: number) => number;
@@ -434,7 +438,7 @@ export interface GridLayout {
    * calling, and renders them through `allDaySpans` instead. A second, unread
    * channel for the same items is how the two disagree.
    */
-  rejected: PlacedOccurrence[];
+  rejected: PlacedOccurrence<T>[];
   tier: GridTier;
   /** Pixels per minute this layout settled on — one hour is `scale * 60` tall. */
   scale: number;
@@ -442,54 +446,83 @@ export interface GridLayout {
   attempts: number;
 }
 
-export interface LayoutOptions {
+/**
+ * Where one item sits on the axis: its TRUE `[start, end)` minutes, `'all-day'` (the
+ * band's business, skipped silently), or `null` (an unreadable time, returned in
+ * `rejected` so the band can still show it).
+ */
+export type GridSpan = { start: number; end: number } | 'all-day' | null;
+
+/**
+ * The default `spanOf`: an activity occurrence's span. Every caller that lays out
+ * activities alone gets exactly this, which is what keeps lane packing in ONE place
+ * when a caller adds items of another kind beside them.
+ */
+export function activityGridSpan(
+  occurrence: WallOccurrence,
+  assumedDurationMin: number = ASSUMED_DURATION_MIN
+): GridSpan {
+  // An all-day item is not the plot's business: every view routes those to the band.
+  // Reported as 'all-day' rather than `null` so it is skipped SILENTLY: `rejected`
+  // drives the `wall_grid_unreadable_time` warning, and reporting a perfectly good
+  // all-day record as corrupt poisons the one diagnostic this feature has for
+  // genuine data corruption.
+  if (isAllDayActivity(occurrence.activity)) return 'all-day';
+  return activitySpanMinutes(occurrence.activity, assumedDurationMin);
+}
+
+export interface LayoutOptions<T = WallOccurrence> {
   maxBlock?: number;
+  /** Read by the default `spanOf` only. */
   assumedDurationMin?: number;
+  /**
+   * How to read one item's span. Defaults to `activityGridSpan`; a caller laying out
+   * more than activities (the wall grid's view-only events) passes its own, which must
+   * still answer `activityGridSpan` for an activity so packing stays identical.
+   */
+  spanOf?: (item: T) => GridSpan;
 }
 
 // ── Parsing (hoisted out of the search — done once, not 100 times) ────────
 
-interface ParsedItem {
-  occurrence: WallOccurrence;
+interface ParsedItem<T = unknown> {
+  occurrence: T;
   start: number;
   end: number;
   column: number;
 }
 
-interface ParsedInput {
-  items: ParsedItem[];
-  byColumn: ParsedItem[][];
+interface ParsedInput<T> {
+  items: ParsedItem<T>[];
+  byColumn: ParsedItem<T>[][];
   /**
    * Hoisted out of the search, because neither varies with a rung or a budget.
    * Both are pure functions of the frozen true spans, so recomputing them inside
    * `attempt()` did the same work up to 100 times per layout — ~700 redundant
    * sorts and 4,200 discarded Map entries for a seven-day week, on a tablet.
    */
-  lanes: ReturnType<typeof assignLanes>[];
+  lanes: LanePlacement<ParsedItem<T>>[];
   busy: [number, number][];
-  rejected: PlacedOccurrence[];
+  rejected: PlacedOccurrence<T>[];
   windowStart: number;
   windowEnd: number;
   columnCount: number;
 }
 
-function parseColumns(
-  columns: readonly (readonly WallOccurrence[])[],
-  assumedDurationMin: number
-): ParsedInput {
-  const items: ParsedItem[] = [];
-  const byColumn: ParsedItem[][] = columns.map(() => []);
-  const rejected: PlacedOccurrence[] = [];
+function parseColumns<T>(
+  columns: readonly (readonly T[])[],
+  spanOf: (item: T) => GridSpan
+): ParsedInput<T> {
+  const items: ParsedItem<T>[] = [];
+  const byColumn: ParsedItem<T>[][] = columns.map(() => []);
+  const rejected: PlacedOccurrence<T>[] = [];
 
   columns.forEach((column, index) => {
     for (const occurrence of column) {
-      // An all-day item is not the plot's business — every view routes those to
-      // the band. Skipped SILENTLY rather than rejected: `rejected` drives the
-      // `wall_grid_unreadable_time` warning, and reporting a perfectly good
-      // all-day record as corrupt poisons the one diagnostic this feature has
-      // for genuine data corruption.
-      if (isAllDayActivity(occurrence.activity)) continue;
-      const span = activitySpanMinutes(occurrence.activity, assumedDurationMin);
+      const span = spanOf(occurrence);
+      // An all-day item: skipped silently (see `activityGridSpan` for why it is
+      // never reported as rejected).
+      if (span === 'all-day') continue;
       if (!span) {
         // An unreadable time. NOT dropped: the caller shows it in the all-day
         // band. Before this, `NaN` propagated into every `top` and the browser
@@ -659,6 +692,12 @@ export function buildScale(
   return { yFor, total: yFor(windowEnd) };
 }
 
+/** Each item's lane within its overlap cluster, as fractions of the column. */
+export type LanePlacement<I> = Map<
+  I,
+  { lane: number; lanes: number; offset: number; width: number }
+>;
+
 /**
  * ⚠️ RULE 3 — TWO kinds of collision, and they want opposite answers.
  *
@@ -677,22 +716,13 @@ export function buildScale(
  *
  * The two are told apart by testing the TRUE time ranges for intersection.
  */
-export function assignLanes(items: readonly ParsedItem[]): Map<
-  ParsedItem,
-  {
-    lane: number;
-    lanes: number;
-    offset: number;
-    width: number;
-  }
-> {
-  const placement = new Map<
-    ParsedItem,
-    { lane: number; lanes: number; offset: number; width: number }
-  >();
+export function assignLanes<I extends { start: number; end: number }>(
+  items: readonly I[]
+): LanePlacement<I> {
+  const placement: LanePlacement<I> = new Map();
   for (const cluster of clusterOverlapping(items)) {
     const laneEnds: number[] = [];
-    const laneItems: ParsedItem[][] = [];
+    const laneItems: I[][] = [];
     for (const item of cluster) {
       let lane = laneEnds.findIndex((end) => item.start >= end);
       if (lane === -1) {
@@ -716,7 +746,7 @@ export function assignLanes(items: readonly ParsedItem[]): Map<
     // otherwise take its widths from the wrong pair.
     let widths: number[];
     if (lanes === 2) {
-      const longest = (list: ParsedItem[]) => Math.max(...list.map((i) => i.end - i.start));
+      const longest = (list: I[]) => Math.max(...list.map((i) => i.end - i.start));
       widths = longest(laneItems[0]!) >= longest(laneItems[1]!) ? [0.62, 0.38] : [0.38, 0.62];
     } else {
       widths = Array.from({ length: lanes }, () => 1 / lanes);
@@ -747,7 +777,7 @@ export function assignLanes(items: readonly ParsedItem[]): Map<
  * every later block, all through one shifted mapping.
  */
 export function settle(
-  blocks: readonly GridBlock[],
+  blocks: readonly GridBlock<unknown>[],
   folds: readonly GridFold[],
   yFor: (t: number) => number
 ): { bands: GridFold[]; shiftedYFor: (t: number) => number } {
@@ -791,8 +821,8 @@ export function settle(
   return { bands, shiftedYFor };
 }
 
-interface Attempt {
-  columns: GridBlock[][];
+interface Attempt<T> {
+  columns: GridBlock<T>[][];
   bands: GridFold[];
   yFor: (t: number) => number;
   total: number;
@@ -815,11 +845,11 @@ interface Attempt {
  * This is why the change cannot make anything worse: when this returns null the
  * caller runs TODAY's code path, at today's rung 0, against today's budget.
  */
-function tryGenerousFit(
-  input: ParsedInput,
+function tryGenerousFit<T>(
+  input: ParsedInput<T>,
   height: number,
   maxBlock: number
-): { attempt: Attempt; attempts: number; axis: AxisMode } | null {
+): { attempt: Attempt<T>; attempts: number; axis: AxisMode } | null {
   let attempts = 0;
   const NARROWEST = DAY_WINDOWS.length - 1;
 
@@ -874,15 +904,15 @@ function tryGenerousFit(
  * name every call site if another is ever added — which is the cheapest possible
  * guard against a second search path forgetting to pass it.
  */
-function attempt(
-  input: ParsedInput,
+function attempt<T>(
+  input: ParsedInput<T>,
   rung: Rung,
   maxBlock: number,
   zoom: number,
   axis: AxisMode = 'folded',
   /** Which of DAY_WINDOWS to draw, when `axis` is 'full'. Widest is 0. */
   dayWindow = DAY_WINDOWS.length - 1
-): Attempt {
+): Attempt<T> {
   /*
    * ⭐ How generous is the axis? Three settings, tried widest-first by the caller.
    *
@@ -935,9 +965,9 @@ function attempt(
       : [];
   const { yFor } = buildScale(windowStart, windowEnd, folds, pxPerMin);
 
-  const columns: GridBlock[][] = input.byColumn.map((columnItems, columnIndex) => {
+  const columns: GridBlock<T>[][] = input.byColumn.map((columnItems, columnIndex) => {
     const placement = input.lanes[columnIndex]!;
-    const blocks: GridBlock[] = columnItems.map((item) => {
+    const blocks: GridBlock<T>[] = columnItems.map((item) => {
       const p = placement.get(item)!;
       const raw = yFor(item.end) - yFor(item.start);
       const height = Math.max(rung.minBlock, applyBlockCap(raw, maxBlock));
@@ -1028,7 +1058,7 @@ function attempt(
  * y-alignment EXACTLY (it is a single affine transform); only legibility
  * degrades, and the tier is telemetered so the degradation is measurable.
  */
-function squeeze(a: Attempt, availableHeight: number): Attempt {
+function squeeze<T>(a: Attempt<T>, availableHeight: number): Attempt<T> {
   if (a.total <= availableHeight || a.total <= 0) return a;
   const k = availableHeight / a.total;
   for (const block of a.columns.flat()) {
@@ -1104,11 +1134,31 @@ function buildTicks(
 export function layoutTimeGrid(
   columns: readonly (readonly WallOccurrence[])[],
   availableHeight: number,
-  options: LayoutOptions = {}
-): GridLayout {
+  options?: LayoutOptions
+): GridLayout;
+/**
+ * Generic over the item, for a caller that lays out more than activities. `spanOf` is
+ * then required: lane packing, folding and the search below are the same code for
+ * every item kind, so a view-only event overlapping an activity splits the column
+ * exactly as two activities would.
+ */
+export function layoutTimeGrid<T>(
+  columns: readonly (readonly T[])[],
+  availableHeight: number,
+  options: LayoutOptions<T> & { spanOf: (item: T) => GridSpan }
+): GridLayout<T>;
+export function layoutTimeGrid<T>(
+  columns: readonly (readonly T[])[],
+  availableHeight: number,
+  options: LayoutOptions<T> = {}
+): GridLayout<T> {
   const height = Math.max(1, availableHeight);
   const maxBlock = options.maxBlock ?? defaultMaxBlock(height);
-  const input = parseColumns(columns, options.assumedDurationMin ?? ASSUMED_DURATION_MIN);
+  const assumed = options.assumedDurationMin ?? ASSUMED_DURATION_MIN;
+  // Without `spanOf` the overloads guarantee `T` is `WallOccurrence`.
+  const spanOf =
+    options.spanOf ?? ((item: T) => activityGridSpan(item as unknown as WallOccurrence, assumed));
+  const input = parseColumns(columns, spanOf);
 
   const base = {
     windowStart: input.windowStart,
@@ -1154,7 +1204,7 @@ export function layoutTimeGrid(
 
   // The candidates the pre-pass burned still count against MAX_ATTEMPTS.
   let attempts = (zoomCandidates(height).length + 1) * (DAY_WINDOWS.length + 1);
-  let last: Attempt | null = null;
+  let last: Attempt<T> | null = null;
   let acceptedRung = 0;
 
   for (let rungIndex = 0; rungIndex < LADDER.length; rungIndex++) {
@@ -1172,14 +1222,14 @@ export function layoutTimeGrid(
   return finish(squeeze(last!, height), base, acceptedRung, attempts, 'squeezed');
 }
 
-function finish(
-  a: Attempt,
-  base: Pick<GridLayout, 'windowStart' | 'windowEnd' | 'rejected'>,
+function finish<T>(
+  a: Attempt<T>,
+  base: Pick<GridLayout<T>, 'windowStart' | 'windowEnd' | 'rejected'>,
   rungIndex: number,
   attempts: number,
   outcome: 'fit' | 'squeezed',
   axis: AxisMode = 'folded'
-): GridLayout {
+): GridLayout<T> {
   /*
    * The tier says which compromise this day cost, and it leads with whether the
    * grid's HOUR had to change height — the one a family would notice from across

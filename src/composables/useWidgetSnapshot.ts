@@ -1,4 +1,4 @@
-import { computed, watch } from 'vue';
+import { computed, shallowRef, watch } from 'vue';
 import { isNative } from '@/services/sync/capabilities';
 import { useScheduledReminders } from '@/composables/useScheduledReminders';
 import { useToday } from '@/composables/useToday';
@@ -13,6 +13,7 @@ import { useTranslationStore } from '@/stores/translationStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useWeatherStore } from '@/stores/weatherStore';
 import { useChoreStore } from '@/stores/choreStore';
+import { useCalendarViewStore } from '@/stores/calendarViewStore';
 import { isFlagEnabled } from '@/config/flags';
 import { addDaysYmd, daysBetweenYmd } from '@/utils/date';
 import { WIDGET_DAYS } from '@/types/widgetSnapshot';
@@ -28,6 +29,7 @@ import {
   circleOptionsToken,
   emitPlacements,
   emitReadOutcome,
+  emitExternalRowsWaitExpired,
   emitSignOutHaltIncomplete,
   emitSnapshotPublished,
   splitPlacements,
@@ -53,6 +55,21 @@ import {
  *         Publishing then would blank a placed widget on every cold start. Sign-out's wipe
  *         is the explicit `clearWidgetSnapshot` step, never a side effect of an empty input.
  *
+ * PUBLISHER STATES. Invariants:
+ *  P1. `snapshotInput === null` means exactly one thing: NO SESSION (the family is not
+ *      loaded). It is the only signal the session-boundary rule reads.
+ *  P2. Holding for the view-only calendars' first read is a SEPARATE state (`holding`),
+ *      never a null input: a hold starting or ending is not a session boundary, so it can
+ *      never clear `halted`. While holding, a queued publish is skipped; the hold ending
+ *      queues one.
+ *  P3. `halted` (set by sign-out before the file is deleted) blocks every publish until
+ *      the watcher sees a session boundary: the input going null, or null to non-null.
+ *  P4. Sign-out cancels the hold timer, so nothing scheduled in the departing session
+ *      fires into it.
+ *  P5. A publish happens only when the input's VALUE changes (or on a return to the
+ *      foreground): every input reference must be stable while its content is (the view
+ *      store's `widgetEvents` keeps its array when nothing changed).
+ *
  * Every failure is reported (`reportError`, surface `home-widget`, severity `error`: the app
  * still works), the console names the fix, and the person is told once per session.
  *
@@ -70,6 +87,13 @@ const PUBLISH_DEBOUNCE_MS = 1000;
  * follows still runs, and a publish landing later is caught by the next sign-in's republish.
  */
 const HALT_WAIT_MS = 3000;
+/**
+ * How long a launch holds the snapshot for the view-only calendars' first read. Past
+ * this the family's own rows publish without those events (and again once the read
+ * settles): a read that is slow, or never starts because the app woke hidden, must
+ * never keep to-dos, activities and meals off the home screen.
+ */
+const EXTERNAL_ROWS_WAIT_MS = 4000;
 
 /** The reject codes the plugin documents (`widgetBridgePlugin.ts`); anything else is unknown. */
 const PLUGIN_ERROR_CODES = ['app_group_unavailable', 'write_failed', 'reload_failed'] as const;
@@ -98,6 +122,13 @@ let lastPlacementsKey: string | null = null;
 let halted = false;
 /** Whether the watcher last saw a null input (no session); drives the boundary rule above. */
 let lastInputNull = true;
+/** The bounded hold's timer (`EXTERNAL_ROWS_WAIT_MS`). Module scope so sign-out can cancel it (P4). */
+let externalWaitTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelExternalWait(): void {
+  if (externalWaitTimer) clearTimeout(externalWaitTimer);
+  externalWaitTimer = null;
+}
 
 /** The plugin's reject code when it is one we know, else a fixed fallback. */
 function pluginErrorCode(e: unknown): string {
@@ -230,12 +261,47 @@ export function useWidgetSnapshot(): void {
   const vacationStore = useVacationStore();
   const weatherStore = useWeatherStore();
   const choreStore = useChoreStore();
+  const calendarViewStore = useCalendarViewStore();
 
   const lockScreenTitles = computed(() => settingsStore.widgetLockScreenTitles);
+
+  // A viewed calendar is in the widgets and its first read has not finished yet.
+  const awaitingExternal = computed(
+    () => calendarViewStore.calendars.some((c) => c.inWidgets) && !calendarViewStore.standingSettled
+  );
+  const externalWaitExpired = shallowRef(false);
+  watch(
+    awaitingExternal,
+    (waiting) => {
+      if (waiting) {
+        if (externalWaitTimer || externalWaitExpired.value) return;
+        externalWaitTimer = setTimeout(() => {
+          externalWaitTimer = null;
+          externalWaitExpired.value = true;
+          emitExternalRowsWaitExpired();
+        }, EXTERNAL_ROWS_WAIT_MS);
+        return;
+      }
+      // Settled (or no calendar in the widgets): the next wait, after a sign-out, is fresh.
+      cancelExternalWait();
+      externalWaitExpired.value = false;
+    },
+    { immediate: true }
+  );
+  /**
+   * Holding the snapshot for the view-only calendars' first read (P2). When any viewed
+   * calendar is in the widgets, a launch waits until the first standing fetch has settled
+   * (success or failure: `standingSettled` is "attempt finished"), so it publishes once WITH
+   * the rows rather than once without and again with them. BOUNDED (`EXTERNAL_ROWS_WAIT_MS`):
+   * past it the family's own rows publish without the events, and again when the read
+   * settles. With no calendar in the widgets this adds no wait at all.
+   */
+  const holding = computed(() => awaitingExternal.value && !externalWaitExpired.value);
 
   /** The reminders' input plus the widget-only stores; null until the family is loaded. */
   const snapshotInput = computed<WidgetSnapshotInput | null>(() => {
     const base = reminderInput.value;
+    // Null is "no session" and nothing else (P1); a hold is `holding` (P2).
     if (!base) return null;
     const day = today.value;
     const days = Array.from({ length: WIDGET_DAYS }, (_, i) => addDaysYmd(day, i));
@@ -291,12 +357,18 @@ export function useWidgetSnapshot(): void {
             beanIds: [...choreStore.livingIds],
           }
         : null,
+      // The widget's one external-content path (ADR-048): only calendars whose widget switch
+      // is on, and `buildWidgetSnapshot` drops them again for a child session.
+      externalEvents: calendarViewStore.widgetEvents,
     };
   });
 
-  // A fresh `now` per run; the trailing run takes the newest reason.
+  // A fresh `now` per run; the trailing run takes the newest reason. Skipped while holding
+  // (P2): the hold ending queues the publish below.
   const run = (reason: WidgetRefreshReason): Promise<void> =>
-    publishWidgetSnapshot(snapshotInput.value, reason, new Date());
+    holding.value
+      ? Promise.resolve()
+      : publishWidgetSnapshot(snapshotInput.value, reason, new Date());
   flight = createTrailingSingleFlight(run, (_queued, incoming) => incoming);
 
   // Deep on purpose: a store may edit an item in place (a renamed to-do) without changing any
@@ -311,6 +383,9 @@ export function useWidgetSnapshot(): void {
     },
     { immediate: true, deep: true }
   );
+  watch(holding, (held) => {
+    if (!held) queue('data-change');
+  });
   // `useToday` owns the app's only visibilitychange listener; watch it, never add another.
   watch(isVisible, (visible) => {
     if (visible) queue('foreground');
@@ -337,6 +412,7 @@ function queue(reason: WidgetRefreshReason): void {
  */
 export async function haltWidgetPublishingForSignOut(): Promise<void> {
   halted = true;
+  cancelExternalWait(); // P4
   if (debounce) clearTimeout(debounce);
   debounce = null;
   pendingReason = null;
@@ -364,4 +440,5 @@ export function __resetUseWidgetSnapshotForTesting(): void {
   lastPlacementsKey = null;
   halted = false;
   lastInputNull = true;
+  cancelExternalWait();
 }

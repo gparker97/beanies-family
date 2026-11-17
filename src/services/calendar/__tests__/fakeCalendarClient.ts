@@ -8,6 +8,9 @@ import type { CalendarClient, CalendarInstance } from '../CalendarClient';
 export function makeCalendarClientStub(overrides: Partial<CalendarClient> = {}): CalendarClient {
   return {
     invalidateConnection() {},
+    hasPermanentAuthFailure() {
+      return false;
+    },
     async insertEvent() {},
     async patchEvent() {},
     async patchEventFields() {},
@@ -26,6 +29,9 @@ export function makeCalendarClientStub(overrides: Partial<CalendarClient> = {}):
     },
     async listEventsForImport() {
       return [];
+    },
+    async listEventsForView() {
+      return { events: [], truncated: false };
     },
     ...overrides,
   };

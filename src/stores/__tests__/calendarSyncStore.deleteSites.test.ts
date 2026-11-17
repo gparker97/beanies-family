@@ -2,7 +2,8 @@
  * There must be exactly ONE place beanies deletes a Google event.
  *
  * Before the one-time import (#94) there were three: the reconcile `deletes` task,
- * `finishDisconnect`, and `setDestinationCalendar`. All three were correct then,
+ * `finishDisconnect`, and the destination switch (removed 2026-11-17 with the
+ * calendar dropdown). All three were correct then,
  * because every link pointed at an event beanies had created. The import breaks
  * that assumption, and two of those three would have deleted a family's real
  * pre-existing Google events: disconnecting the calendar, or simply changing which
@@ -52,11 +53,10 @@ describe('beanies deletes Google events from exactly one place', () => {
     expect(callAt).toBeGreaterThan(guardAt);
   });
 
-  it('the three historical call sites all go through the helper', () => {
+  it('the remaining historical call sites all go through the helper', () => {
     const src = code(SOURCE);
     const routed = src.match(/deleteRemoteEventForLink\(/g) ?? [];
-    // One declaration plus three call sites: reconcile deletes, finishDisconnect,
-    // setDestinationCalendar.
-    expect(routed.length).toBeGreaterThanOrEqual(4);
+    // One declaration plus two call sites: reconcile deletes and finishDisconnect.
+    expect(routed.length).toBeGreaterThanOrEqual(3);
   });
 });

@@ -32,14 +32,14 @@ export const useOverlapAckStore = defineStore('overlapAck', () => {
   function isAcknowledged(
     activityId: string,
     occurrenceDate: string,
-    connectionId: string,
+    sourceId: string,
     fingerprint: string
   ): boolean {
     void docVersion.value; // re-read after any write (raw doc projection)
     if (!isDocLoaded()) return false;
     const entry = projectionGetById(
       'overlapAcknowledgments',
-      overlapAckKey(activityId, occurrenceDate, connectionId)
+      overlapAckKey(activityId, occurrenceDate, sourceId)
     ) as OverlapAck | undefined;
     return entry?.fingerprint === fingerprint;
   }
@@ -75,14 +75,16 @@ export const useOverlapAckStore = defineStore('overlapAck', () => {
     }
   }
 
-  /** Quiet this overlap for the whole family (upsert at the unique key). */
+  /** Quiet this overlap for the whole family (upsert at the unique key).
+   *  `sourceId` is a connection id or a viewed calendar id; it is stored in the
+   *  record's persisted `connectionId` field, whose name is data format. */
   function acknowledge(
     activityId: string,
     occurrenceDate: string,
-    connectionId: string,
+    sourceId: string,
     fingerprint: string
   ): void {
-    const key = overlapAckKey(activityId, occurrenceDate, connectionId);
+    const key = overlapAckKey(activityId, occurrenceDate, sourceId);
     void applyChange('acknowledge', (memberId) => ({
       op: 'set',
       collection: 'overlapAcknowledgments',
@@ -90,7 +92,7 @@ export const useOverlapAckStore = defineStore('overlapAck', () => {
       entity: {
         activityId,
         occurrenceDate,
-        connectionId,
+        connectionId: sourceId,
         fingerprint,
         acknowledgedAt: new Date().toISOString(),
         acknowledgedBy: memberId,
@@ -99,8 +101,8 @@ export const useOverlapAckStore = defineStore('overlapAck', () => {
   }
 
   /** Undo — re-raise this overlap (remove the key). */
-  function unacknowledge(activityId: string, occurrenceDate: string, connectionId: string): void {
-    const key = overlapAckKey(activityId, occurrenceDate, connectionId);
+  function unacknowledge(activityId: string, occurrenceDate: string, sourceId: string): void {
+    const key = overlapAckKey(activityId, occurrenceDate, sourceId);
     void applyChange('unacknowledge', () => ({
       op: 'delete',
       collection: 'overlapAcknowledgments',

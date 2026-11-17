@@ -19,19 +19,30 @@
  */
 import { computed, ref, watch } from 'vue';
 import WallTimeBlock from '@/components/wall/WallTimeBlock.vue';
+import WallExternalBlock from '@/components/wall/WallExternalBlock.vue';
+import ExternalSourceLabel from '@/components/planner/ExternalSourceLabel.vue';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { useElementSize } from '@/composables/useElementSize';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { layoutTimeGrid, type GridLayout } from '@/utils/wallTimeGrid';
+import {
+  isWallExternal,
+  wallGridItemKey,
+  wallGridSpan,
+  type WallExternalItem,
+  type WallGridItem,
+} from '@/utils/wallExternalEvents';
+import { externalEventTitle, externalSpokenLabel } from '@/utils/calendar/externalDisplay';
 import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import type { WallAllDaySpan, WallBandReference, WallOccurrence } from '@/utils/wallActivities';
-import type { DayExtraKind } from '@/utils/calendarDay';
+import type { DayExtra } from '@/utils/calendarDay';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import type { FamilyActivity } from '@/types/models';
 import type { WallSheetTarget } from '@/types/wall';
+import type { ExternalEvent } from '@/types/externalEvents';
 
 const SURFACE = 'wall-time-grid';
 /** One frame. A layout slower than this on an old iPad is the actionable case. */
@@ -40,6 +51,13 @@ const SLOW_MS = 16;
 export interface WallGridColumn {
   key: string;
   occurrences: WallOccurrence[];
+  /**
+   * Timed view-only external events on this column's day (plan 2026-11-17, C4), from
+   * `wallExternalItems`. Laid out in the SAME `layoutTimeGrid` call as the occurrences,
+   * so they pack into lanes beside the activities they overlap. Absent or empty unless
+   * a calendar is viewed, and then the grid is exactly what it was.
+   */
+  externals?: WallExternalItem[];
   /**
    * Set on a bean lane. Two things follow from it, and they are the same idea:
    * the lane header already names this bean, so a solo card here draws no face —
@@ -138,7 +156,7 @@ const rejectedGate = createChangeGate();
  * effect belongs.
  */
 interface LayoutOutcome {
-  layout: GridLayout | null;
+  layout: GridLayout<WallGridItem> | null;
   error: unknown;
   elapsedMs: number;
 }
@@ -147,9 +165,14 @@ const outcome = computed<LayoutOutcome>(() => {
   if (!layoutHeight.value) return { layout: null, error: null, elapsedMs: 0 };
   const started = typeof performance !== 'undefined' ? performance.now() : 0;
   try {
-    const layout = layoutTimeGrid(
-      props.columns.map((c) => c.occurrences),
-      layoutHeight.value
+    // ONE layout for both item kinds: `wallGridSpan` reads an activity exactly as the
+    // default does, so a column with no externals lays out byte-for-byte as before.
+    const layout = layoutTimeGrid<WallGridItem>(
+      props.columns.map((c) =>
+        c.externals?.length ? [...c.occurrences, ...c.externals] : c.occurrences
+      ),
+      layoutHeight.value,
+      { spanOf: wallGridSpan }
     );
     const now = typeof performance !== 'undefined' ? performance.now() : 0;
     return { layout, error: null, elapsedMs: now - started };
@@ -265,8 +288,10 @@ const nowMinutes = computed(() => props.now.getHours() * 60 + props.now.getMinut
 const bandRows = computed(() => {
   const rows = [...props.allDaySpans];
   // Its OWN column, not the whole width. Spanning every column drew one broken
-  // Thursday record as a bar across the entire week.
+  // Thursday record as a bar across the entire week. Only activities can be rejected:
+  // an external's span is read from finite instants (`wallExternalItems`).
   for (const { occurrence, column } of layout.value?.rejected ?? []) {
+    if (isWallExternal(occurrence)) continue;
     rows.push({ occurrence, startCol: column, span: 1, everyone: false });
   }
   return rows;
@@ -342,18 +367,28 @@ function ownerNames(activity: FamilyActivity, laneMemberId?: string): string {
 function openActivity(occurrence: WallOccurrence): void {
   emit('open', { kind: 'activity', activityId: occurrence.activity.id, ymd: occurrence.date });
 }
+/** A view-only event opens its read-only details; the page decides how (never a drawer). */
+function openExternal(event: ExternalEvent): void {
+  emit('open', { kind: 'external', event });
+}
+/** The fallback list's view-only items, beside its activities. */
+const fallbackExternals = computed(() => props.columns.flatMap((c) => c.externals ?? []));
 /**
  * The planner's own tokens, so a birthday is the same colour in the kitchen as
  * it is on a phone. Both carry a light and a dark value (see `style.css`), which
  * is what keeps them readable on the wall's night mode.
  */
-function refColour(kind: DayExtraKind): string {
+function refColour(reference: DayExtra): string {
   // Exhaustive on purpose. `DayExtraKind` is the union every calendar shares, so
   // adding a kind breaks HERE at compile time rather than rendering a colourless
   // pill on the one surface somebody forgot.
-  switch (kind) {
+  switch (reference.kind) {
     case 'birthday':
       return 'var(--birthday-orange)';
+    // Unread for now: a view-only all-day event draws as its own striped button with no
+    // color edge (see the template). Kept so the switch stays exhaustive.
+    case 'external':
+      return reference.external?.color ?? 'var(--muted-text)';
     case 'holiday':
       return 'var(--holiday-clay)';
     case 'trip':
@@ -393,30 +428,59 @@ function refColour(kind: DayExtraKind): string {
           open on the wall. Hence `<component :is>` rather than a button with a
           disabled state: a non-interactive thing should not be a control at all.
         -->
-        <component
-          :is="ref.reference.kind === 'birthday' ? 'button' : 'div'"
-          v-for="ref in bandReferences ?? []"
-          :key="ref.reference.id"
-          :type="ref.reference.kind === 'birthday' ? 'button' : undefined"
-          class="wall-allday dark:bg-surface-raised flex min-w-0 items-center gap-1.5 rounded-[10px] bg-white px-2 py-1 text-left"
-          :style="{
-            gridColumn: `${ref.startCol + 1} / span ${ref.span}`,
-            borderLeft: `3px solid ${refColour(ref.reference.kind)}`,
-          }"
-          @click="ref.reference.birthday && emit('open-birthday', ref.reference.birthday)"
-        >
-          <span v-if="ref.reference.emoji" aria-hidden="true">{{ ref.reference.emoji }}</span>
+        <template v-for="band in bandReferences ?? []" :key="band.reference.id">
           <!--
-            ⚠️ The label takes the pill's normal ink; the colour lives on the EDGE
-            only. Two reasons, and they agree. Style: the band's activity rows do
-            exactly this (an emoji plus an uncoloured title), so colouring the
-            text made these the one thing in the band that did not match it.
-            Contrast: `.wall-allday` is 0.85rem semibold, which is NOT AA "large
-            text", so it needs 4.5:1 — and clay on the white pill measures 4.26.
-            As an edge it carries no text and the rule does not apply.
+            A view-only ALL-DAY event (plan 2026-11-17, C4): the shared stripes in its
+            calendar's color, no color edge, its title (or "Busy") and the calendar's
+            name. A button, because it opens the read-only details.
           -->
-          <span class="font-outfit truncate font-semibold">{{ ref.reference.label }}</span>
-        </component>
+          <button
+            v-if="band.reference.external"
+            type="button"
+            class="wall-allday view-only-stripes flex min-w-0 items-center gap-1.5 rounded-[10px] px-2 py-1 text-left"
+            :style="{
+              gridColumn: `${band.startCol + 1} / span ${band.span}`,
+              '--vo-hue': band.reference.external.color,
+            }"
+            :aria-label="externalSpokenLabel(band.reference.external, t)"
+            data-testid="wall-external-allday"
+            @click="openExternal(band.reference.external)"
+          >
+            <span class="font-outfit min-w-0 shrink truncate font-semibold" aria-hidden="true">{{
+              externalEventTitle(band.reference.external, t)
+            }}</span>
+            <ExternalSourceLabel
+              :name="band.reference.external.calendarName"
+              :color="band.reference.external.color"
+              on-stripes
+              class="wall-block-meta min-w-0 shrink-[2]"
+              aria-hidden="true"
+            />
+          </button>
+          <component
+            :is="band.reference.kind === 'birthday' ? 'button' : 'div'"
+            v-else
+            :type="band.reference.kind === 'birthday' ? 'button' : undefined"
+            class="wall-allday dark:bg-surface-raised flex min-w-0 items-center gap-1.5 rounded-[10px] bg-white px-2 py-1 text-left"
+            :style="{
+              gridColumn: `${band.startCol + 1} / span ${band.span}`,
+              borderLeft: `3px solid ${refColour(band.reference)}`,
+            }"
+            @click="band.reference.birthday && emit('open-birthday', band.reference.birthday)"
+          >
+            <span v-if="band.reference.emoji" aria-hidden="true">{{ band.reference.emoji }}</span>
+            <!--
+              ⚠️ The label takes the pill's normal ink; the colour lives on the EDGE
+              only. Two reasons, and they agree. Style: the band's activity rows do
+              exactly this (an emoji plus an uncoloured title), so colouring the
+              text made these the one thing in the band that did not match it.
+              Contrast: `.wall-allday` is 0.85rem semibold, which is NOT AA "large
+              text", so it needs 4.5:1 — and clay on the white pill measures 4.26.
+              As an edge it carries no text and the rule does not apply.
+            -->
+            <span class="font-outfit truncate font-semibold">{{ band.reference.label }}</span>
+          </component>
+        </template>
 
         <button
           v-for="(row, i) in bandRows"
@@ -549,27 +613,45 @@ function refColour(kind: DayExtraKind): string {
             class="wall-blocklayer absolute top-0 bottom-0"
             :style="{ left: `${columnPercent * i}%`, width: `${columnPercent}%` }"
           >
-            <WallTimeBlock
+            <template
               v-for="block in layout.columns[i] ?? []"
-              :key="`${block.occurrence.activity.id}:${block.occurrence.date}`"
-              :activity="block.occurrence.activity"
-              :identity="identityOf(block.occurrence.activity, column.laneMemberId)"
-              :width="columnWidth * block.laneWidth"
-              :height="block.height"
-              :capped="block.capped"
-              :washed="!column.tint"
-              :state="column.isToday || !dimPast ? stateOf(block.start, block.end) : 'future'"
-              :progress="progressOf(block.start, block.end)"
-              :time-range="`${hhmm(block.start)}–${hhmm(block.end)}`"
-              :owner-names="ownerNames(block.occurrence.activity, column.laneMemberId)"
-              :style="{
-                top: `${block.top}px`,
-                height: `${block.height}px`,
-                left: `calc(${block.laneOffset * 100}% + ${block.lane ? 3 : 0}px)`,
-                width: `calc(${block.laneWidth * 100}% - ${block.lanes > 1 ? 3 : 0}px)`,
-              }"
-              @open="openActivity(block.occurrence)"
-            />
+              :key="wallGridItemKey(block.occurrence)"
+            >
+              <WallExternalBlock
+                v-if="isWallExternal(block.occurrence)"
+                :event="block.occurrence.event"
+                :width="columnWidth * block.laneWidth"
+                :height="block.height"
+                :time-range="`${hhmm(block.start)}–${hhmm(block.end)}`"
+                :style="{
+                  top: `${block.top}px`,
+                  height: `${block.height}px`,
+                  left: `calc(${block.laneOffset * 100}% + ${block.lane ? 3 : 0}px)`,
+                  width: `calc(${block.laneWidth * 100}% - ${block.lanes > 1 ? 3 : 0}px)`,
+                }"
+                @open="openExternal(block.occurrence.event)"
+              />
+              <WallTimeBlock
+                v-else
+                :activity="block.occurrence.activity"
+                :identity="identityOf(block.occurrence.activity, column.laneMemberId)"
+                :width="columnWidth * block.laneWidth"
+                :height="block.height"
+                :capped="block.capped"
+                :washed="!column.tint"
+                :state="column.isToday || !dimPast ? stateOf(block.start, block.end) : 'future'"
+                :progress="progressOf(block.start, block.end)"
+                :time-range="`${hhmm(block.start)}–${hhmm(block.end)}`"
+                :owner-names="ownerNames(block.occurrence.activity, column.laneMemberId)"
+                :style="{
+                  top: `${block.top}px`,
+                  height: `${block.height}px`,
+                  left: `calc(${block.laneOffset * 100}% + ${block.lane ? 3 : 0}px)`,
+                  width: `calc(${block.laneWidth * 100}% - ${block.lanes > 1 ? 3 : 0}px)`,
+                }"
+                @open="openActivity(block.occurrence)"
+              />
+            </template>
             <!--
               The day is empty only when NOTHING is on it — the all-day band
               counts. Testing timed blocks alone wrote "nothing on" across a
@@ -614,6 +696,17 @@ function refColour(kind: DayExtraKind): string {
           >
             <span aria-hidden="true">{{ identityOf(occ.activity).emoji }}</span>
             {{ occ.activity.startTime || t('planner.allDay') }} · {{ occ.activity.title }}
+          </button>
+          <button
+            v-for="item in fallbackExternals"
+            :key="wallGridItemKey(item)"
+            type="button"
+            class="wall-block-title font-outfit view-only-stripes rounded-xl px-2 py-1 text-left font-semibold"
+            :style="{ '--vo-hue': item.event.color }"
+            :aria-label="externalSpokenLabel(item.event, t, hhmm(item.start))"
+            @click="openExternal(item.event)"
+          >
+            {{ hhmm(item.start) }} · {{ externalEventTitle(item.event, t) }}
           </button>
         </div>
       </div>

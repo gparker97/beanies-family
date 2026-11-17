@@ -1,6 +1,7 @@
 /**
  * THE one query for what a day carries besides the family's own activities:
- * birthdays, public holidays, and (where a surface wants them) trips.
+ * birthdays, public holidays, all-day events from view-only external calendars, and
+ * (where a surface wants them) trips.
  *
  * Every calendar surface calls this. That is the point — see `utils/calendarDay.ts`
  * for why the planner and the beanie wall drifted, and why the fix is one query
@@ -15,12 +16,19 @@
  * `holidaysInRange` already returns nothing when the family has hidden public
  * holidays or has set no country, so every surface inherits that preference with
  * no extra wiring. Birthdays come from members' own `dateOfBirth`, which is
- * optional and simply absent for anyone who has not set one.
+ * optional and simply absent for anyone who has not set one. All-day external events
+ * come from `useExternalEvents().allDayForDate`, a read-only selector that is empty
+ * unless the `viewOnlyCalendars` flag is on and a calendar is viewed. This composable
+ * NEVER sets the fetch window (it has six concurrent callers with different ranges);
+ * only a page host does. They belong to no member, so the person filter ignores them.
  */
 import { computed, type ComputedRef } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { externalEventTitle } from '@/utils/calendar/externalDisplay';
+import { addDaysYmd } from '@/utils/date';
 import { birthdaysInRange, birthdayLabel, birthdayPassesFilter } from '@/utils/birthdays';
 import { sortDayExtras, dayExtrasByDate, type DayExtra } from '@/utils/calendarDay';
 
@@ -49,6 +57,7 @@ export function useDayExtras(
 } {
   const familyStore = useFamilyStore();
   const holidayStore = useHolidayStore();
+  const externalEvents = useExternalEvents();
   const { t } = useTranslation();
 
   const extras = computed<DayExtra[]>(() => {
@@ -81,6 +90,23 @@ export function useDayExtras(
         label: `${h.name} (${h.countryCode})`,
         holiday: h,
       });
+    }
+
+    // One extra per covered day: `allDayForDate` already lists a multi-day event on
+    // each of its days. Skipped outright while nothing is viewed, so the walk costs
+    // nothing for a family without the feature.
+    if (externalEvents.isActive.value) {
+      for (let ymd = first; ymd <= last; ymd = addDaysYmd(ymd, 1)) {
+        for (const e of externalEvents.allDayForDate(ymd)) {
+          out.push({
+            kind: 'external',
+            id: `x:${e.viewedCalendarId}:${e.id}:${ymd}`,
+            ymd,
+            label: externalEventTitle(e, t),
+            external: e,
+          });
+        }
+      }
     }
 
     return sortDayExtras(out);

@@ -7,7 +7,13 @@ import {
   getCalendarConnectionById,
   updateCalendarConnection,
 } from '@/services/automerge/repositories/calendarRepository';
+import {
+  getAllViewedCalendars,
+  getCalendarViewAccountById,
+  updateCalendarViewAccount,
+} from '@/services/automerge/repositories/calendarViewRepository';
 import { refreshCalendarToken } from './calendarAuth';
+import { pendingCredential } from './pendingCredential';
 import { isPermanentRefreshFailure } from '@/services/google/refreshFailure';
 import { delay, withTimeout } from '@/utils/timing';
 import {
@@ -15,7 +21,7 @@ import {
   isGoogleRetryableThrottleReason,
   isGoogleThrottleReason,
 } from '@/utils/googleApiError';
-import { parseLocalDate } from '@/utils/date';
+import { eventItemToMs } from '@/utils/calendar/googleEventTime';
 import {
   CalendarApiError,
   type CalendarClient,
@@ -23,6 +29,7 @@ import {
   type CalendarInstance,
   type CalendarSummary,
   type CalendarEventFull,
+  type CalendarViewEvent,
   type EventTime,
   type GoogleEventPatch,
   type TokenProvider,
@@ -33,6 +40,10 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const RETRY_BACKOFF_MS = [500, 1500] as const; // → up to 3 attempts on transient/429
 /** Safety cap on event-list paging: 20 × 250 = 5000 events >> any ≤42-day window.
  *  Structural guard against a non-terminating nextPageToken — never fires in practice. */
+/** The Google event types a view-only read asks for. Focus time, working location and
+ *  birthdays are left out on purpose. */
+const VIEW_EVENT_TYPES = ['default', 'outOfOffice', 'fromGmail'] as const;
+
 const MAX_EVENT_PAGES = 20;
 
 /** Access-token expiry skew — refresh a little early so a request never races expiry. */
@@ -100,32 +111,105 @@ interface GoogleEventTimeItem {
   end?: { dateTime?: string; date?: string };
 }
 
-/**
- * Map one masked `events.list` item to an absolute-ms `[startMs, endMs)`. Timed
- * events use the offset-bearing `dateTime`; all-day events use the zoneless `date`
- * (Google's `end.date` is exclusive) resolved to the local-midnight span. Returns
- * `null` ONLY for a structurally-malformed item (neither shape present) — the
- * caller turns that into a `console.warn` (never a silent drop). Pure. (#34)
- */
-export function eventItemToMs(
-  item: GoogleEventTimeItem
-): { startMs: number; endMs: number } | null {
-  const s = item.start;
-  const e = item.end;
-  if (s?.dateTime && e?.dateTime) {
-    return { startMs: new Date(s.dateTime).getTime(), endMs: new Date(e.dateTime).getTime() };
-  }
-  if (s?.date && e?.date) {
-    return { startMs: parseLocalDate(s.date).getTime(), endMs: parseLocalDate(e.date).getTime() };
-  }
-  return null;
-}
+// The one start/end → ms rule lives in a pure module so the view-only normalizer
+// shares it; re-exported here for existing importers. (#34)
+export { eventItemToMs };
 
 // ── Token provider ───────────────────────────────────────────────────────────
 
 interface CachedToken {
   token: string;
   expiresAt: number;
+  /** The refresh token this access token was minted from (see the provider's keying note). */
+  refreshToken: string;
+}
+
+/** A latched permanent refresh failure, for the refresh token Google rejected. */
+interface DeadLatch {
+  refreshToken: string;
+  error: CalendarApiError;
+}
+
+/**
+ * A refresh token the provider can mint from, plus where a rotated one goes.
+ * `saveRotated` is how a rotation reaches its owner without the provider knowing
+ * which collection (or memory slot) that is.
+ */
+export interface CalendarCredential {
+  refreshToken: string;
+  saveRotated(token: string): Promise<void> | void;
+}
+
+/** Look up the credential for an id the provider is asked about; `null` when unknown. */
+export type CalendarCredentialResolver = (
+  id: string
+) => CalendarCredential | null | Promise<CalendarCredential | null>;
+
+/** A sync connection in the doc's `calendarConnections`, rotation written back there (as before). */
+async function credentialFromConnections(id: string): Promise<CalendarCredential | null> {
+  const connection = await getCalendarConnectionById(id);
+  if (!connection) return null;
+  return {
+    refreshToken: connection.refreshToken,
+    saveRotated: async (token) => {
+      await updateCalendarConnection(id, { refreshToken: token });
+    },
+  };
+}
+
+/**
+ * A view-only account in the doc's `calendarViewAccounts` (plan 2026-11-17, A1/A3), rotation
+ * written back to that record. The account is a credential only, so this is the one automatic
+ * write the feature makes, exactly as for a sync connection.
+ */
+async function credentialFromViewAccounts(id: string): Promise<CalendarCredential | null> {
+  const account = await getCalendarViewAccountById(id);
+  if (!account) return null;
+  return {
+    refreshToken: account.refreshToken,
+    saveRotated: async (token) => {
+      await updateCalendarViewAccount(id, { refreshToken: token });
+    },
+  };
+}
+
+/** The in-memory pending credential (a consent whose calendar is not chosen yet). */
+function credentialFromPending(id: string): CalendarCredential | null {
+  const held = pendingCredential.peek();
+  if (!held || held.id !== id) return null;
+  return {
+    refreshToken: held.refreshToken,
+    // A rotation is kept with the slot, and only while the slot still holds this
+    // credential: one taken or replaced in the meantime is not resurrected.
+    saveRotated: (token) => {
+      const current = pendingCredential.peek();
+      if (current?.id === id) pendingCredential.set({ ...current, refreshToken: token });
+    },
+  };
+}
+
+/**
+ * Where the default resolver looks, in order. The first hit wins: sync
+ * connections, then view-only accounts, then the pending slot. Ids are UUIDs per
+ * collection, so order only matters for speed, never for which record answers.
+ */
+export const DEFAULT_CREDENTIAL_SOURCES: readonly CalendarCredentialResolver[] = [
+  credentialFromConnections,
+  credentialFromViewAccounts,
+  credentialFromPending,
+];
+
+/** Compose resolvers: the first source that knows the id answers. */
+export function createCredentialResolver(
+  sources: readonly CalendarCredentialResolver[] = DEFAULT_CREDENTIAL_SOURCES
+): CalendarCredentialResolver {
+  return async (id) => {
+    for (const source of sources) {
+      const hit = await source(id);
+      if (hit) return hit;
+    }
+    return null;
+  };
 }
 
 /**
@@ -152,22 +236,44 @@ interface CachedToken {
  * about the same dead token (observed in prod, 2026-07-09). `googleAuth` has
  * had the equivalent protection (`pendingSilentRefresh` + permanent
  * short-circuit) all along; this brings the calendar client up to parity.
+ *
+ * WHERE the refresh token lives is the injected `resolveCredential`'s business
+ * (default: sync connections, then view accounts, then the pending credential).
+ * The three maps are keyed on the id and shared by every credential kind.
+ *
+ * ⚠️ Every decision is also pinned to the REFRESH TOKEN it was made for. The
+ * stored token is resolved on each call, and a cached access token, an in-flight
+ * refresh or a dead latch that belongs to a different refresh token is ignored
+ * (the latch is dropped). This is how a device that did NOT perform a reconnect
+ * recovers: the reconnecting device clears its own maps with `invalidate()`, but
+ * every other device (the wall tablet, a kiosk open for days) only receives the
+ * new refresh token by sync, and keying on the id alone left it latched dead
+ * until a reload (and re-parked a just-reconnected sync connection).
  */
-export function createGoogleTokenProvider(): TokenProvider {
+export function createGoogleTokenProvider(
+  resolveCredential: CalendarCredentialResolver = createCredentialResolver()
+): TokenProvider {
   const cache = new Map<string, CachedToken>();
-  const inflight = new Map<string, Promise<string>>();
-  const dead = new Map<string, CalendarApiError>();
+  const inflight = new Map<string, { refreshToken: string; promise: Promise<string> }>();
+  const dead = new Map<string, DeadLatch>();
+  /**
+   * A rotated refresh token held in memory until the store holds it: `from` is the
+   * token the store still has, `to` the one Google issued in its place. While held,
+   * every decision (cache, in-flight, latch) is made for `to`, so a failed write-back
+   * can never send the old token to Google again (it may be invalidated by the
+   * rotation) and latch a live grant dead. Not cleared by `invalidate()` (a 401 must
+   * not lose the only copy); retired when the stored token changes.
+   */
+  const rotations = new Map<string, { from: string; to: string; saving?: boolean }>();
 
-  /** Mint a fresh access token. One caller at a time per connection. */
-  async function mintAccessToken(connectionId: string): Promise<string> {
-    const connection = await getCalendarConnectionById(connectionId);
-    if (!connection) {
-      throw new CalendarApiError('unknown', `calendar connection ${connectionId} not found`);
-    }
-
+  /** Mint a fresh access token from `credential`. One caller at a time per connection + token. */
+  async function mintAccessToken(
+    connectionId: string,
+    credential: CalendarCredential
+  ): Promise<string> {
     let tokens;
     try {
-      tokens = await refreshCalendarToken(connection.refreshToken);
+      tokens = await refreshCalendarToken(credential.refreshToken);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const permanent = isPermanentRefreshFailure(msg);
@@ -178,26 +284,105 @@ export function createGoogleTokenProvider(): TokenProvider {
       // Latch ONLY permanent failures. A transient (network, 5xx, timeout) must
       // remain retryable on the next poll, or a brief outage would look like a
       // revocation and strand the connection until reconnect.
-      if (permanent) dead.set(connectionId, classified);
+      if (permanent) {
+        dead.set(connectionId, { refreshToken: credential.refreshToken, error: classified });
+      }
       throw classified;
     }
 
+    // Rotation (defensive: this client type is normally non-rotating). The rotated
+    // token is the live one from now on, whether or not the write-back below lands:
+    // it is recorded first, so `effectiveCredential` maps the still-stored old token
+    // onto it until the store catches up (see `rotations`).
+    const rotated =
+      tokens.refresh_token && tokens.refresh_token !== credential.refreshToken
+        ? tokens.refresh_token
+        : null;
+    if (rotated) {
+      // Keyed on the token the STORE holds: when this mint already used a held
+      // rotation, the store still holds that rotation's `from`.
+      const held = rotations.get(connectionId);
+      const from =
+        held && held.to === credential.refreshToken ? held.from : credential.refreshToken;
+      rotations.set(connectionId, { from, to: rotated });
+    }
     cache.set(connectionId, {
       token: tokens.access_token,
       expiresAt: Date.now() + tokens.expires_in * 1000,
+      refreshToken: rotated ?? credential.refreshToken,
     });
-
-    // Rotation write-back (defensive — this client type is normally non-rotating).
-    if (tokens.refresh_token && tokens.refresh_token !== connection.refreshToken) {
-      await updateCalendarConnection(connectionId, { refreshToken: tokens.refresh_token });
-    }
+    if (rotated) await writeBackRotation(connectionId, credential);
 
     return tokens.access_token;
   }
 
+  /**
+   * Persist a held rotation. A failure never fails the caller (the access token in
+   * hand is good) and never drops the rotated token: it stays in `rotations` and the
+   * write-back is retried on the next call that resolves the old stored token.
+   */
+  async function writeBackRotation(
+    connectionId: string,
+    credential: CalendarCredential
+  ): Promise<void> {
+    const held = rotations.get(connectionId);
+    if (!held || held.saving) return;
+    held.saving = true;
+    try {
+      await credential.saveRotated(held.to);
+    } catch (e) {
+      console.warn(
+        `[googleCalendarClient] could not store the rotated refresh token for ${connectionId}; ` +
+          `keeping it in memory and retrying on the next call.`,
+        e
+      );
+    } finally {
+      held.saving = false;
+    }
+  }
+
+  /**
+   * The credential to act on: the stored one, unless this provider holds a rotation
+   * of exactly that stored token whose write-back has not landed (then the rotated
+   * token, which Google may have invalidated the old one for). The stored token
+   * reaching the rotated value (the write-back landed, here or by sync) or moving to
+   * anything else (a reconnect) retires the rotation.
+   */
+  function effectiveCredential(
+    connectionId: string,
+    stored: CalendarCredential
+  ): CalendarCredential {
+    const held = rotations.get(connectionId);
+    if (!held) return stored;
+    if (held.from === stored.refreshToken) return { ...stored, refreshToken: held.to };
+    rotations.delete(connectionId);
+    return stored;
+  }
+
+  /** The refresh token a stored token stands for right now (see `effectiveCredential`). */
+  function effectiveToken(connectionId: string, storedToken: string): string {
+    const held = rotations.get(connectionId);
+    return held && held.from === storedToken ? held.to : storedToken;
+  }
+
   async function getAccessToken(connectionId: string): Promise<string> {
+    // The stored refresh token decides which cached decisions still apply. A
+    // projection read (in memory), so the hot path stays cheap.
+    const stored = await resolveCredential(connectionId);
+    if (!stored) {
+      throw new CalendarApiError('unknown', `calendar connection ${connectionId} not found`);
+    }
+    const credential = effectiveCredential(connectionId, stored);
+    // A rotation still unsaved: try the write-back again, in the background (it never
+    // throws, and one attempt at a time).
+    if (credential !== stored) void writeBackRotation(connectionId, stored);
+
     const cached = cache.get(connectionId);
-    if (cached && cached.expiresAt - TOKEN_EXPIRY_SKEW_MS > Date.now()) {
+    if (
+      cached &&
+      cached.refreshToken === credential.refreshToken &&
+      cached.expiresAt - TOKEN_EXPIRY_SKEW_MS > Date.now()
+    ) {
       return cached.token;
     }
 
@@ -205,33 +390,45 @@ export function createGoogleTokenProvider(): TokenProvider {
     // the original classified error is re-thrown (so the reconcile engine still
     // routes `auth` → `needs_reconnect`) and the short-circuit is logged.
     const latched = dead.get(connectionId);
-    if (latched) {
+    if (latched && latched.refreshToken === credential.refreshToken) {
       console.warn(
         `[googleCalendarClient] skipping token refresh for ${connectionId} — ` +
-          `refresh token permanently rejected this session (${latched.message}). ` +
+          `refresh token permanently rejected this session (${latched.error.message}). ` +
           `Reconnect the calendar connection to clear this.`
       );
-      throw latched;
+      throw latched.error;
+    }
+    if (latched) {
+      // The stored refresh token changed since Google rejected the old one (a
+      // reconnect, possibly on another device): the latch no longer applies.
+      dead.delete(connectionId);
+      console.warn(
+        `[googleCalendarClient] refresh token for ${connectionId} changed since it was ` +
+          `rejected; clearing the permanent-failure latch and retrying.`
+      );
     }
 
-    // Coalesce concurrent callers onto one refresh.
+    // Coalesce concurrent callers onto one refresh of the SAME token.
     const pending = inflight.get(connectionId);
-    if (pending) return pending;
+    if (pending && pending.refreshToken === credential.refreshToken) return pending.promise;
 
-    const promise = mintAccessToken(connectionId).finally(() => {
-      inflight.delete(connectionId);
+    const promise = mintAccessToken(connectionId, credential).finally(() => {
+      if (inflight.get(connectionId)?.promise === promise) inflight.delete(connectionId);
     });
-    inflight.set(connectionId, promise);
+    inflight.set(connectionId, { refreshToken: credential.refreshToken, promise });
     return promise;
   }
 
   return {
     getAccessToken,
+    // Read-only view of the `dead` latch: only a permanent refresh failure of THIS
+    // refresh token sets it, so a token replaced by a reconnect reads as not failed.
+    isPermanentlyFailed: (connectionId: string, refreshToken: string) =>
+      dead.get(connectionId)?.refreshToken === effectiveToken(connectionId, refreshToken),
     /**
      * Drop every cached decision for a connection. Called on a 401 (stale access
-     * token) and — critically — after a successful reconnect, which is the ONLY
-     * thing that can clear the `dead` latch. Forgetting that call would brick
-     * calendar sync for the rest of the session.
+     * token) and after a successful reconnect on this device. Other devices recover
+     * without it: every decision is pinned to the refresh token it was made for.
      */
     invalidate: (connectionId: string) => {
       cache.delete(connectionId);
@@ -373,9 +570,55 @@ const enc = encodeURIComponent;
 export function createGoogleCalendarClient(tokenProvider: TokenProvider): CalendarClient {
   const authedFetch = createAuthedFetch(tokenProvider);
 
+  /**
+   * GET every page of a Google list endpoint, following `nextPageToken`, and say
+   * whether the page cap stopped it early. The one paging loop for every event
+   * read (instances, times, import, view).
+   *
+   * `pageToken &&` in the cap test matters: without it a read that ENDED exactly
+   * on the cap would report truncating a complete result.
+   *
+   * ⚠️ Logs a COUNT only, never the calendar id: a shared calendar's id is its
+   * owner's email address. `label` is a fixed string naming the read.
+   */
+  async function pageAll<T>(
+    connectionId: string,
+    path: string,
+    params: URLSearchParams,
+    label: string
+  ): Promise<{ items: T[]; truncated: boolean }> {
+    const items: T[] = [];
+    let pageToken: string | undefined;
+    let pages = 0;
+    do {
+      const pageParams = new URLSearchParams(params);
+      if (pageToken) pageParams.set('pageToken', pageToken);
+      const res = await authedFetch(connectionId, `${path}?${pageParams.toString()}`, {
+        method: 'GET',
+      });
+      const data = (await res.json()) as { nextPageToken?: string; items?: T[] };
+      for (const it of data.items ?? []) items.push(it);
+      pageToken = data.nextPageToken;
+      pages += 1;
+      if (pageToken && pages >= MAX_EVENT_PAGES) {
+        // Enforced invariant: a non-terminating token can never spin the loop.
+        console.warn(`[googleCalendarClient] ${label} page cap reached; truncating`, {
+          pages,
+          count: items.length,
+        });
+        return { items, truncated: true };
+      }
+    } while (pageToken);
+    return { items, truncated: false };
+  }
+
   return {
     invalidateConnection(connectionId) {
       tokenProvider.invalidate(connectionId);
+    },
+
+    hasPermanentAuthFailure(credentialId, refreshToken) {
+      return tokenProvider.isPermanentlyFailed?.(credentialId, refreshToken) ?? false;
     },
 
     async insertEvent(connectionId, calendarId, eventId, resource) {
@@ -402,42 +645,25 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
     },
 
     async listInstances(connectionId, calendarId, masterEventId, timeMinIso, timeMaxIso, timeZone) {
-      const out: CalendarInstance[] = [];
-      let pageToken: string | undefined;
-      let pages = 0;
-      do {
-        const params = new URLSearchParams({
-          timeMin: timeMinIso,
-          timeMax: timeMaxIso,
-          // Render instance times in the family's HOME zone, not the calendar's
-          // (see `CalendarClient.listInstances`).
-          timeZone,
-          // Belt-and-suspenders — discovery always runs while the instance is still
-          // confirmed, so cancelled instances are never load-bearing here.
-          showDeleted: 'true',
-          maxResults: '250',
-          fields: 'nextPageToken,items(id,status,start,end,originalStartTime)',
-        });
-        if (pageToken) params.set('pageToken', pageToken);
-        const res = await authedFetch(
-          connectionId,
-          `/calendars/${enc(calendarId)}/events/${enc(masterEventId)}/instances?${params.toString()}`,
-          { method: 'GET' }
-        );
-        const data = (await res.json()) as { nextPageToken?: string; items?: CalendarInstance[] };
-        for (const it of data.items ?? []) out.push(it);
-        pageToken = data.nextPageToken;
-        pages += 1;
-        if (pageToken && pages >= MAX_EVENT_PAGES) {
-          console.warn('[calendarSync] events.instances exceeded MAX_EVENT_PAGES; truncating', {
-            calendarId,
-            masterEventId,
-            pages,
-          });
-          break;
-        }
-      } while (pageToken);
-      return out;
+      const params = new URLSearchParams({
+        timeMin: timeMinIso,
+        timeMax: timeMaxIso,
+        // Render instance times in the family's HOME zone, not the calendar's
+        // (see `CalendarClient.listInstances`).
+        timeZone,
+        // Belt-and-suspenders — discovery always runs while the instance is still
+        // confirmed, so cancelled instances are never load-bearing here.
+        showDeleted: 'true',
+        maxResults: '250',
+        fields: 'nextPageToken,items(id,status,start,end,originalStartTime)',
+      });
+      const { items } = await pageAll<CalendarInstance>(
+        connectionId,
+        `/calendars/${enc(calendarId)}/events/${enc(masterEventId)}/instances`,
+        params,
+        'events.instances'
+      );
+      return items;
     },
 
     async deleteEvent(connectionId, calendarId, eventId) {
@@ -485,170 +711,185 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
     },
 
     async listEventTimes(connectionId, calendarId, timeMinIso, timeMaxIso) {
+      const params = new URLSearchParams({
+        timeMin: timeMinIso,
+        timeMax: timeMaxIso,
+        singleEvents: 'true', // expand recurring → instances (gives times + recurringEventId)
+        showDeleted: 'false', // exclude cancelled
+        maxResults: '250',
+        // Field mask = the privacy guarantee: only times + the structural fields we
+        // filter on. Event content (summary/description/location/attendees) is never
+        // requested. `nextPageToken` MUST be included or paging stops after page 1.
+        fields: 'nextPageToken,items(id,recurringEventId,start,end,status,transparency)',
+      });
+      const { items } = await pageAll<GoogleEventTimeItem>(
+        connectionId,
+        `/calendars/${enc(calendarId)}/events`,
+        params,
+        'events.list (times)'
+      );
       const out: EventTime[] = [];
-      let pageToken: string | undefined;
-      let pages = 0;
-      do {
-        const params = new URLSearchParams({
-          timeMin: timeMinIso,
-          timeMax: timeMaxIso,
-          singleEvents: 'true', // expand recurring → instances (gives times + recurringEventId)
-          showDeleted: 'false', // exclude cancelled
-          maxResults: '250',
-          // Field mask = the privacy guarantee: only times + the structural fields we
-          // filter on. Event content (summary/description/location/attendees) is never
-          // requested. `nextPageToken` MUST be included or paging stops after page 1.
-          fields: 'nextPageToken,items(id,recurringEventId,start,end,status,transparency)',
-        });
-        if (pageToken) params.set('pageToken', pageToken);
-        const res = await authedFetch(
-          connectionId,
-          `/calendars/${enc(calendarId)}/events?${params.toString()}`,
-          { method: 'GET' }
-        );
-        const data = (await res.json()) as {
-          nextPageToken?: string;
-          items?: GoogleEventTimeItem[];
-        };
-        for (const it of data.items ?? []) {
-          if (it.status === 'cancelled') continue; // backstop; showDeleted handles most
-          const range = eventItemToMs(it);
-          if (!range) {
-            // Never a silent drop. A malformed item is a data anomaly, so a console.warn
-            // here is the right altitude — the REST client holds no errorReporter
-            // dependency, and genuine fetch failures still bubble as CalendarApiError to
-            // the store's reportError. Should never fire (Google returns one shape).
-            console.warn('[calendarClash] events.list item has no usable start/end; skipping', {
-              calendarId,
-              eventId: it.id,
-            });
-            continue;
-          }
-          out.push({
-            id: it.id,
-            recurringEventId: it.recurringEventId,
-            startMs: range.startMs,
-            endMs: range.endMs,
-            transparent: it.transparency === 'transparent',
-          });
-        }
-        pageToken = data.nextPageToken;
-        pages += 1;
-        if (pageToken && pages >= MAX_EVENT_PAGES) {
-          // Enforced invariant: a non-terminating token can never spin the loop.
-          console.warn('[calendarClash] events.list exceeded MAX_EVENT_PAGES; truncating', {
+      for (const it of items) {
+        if (it.status === 'cancelled') continue; // backstop; showDeleted handles most
+        const range = eventItemToMs(it);
+        if (!range) {
+          // Never a silent drop. A malformed item is a data anomaly, so a console.warn
+          // here is the right altitude — the REST client holds no errorReporter
+          // dependency, and genuine fetch failures still bubble as CalendarApiError to
+          // the store's reportError. Should never fire (Google returns one shape).
+          console.warn('[calendarClash] events.list item has no usable start/end; skipping', {
             calendarId,
-            pages,
+            eventId: it.id,
           });
-          break;
+          continue;
         }
-      } while (pageToken);
+        out.push({
+          id: it.id,
+          recurringEventId: it.recurringEventId,
+          startMs: range.startMs,
+          endMs: range.endMs,
+          transparent: it.transparency === 'transparent',
+        });
+      }
       return out;
     },
 
     async listEventsForImport(connectionId, calendarId, timeMinIso, timeMaxIso) {
+      const params = new URLSearchParams({
+        timeMin: timeMinIso,
+        timeMax: timeMaxIso,
+        // FALSE, unlike listEventTimes. A recurring series must come back as ONE
+        // master carrying its RRULE, or the import would create N copies of a
+        // weekly swim lesson instead of one repeating activity. Google returns a
+        // master whose DTSTART is in the past when any instance falls in the
+        // window, which is how a long-running series is importable at all.
+        singleEvents: 'false',
+        // TRUE, deliberately, and NOT a copy-paste slip from listEventTimes.
+        // Deleting one occurrence in Google's own UI does NOT add an EXDATE to
+        // the master: Google writes a separate event carrying `recurringEventId`
+        // and `status:'cancelled'`. With showDeleted=false those never arrive,
+        // so the EXDATE refusal in `parseRrule` would almost never fire for a
+        // series authored in Google, and beanies would adopt a series showing
+        // occurrences the family deliberately removed. The planner uses these
+        // cancelled instances to detect exactly that; they are never imported.
+        showDeleted: 'true',
+        // Google returns Working Location, Out-of-office and Focus-time events
+        // by default. Those are synthetic, the signed-in user is their creator,
+        // and they recur daily, so without this filter a review list fills with
+        // "Home"/"Office" rows, ticked, ahead of the family's real events.
+        eventTypes: 'default',
+        maxResults: '250',
+        // The import's mask, deliberately WIDER than the clash-nudge read's. It
+        // requests what an activity needs and nothing more. `attendees` is absent
+        // on purpose: not requesting the guest list is what keeps other people's
+        // email addresses out of the family's .beanpod. `organizer(self)` and
+        // `creator(self)` are booleans about the signed-in user, not identities.
+        // `nextPageToken` MUST be included or paging stops after page 1.
+        fields:
+          'nextPageToken,items(id,summary,description,location,start,end,recurrence,status,recurringEventId,organizer(self),creator(self))',
+      });
+      const { items } = await pageAll<
+        Omit<CalendarEventFull, 'isOrganizer'> & {
+          organizer?: { self?: boolean };
+          creator?: { self?: boolean };
+        }
+      >(connectionId, `/calendars/${enc(calendarId)}/events`, params, 'events.list (import)');
       const out: CalendarEventFull[] = [];
-      let pageToken: string | undefined;
-      let pages = 0;
-      do {
-        const params = new URLSearchParams({
-          timeMin: timeMinIso,
-          timeMax: timeMaxIso,
-          // FALSE, unlike listEventTimes. A recurring series must come back as ONE
-          // master carrying its RRULE, or the import would create N copies of a
-          // weekly swim lesson instead of one repeating activity. Google returns a
-          // master whose DTSTART is in the past when any instance falls in the
-          // window, which is how a long-running series is importable at all.
-          singleEvents: 'false',
-          // TRUE, deliberately, and NOT a copy-paste slip from listEventTimes.
-          // Deleting one occurrence in Google's own UI does NOT add an EXDATE to
-          // the master: Google writes a separate event carrying `recurringEventId`
-          // and `status:'cancelled'`. With showDeleted=false those never arrive,
-          // so the EXDATE refusal in `parseRrule` would almost never fire for a
-          // series authored in Google, and beanies would adopt a series showing
-          // occurrences the family deliberately removed. The planner uses these
-          // cancelled instances to detect exactly that; they are never imported.
-          showDeleted: 'true',
-          // Google returns Working Location, Out-of-office and Focus-time events
-          // by default. Those are synthetic, the signed-in user is their creator,
-          // and they recur daily, so without this filter a review list fills with
-          // "Home"/"Office" rows, ticked, ahead of the family's real events.
-          eventTypes: 'default',
-          maxResults: '250',
-          // The import's mask, deliberately WIDER than the clash-nudge read's. It
-          // requests what an activity needs and nothing more. `attendees` is absent
-          // on purpose: not requesting the guest list is what keeps other people's
-          // email addresses out of the family's .beanpod. `organizer(self)` and
-          // `creator(self)` are booleans about the signed-in user, not identities.
-          // `nextPageToken` MUST be included or paging stops after page 1.
-          fields:
-            'nextPageToken,items(id,summary,description,location,start,end,recurrence,status,recurringEventId,organizer(self),creator(self))',
-        });
-        if (pageToken) params.set('pageToken', pageToken);
-        const res = await authedFetch(
-          connectionId,
-          `/calendars/${enc(calendarId)}/events?${params.toString()}`,
-          { method: 'GET' }
-        );
-        const data = (await res.json()) as {
-          nextPageToken?: string;
-          items?: Array<
-            Omit<CalendarEventFull, 'isOrganizer'> & {
-              organizer?: { self?: boolean };
-              creator?: { self?: boolean };
-            }
-          >;
-        };
-        for (const it of data.items ?? []) {
-          // A cancelled INSTANCE (it carries `recurringEventId`) is meaningful: it
-          // is how Google records a removed occurrence, and the planner refuses to
-          // adopt a master that has any. A cancelled MASTER is genuinely gone.
-          if (it.status === 'cancelled' && !it.recurringEventId) continue;
-          // A cancelled instance carries no `start` — it is a tombstone, not an
-          // event. It is not a data anomaly and must not be warned about or
-          // dropped: the planner reads only its `recurringEventId`.
-          if (it.status === 'cancelled' && it.recurringEventId) {
-            out.push({ ...it, isOrganizer: false });
-            continue;
-          }
-          if (!it.start) {
-            // Never a silent drop. An item with no start cannot become an activity.
-            // Same altitude as listEventTimes: the REST client holds no
-            // errorReporter dependency, and real fetch failures still bubble as
-            // CalendarApiError to the store's reportError.
-            console.warn('[calendarImport] events.list item has no start; skipping', {
-              calendarId,
-              eventId: it.id,
-            });
-            continue;
-          }
-          out.push({
-            id: it.id,
-            summary: it.summary,
-            description: it.description,
-            location: it.location,
-            start: it.start,
-            end: it.end,
-            recurrence: it.recurrence,
-            status: it.status,
-            recurringEventId: it.recurringEventId,
-            isOrganizer: it.organizer?.self === true || it.creator?.self === true,
-          });
+      for (const it of items) {
+        // A cancelled INSTANCE (it carries `recurringEventId`) is meaningful: it
+        // is how Google records a removed occurrence, and the planner refuses to
+        // adopt a master that has any. A cancelled MASTER is genuinely gone.
+        if (it.status === 'cancelled' && !it.recurringEventId) continue;
+        // A cancelled instance carries no `start` — it is a tombstone, not an
+        // event. It is not a data anomaly and must not be warned about or
+        // dropped: the planner reads only its `recurringEventId`.
+        if (it.status === 'cancelled' && it.recurringEventId) {
+          out.push({ ...it, isOrganizer: false });
+          continue;
         }
-        pageToken = data.nextPageToken;
-        pages += 1;
-        // `pageToken &&` matters: without it a read that ENDED exactly on the cap
-        // warned that it had truncated a complete result. Same shape as
-        // `listInstances`, deliberately.
-        if (pageToken && pages >= MAX_EVENT_PAGES) {
-          console.warn('[calendarImport] events.list page cap reached; truncating', {
+        if (!it.start) {
+          // Never a silent drop. An item with no start cannot become an activity.
+          // Same altitude as listEventTimes: the REST client holds no
+          // errorReporter dependency, and real fetch failures still bubble as
+          // CalendarApiError to the store's reportError.
+          console.warn('[calendarImport] events.list item has no start; skipping', {
             calendarId,
-            pages,
+            eventId: it.id,
           });
-          break;
+          continue;
         }
-      } while (pageToken);
+        out.push({
+          id: it.id,
+          summary: it.summary,
+          description: it.description,
+          location: it.location,
+          start: it.start,
+          end: it.end,
+          recurrence: it.recurrence,
+          status: it.status,
+          recurringEventId: it.recurringEventId,
+          isOrganizer: it.organizer?.self === true || it.creator?.self === true,
+        });
+      }
       return out;
+    },
+
+    async listEventsForView(credentialId, calendarId, timeMinIso, timeMaxIso) {
+      // The read guard (plan A3). A view grant can read EVERY calendar on the signed-in
+      // account; beanies only ever reads one the family added, through the account it
+      // was added from. Enforced here, at the one place the request is made, so no
+      // caller can read past it. The message names neither id (a shared calendar's id
+      // is its owner's email address).
+      const viewed = await getAllViewedCalendars();
+      if (!viewed.some((c) => c.viewAccountId === credentialId && c.calendarId === calendarId)) {
+        throw new CalendarApiError(
+          'invalid',
+          'view read refused: the calendar is not a viewed calendar of this account'
+        );
+      }
+      const params = new URLSearchParams({
+        timeMin: timeMinIso,
+        timeMax: timeMaxIso,
+        // Occurrences, not masters: a view shows what happens on each day, and
+        // each instance carries `recurringEventId` for the beanies-origin dedupe.
+        singleEvents: 'true',
+        showDeleted: 'false',
+        maxResults: '250',
+        // The view-only mask: what a calendar block shows and nothing more. No
+        // `description` (an owner's private notes) and no `attendees` (other
+        // people's addresses). `nextPageToken` MUST be included or paging stops
+        // after page 1.
+        fields:
+          'nextPageToken,items(id,recurringEventId,status,eventType,summary,location,start,end,transparency,visibility,htmlLink)',
+      });
+      // `eventTypes` is a repeated parameter. Out-of-office is the most useful
+      // work-calendar signal; focus time and working location are left out.
+      // `fromGmail` is what Google makes from an email (a dinner booking, a flight):
+      // on the calendar it looks like any other event, so leaving it out reads as a
+      // missing event (found in testing, 2026-11-17).
+      for (const type of VIEW_EVENT_TYPES) params.append('eventTypes', type);
+      const { items, truncated } = await pageAll<CalendarViewEvent>(
+        credentialId,
+        `/calendars/${enc(calendarId)}/events`,
+        params,
+        'events.list (view)'
+      );
+      // Pick the masked fields explicitly, so nothing Google adds to a response
+      // can ride along into memory.
+      const events = items.map((it): CalendarViewEvent => ({
+        id: it.id,
+        recurringEventId: it.recurringEventId,
+        status: it.status,
+        eventType: it.eventType,
+        summary: it.summary,
+        location: it.location,
+        start: it.start,
+        end: it.end,
+        transparency: it.transparency,
+        visibility: it.visibility,
+        htmlLink: it.htmlLink,
+      }));
+      return { events, truncated };
     },
   };
 }

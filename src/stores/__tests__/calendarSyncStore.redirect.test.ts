@@ -7,9 +7,12 @@ import {
 } from '@/services/automerge/repositories/calendarRepository';
 import { useCalendarSyncStore, setCalendarClientForTesting } from '../calendarSyncStore';
 import { makeCalendarClientStub } from '@/services/calendar/__tests__/fakeCalendarClient';
+import { pendingCredential } from '@/services/calendar/pendingCredential';
 
 // P2 — the store's redirect handoff (connect/reconnect → 'redirecting') + the
-// post-redirect resume (`resumeRedirectConnect` → CRDT commit via finalizeConnected).
+// post-redirect resume. A fresh connect's resume ends with the consent PENDING in
+// memory and nothing written (view-only calendars plan 2026-11-17, A2); a
+// reconnect's resume commits in place via finalizeConnected, as before.
 // The auth seam is mocked; the CRDT commit runs against the real inline backend.
 
 const {
@@ -55,6 +58,7 @@ describe('calendarSyncStore — redirect handoff + resume (P2)', () => {
     setCalendarClientForTesting(noopClient);
     localStorage.setItem('beanies:flag:googleCalendarSync', 'true');
     redirectSurface.value = false;
+    pendingCredential.clear();
   });
   afterEach(() => {
     setCalendarClientForTesting(null);
@@ -63,11 +67,11 @@ describe('calendarSyncStore — redirect handoff + resume (P2)', () => {
   });
 
   describe('connect() / reconnect() on a redirect surface', () => {
-    it('connect hands off to the redirect transport (calResume=connect, mode create) and returns redirecting', async () => {
+    it('beginConnect hands off to the redirect transport (calResume=connect, mode create) and returns redirecting', async () => {
       redirectSurface.value = true;
       const store = useCalendarSyncStore();
 
-      const result = await store.connect();
+      const result = await store.beginConnect();
 
       expect(result).toEqual({ status: 'redirecting' });
       expect(connectGoogleCalendar).not.toHaveBeenCalled();
@@ -77,6 +81,9 @@ describe('calendarSyncStore — redirect handoff + resume (P2)', () => {
       expect(returnPath).toContain('calResume=connect');
       expect(loginHint).toBe('me@example.com');
       expect(mode).toBe('create');
+      // Nothing is held or written before the round trip.
+      expect(store.pendingConnect).toBeNull();
+      expect(store.connections).toHaveLength(0);
     });
 
     it('reconnect hands off with calResume=<connectionId> + mode reconnect', async () => {
@@ -105,24 +112,59 @@ describe('calendarSyncStore — redirect handoff + resume (P2)', () => {
       connectGoogleCalendar.mockResolvedValue(connected);
       const store = useCalendarSyncStore();
 
-      const result = await store.connect();
+      const result = await store.beginConnect();
 
       expect(startCalendarRedirectAuth).not.toHaveBeenCalled();
       expect(connectGoogleCalendar).toHaveBeenCalledOnce();
-      expect(result).toMatchObject({ status: 'connected' });
+      expect(result).toEqual({ status: 'pending' });
+      expect(store.connections).toHaveLength(0);
     });
   });
 
   describe('resumeRedirectConnect()', () => {
-    it("intent 'connect' → creates a new ok connection from the redeemed token", async () => {
+    it("intent 'connect' → holds the redeemed token as PENDING and writes no connection", async () => {
       completeCalendarRedirectAuth.mockResolvedValue(connected);
       const store = useCalendarSyncStore();
 
       const result = await store.resumeRedirectConnect('connect');
 
-      expect(result).toMatchObject({ status: 'connected' });
+      expect(result).toEqual({ status: 'pending' });
+      expect(store.connections).toHaveLength(0);
+      expect(store.pendingConnect).toEqual({ accountEmail: 'me@example.com' });
+      expect(pendingCredential.peek()).toMatchObject({ kind: 'sync', refreshToken: 'rt-new' });
+    });
+
+    it("intent 'connect' → the add step can then list and confirm the chosen calendar", async () => {
+      completeCalendarRedirectAuth.mockResolvedValue({
+        ...connected,
+        grantedScopes: [
+          ...connected.grantedScopes,
+          'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+        ],
+      });
+      setCalendarClientForTesting(
+        makeCalendarClientStub({
+          async listCalendars() {
+            return [
+              { id: 'me@example.com', summary: 'Me', primary: true },
+              { id: 'family@group.calendar.google.com', summary: 'Family', primary: false },
+            ];
+          },
+        })
+      );
+      const store = useCalendarSyncStore();
+      await store.resumeRedirectConnect('connect');
+
+      const calendars = await store.listPendingCalendars();
+      const confirmed = await store.confirmConnect(calendars[1].id);
+
+      expect(confirmed).toEqual({ status: 'connected' });
       expect(store.connections).toHaveLength(1);
-      expect(store.connections[0]).toMatchObject({ status: 'ok', refreshToken: 'rt-new' });
+      expect(store.connections[0]).toMatchObject({
+        destinationCalendarId: 'family@group.calendar.google.com',
+        refreshToken: 'rt-new',
+      });
+      expect(store.pendingConnect).toBeNull();
     });
 
     it('intent <connectionId> → updates that connection in place, clearing needs_reconnect', async () => {
@@ -176,6 +218,7 @@ describe('calendarSyncStore — redirect handoff + resume (P2)', () => {
 
       expect(result).toMatchObject({ status: 'failed' });
       expect(store.connections).toHaveLength(0);
+      expect(store.pendingConnect).toBeNull();
     });
   });
 });

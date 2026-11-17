@@ -27,11 +27,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - A chore's picture is now re-picked when the chore is renamed to something different, and kept on a small edit.
 - A chore added on the Beanie Wall now gets the picture its name suggests, as chores added in the app do.
 - A travel segment's title can now be typed in the segment editor, with a way back to the automatic title.
+- The Google calendar to sync to is now chosen when connecting and shown as fixed text afterwards. To use a different one, another calendar is connected, or this one is disconnected and connected again.
+- The connect button now reads "Connect Another Google Calendar" once a calendar is connected.
 
 ### Fixed
 
 - A family that left setup early is now counted as having finished creating its pod.
 - Travel segment titles are now built from the segment's details everywhere they appear, so imported trips no longer show a document's own headings on the calendar.
+- Disconnecting one of two calendars on the same Google account no longer cuts off the other.
 
 ## 2026-11-15
 

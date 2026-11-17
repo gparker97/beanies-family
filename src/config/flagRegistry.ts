@@ -115,6 +115,20 @@ export const FLAG_REGISTRY = [
     description:
       "Chores in their own place under The Treehouse, by time of day, on the wall and in the briefing. ON for everyone since 2026-11-14, ahead of the update floor: older builds that meet 'chores' / 'choreMarks' rebuild their projection on merges until the floor is raised to the store builds that know them.",
   },
+  {
+    // View-only external calendars (plan 2026-11-17). Gates every view-only SURFACE and the
+    // `calendar.events.readonly` consent; the two doc collections (`calendarViewAccounts`,
+    // `viewedCalendars`) exist for everyone and stay empty while this is off.
+    // ⚠️ MUST STAY OFF IN PRODUCTION until Google approves `calendar.events.readonly`
+    // ("sensitive"): before approval any consent that includes it shows the unverified-app
+    // screen and counts against the 100-user cap. Flip it only after the approval lands.
+    // REVIEW BY 2027-02-15 (90 days): if Google has refused or not yet decided, decide then
+    // whether to keep waiting or delete the gated code (the empty collections stay, harmless).
+    id: 'viewOnlyCalendars',
+    label: 'View-only calendars',
+    description:
+      'Show shared Google calendars read-only on the family calendar and the wall; must stay off in production until Google approves calendar.events.readonly (review by 2027-02-15).',
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */

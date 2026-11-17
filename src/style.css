@@ -317,6 +317,101 @@
   --chore-ink: var(--chore-anytime-ink);
 }
 
+/* ─── View-only external calendar events (plan 2026-11-17, C1) ─────────────
+   ONE look for an event from a Google calendar the family only views: soft diagonal
+   stripes in the calendar's color, a faint base, a 1px edge tinted toward that color,
+   no left color bar. Every planner chip, block, row and the details icon wear it.
+   A caller sets ONLY `--vo-hue` inline (the calendar's color); the background is
+   never inline, so the dark rule below always wins.
+
+   The base is OPAQUE (white / surface-raised) under the tint, so the text contrast is
+   the same whatever the chip sits on (a white cell, the all-day row's wash, the
+   overlay popover). The stripe alpha is kept low so both inks clear WCAG AA on the
+   stripe band, the darkest part, for the neutral gray and every palette hue
+   (VIEW_CALENDAR_PALETTE), measured on the composited colors:
+     light, on white: title #4d5d6c >= 5.73:1, meta secondary-400 >= 4.76:1
+                      (worst: the neutral gray #6b7280)
+     dark, on raised: title ink-soft >= 7.09:1, meta ink-faint >= 4.71:1
+                      (worst: amber #f59e0b, lifted)
+   Raising the alphas re-opens that measurement; do not tune them by eye.
+
+   The text locals: `--vo-ink` (the title, ink-soft semantics) and `--vo-ink-faint`
+   (time and source line, ink-faint semantics). The fallback hue is the neutral gray
+   (`NEUTRAL_MEMBER_COLOR`). */
+.view-only-stripes {
+  --vo-tint: var(--vo-hue, #6b7280);
+  --vo-ink: var(--muted-text); /* #4d5d6c by day, the semantic token the wall uses */
+  --vo-ink-faint: var(--color-secondary-400);
+
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--vo-tint) 10%, transparent) 0 0.25rem,
+      transparent 0.25rem 0.5rem
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--vo-tint) 4%, transparent),
+      color-mix(in srgb, var(--vo-tint) 4%, transparent)
+    ),
+    #fff;
+  border: 1px solid color-mix(in srgb, var(--vo-tint) 35%, var(--color-border));
+  color: var(--vo-ink);
+}
+
+/* A view-only item is a real button: a visible focus ring (Heritage Orange, its lift
+   on dark) and a hover that never touches the text. */
+.view-only-stripes:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+button.view-only-stripes:hover {
+  border-color: color-mix(in srgb, var(--vo-tint) 70%, var(--color-border));
+}
+
+/* Accents get LIGHTER on dark, never darker (CIG slide 9): the hue is lifted halfway
+   toward ink, so the neutral gray reads as a quiet gray and a color keeps its family. */
+html.dark .view-only-stripes {
+  --vo-tint: color-mix(in srgb, var(--vo-hue, #6b7280) 50%, var(--color-ink));
+  --vo-ink: var(--color-ink-soft);
+  --vo-ink-faint: var(--color-ink-faint);
+
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--vo-tint) 8%, transparent) 0 0.25rem,
+      transparent 0.25rem 0.5rem
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--vo-tint) 3%, transparent),
+      color-mix(in srgb, var(--vo-tint) 3%, transparent)
+    ),
+    var(--color-surface-raised);
+
+  /* The stripes stay faint on dark to keep the text at AA, so two calendars would
+     differ only by their dot. The border carries the hue instead: it sits outside the
+     text's background, so it can be stronger without costing contrast. */
+  border-color: color-mix(in srgb, var(--vo-tint) 65%, var(--color-line));
+}
+
+html.dark button.view-only-stripes:hover {
+  border-color: color-mix(in srgb, var(--vo-tint) 75%, var(--color-line));
+}
+
+html.dark .view-only-stripes:focus-visible {
+  outline-color: var(--color-accent-lift);
+}
+
+/* The source's hollow dot (`ExternalSourceLabel`): a ring in the calendar's color,
+   lifted on dark like the stripes, so a mid-tone hue stays visible on a dark card. */
+.view-only-dot {
+  border-color: var(--vo-hue, #6b7280);
+}
+
+html.dark .view-only-dot {
+  border-color: color-mix(in srgb, var(--vo-hue, #6b7280) 60%, var(--color-ink));
+}
+
 /* ─── Micro-animation keyframes ────────────────────────────────────────── */
 @keyframes sway {
   0%,

@@ -24,6 +24,8 @@ import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { wallExternalItems } from '@/utils/wallExternalEvents';
 import type { FamilyActivity } from '@/types/models';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
@@ -60,6 +62,8 @@ const emit = defineEmits<{
 
 const activityStore = useActivityStore();
 const { identityFor } = useActivityIdentity();
+/** Read only: the page sets the fetch window (plan 2026-11-17, C4). */
+const externalEvents = useExternalEvents();
 
 /**
  * The day the big panel is showing. Tapping the week strip moves this rather
@@ -94,11 +98,18 @@ const isToday = computed(() => focusYmd.value === props.todayYmd);
 const events = computed(() =>
   wallEvents(activityStore.activitiesForDate(focusYmd.value), props.visibleMemberIds)
 );
+/** The day's timed view-only events; empty unless a calendar is viewed. */
+const externals = computed(() =>
+  externalEvents.isActive.value
+    ? wallExternalItems(externalEvents.timedForDate(focusYmd.value), focusYmd.value)
+    : []
+);
 const gridColumns = computed(() => [
   {
     key: focusYmd.value,
     isToday: isToday.value,
     occurrences: events.value.filter((e) => !isAllDayActivity(e.activity)),
+    externals: externals.value,
   },
 ]);
 /**
@@ -130,7 +141,7 @@ const allDaySpans = computed(() => {
 });
 
 /** Content-derived; the shell turns it into a band/rail/strip choice. */
-const busiest = computed(() => events.value.length);
+const busiest = computed(() => events.value.length + externals.value.length);
 
 /** Memoised for the same reason as view A — see `eventsByDay` there. */
 const stripByDay = computed(() => {

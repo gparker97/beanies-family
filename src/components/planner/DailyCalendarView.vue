@@ -13,8 +13,14 @@ import {
   useTimeGrid,
   groupOverlapping,
   timedCards,
-  type TimedCard,
+  externalCards,
+  isExternalCard,
+  type PlannerCard,
 } from '@/composables/useCalendarNavigation';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import type { ExternalEvent } from '@/types/externalEvents';
+import ExternalChip from '@/components/planner/ExternalChip.vue';
+import ExternalTimedBlock from '@/components/planner/ExternalTimedBlock.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useCalendarDrag } from '@/composables/useCalendarDrag';
@@ -29,6 +35,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useDayExtras } from '@/composables/useDayExtras';
+import { externalExtras } from '@/utils/calendarDay';
 import { belongsInMemberColumn, matchesAssigneeFilter } from '@/utils/assignees';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import { extractDatePart, addHourToTime } from '@/utils/date';
@@ -62,6 +69,8 @@ const emit = defineEmits<{
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
   'holiday-click': [holiday: HolidayOccurrence];
+  /** A view-only external event was tapped; the page opens its read-only details. */
+  'external-click': [event: ExternalEvent];
   /** Swipe navigation — the page advances the shared reference date. */
   prev: [];
   next: [];
@@ -142,11 +151,21 @@ function memberActivities(memberId: string): Occurrence[] {
   return dayActivities.value.filter((o) => belongsInMemberColumn(o.activity, memberId));
 }
 
+/**
+ * The day's timed view-only external events as cards (read only: the page sets the
+ * fetch window). They belong to no member, so, like an activity with no owner, they
+ * appear in EVERY lane, side by side with whatever they overlap there.
+ */
+const { timedForDate: externalTimedFor } = useExternalEvents();
+const dayExternalCards = computed(() =>
+  externalCards(externalTimedFor(currentDay.value.dateStr), currentDay.value.dateStr)
+);
+
 /** Each lane's timed cards, built once per change (a continuation draws from 00:00). */
 const cardsByMember = computed(() => {
-  const map = new Map<string, TimedCard[]>();
+  const map = new Map<string, PlannerCard[]>();
   for (const member of visibleMembers.value) {
-    map.set(member.id, timedCards(memberActivities(member.id)));
+    map.set(member.id, [...timedCards(memberActivities(member.id)), ...dayExternalCards.value]);
   }
   return map;
 });
@@ -235,9 +254,15 @@ const birthdaysForCurrentDay = computed(() =>
     .map((e) => e.birthday!)
 );
 
+/** All-day view-only external events on the day in view, from the same shared query. */
+const externalsForCurrentDay = computed<ExternalEvent[]>(() =>
+  externalExtras(extrasByDate.value.get(currentDay.value.dateStr))
+);
+
 const hasAnyUntimedContent = computed(
   () =>
     birthdaysForCurrentDay.value.length > 0 ||
+    externalsForCurrentDay.value.length > 0 ||
     activeVacations.value.length > 0 ||
     dayTodos.value.length > 0 ||
     segmentBuckets.value.untimed.length > 0 ||
@@ -452,6 +477,21 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
           <BirthdayChip :birthday="b" class="block w-full" @click="emit('birthday-click', b)" />
         </div>
 
+        <!-- View-only external all-day events: family-scope, like a birthday, so they
+             cross every member column; striped and quieter than the family's own. -->
+        <div
+          v-for="e in externalsForCurrentDay"
+          :key="'ext-' + e.viewedCalendarId + '-' + e.id"
+          :style="{ gridColumn: `2 / span ${familyRowSpan}` }"
+          class="px-1"
+        >
+          <ExternalChip
+            :event="e"
+            :date="currentDay.dateStr"
+            @open="(ev) => emit('external-click', ev)"
+          />
+        </div>
+
         <!-- Vacation bars (span all member columns) -->
         <div
           v-for="v in activeVacations"
@@ -612,24 +652,38 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
               v-for="(group, gi) in groupOverlapping(cardsByMember.get(member.id) ?? [])"
               :key="gi"
             >
-              <PlannerTimedBlock
-                v-for="({ activity, startTime, endTime, eventDate, key, isTail }, ai) in group"
-                :key="key"
-                :activity="activity"
-                :event-date="eventDate"
-                :start-time="startTime!"
-                :end-time="endTime"
-                :lane-index="ai"
-                :lane-count="group.length"
-                :identity="identityFor(activity, { laneMemberId: member.id })"
-                :get-position="getPosition"
-                :title="displayTitle(activity, eventDate)"
-                :clash="clashFor(activity.id, eventDate)"
-                surface="lanes"
-                resizable
-                :draggable="!isTail"
-                @view-activity="(id, date) => emit('view-activity', id, date)"
-              />
+              <template v-for="(card, ai) in group" :key="card.key">
+                <!-- A view-only external event: a quiet sibling in the same lanes, no
+                     drag, no resize, and its click never reaches the slot underneath. -->
+                <ExternalTimedBlock
+                  v-if="isExternalCard(card)"
+                  :event="card.external"
+                  :start-time="card.startTime"
+                  :end-time="card.endTime"
+                  :lane-index="ai"
+                  :lane-count="group.length"
+                  :get-position="getPosition"
+                  class="z-10"
+                  @open="(e) => emit('external-click', e)"
+                />
+                <PlannerTimedBlock
+                  v-else
+                  :activity="card.activity"
+                  :event-date="card.eventDate"
+                  :start-time="card.startTime!"
+                  :end-time="card.endTime"
+                  :lane-index="ai"
+                  :lane-count="group.length"
+                  :identity="identityFor(card.activity, { laneMemberId: member.id })"
+                  :get-position="getPosition"
+                  :title="displayTitle(card.activity, card.eventDate)"
+                  :clash="clashFor(card.activity.id, card.eventDate)"
+                  surface="lanes"
+                  resizable
+                  :draggable="!card.isTail"
+                  @view-activity="(id, date) => emit('view-activity', id, date)"
+                />
+              </template>
             </template>
 
             <!-- Where the lifted block would land (#142), in the column it would land in. -->
@@ -666,6 +720,8 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
         :is-today="currentDay.isToday"
         :holiday="holidayForCurrentDay"
         :birthdays="birthdaysForCurrentDay"
+        :external-timed="externalTimedFor(currentDay.dateStr)"
+        :external-all-day="externalsForCurrentDay"
         :drop-slot="overSlot"
         @birthday-click="(b) => emit('birthday-click', b)"
         @view-activity="(id, date) => emit('view-activity', id, date)"
@@ -674,6 +730,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
         @view-segment="(vid: string, idx: number) => emit('view-segment', vid, idx)"
         @add-activity="(date, time) => emit('add-activity', date, time)"
         @holiday-click="(h) => emit('holiday-click', h)"
+        @external-click="(e) => emit('external-click', e)"
       />
     </template>
   </div>

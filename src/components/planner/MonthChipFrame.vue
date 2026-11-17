@@ -19,6 +19,10 @@
  *    `aria-hidden` span with no click, so buttons never nest.
  *  - `interactive: true` also means "may be a drag source" (#142, `MonthDayItem` places the
  *    source): the button takes `select-none` and no iOS long-press callout.
+ *  - `striped` (a view-only external event, `ExternalChip`): no left color bar and no
+ *    wash; the `.view-only-stripes` utility (`style.css`) paints the stripes in `color`
+ *    (passed as `--vo-hue`, never an inline background) and sets the lighter inks. Its
+ *    hover touches the edge, never the text, so the frame's opacity hover stands down.
  *
  * Height is never set here. In the grid the cell passes `h-[var(--mg-chip-h)]` by
  * fallthrough; elsewhere the chip is content-sized. Data attributes (the reveal hooks)
@@ -44,6 +48,8 @@ const props = withDefaults(
     faces?: FamilyMember[];
     /** A one-owner chip: its face is dropped when the context says `hideSoloFace`. */
     solo?: boolean;
+    /** A view-only external event: stripes in `color`, no edge bar (see the docblock). */
+    striped?: boolean;
     /** The accessible name (an interactive chip only; a non-interactive one is aria-hidden). */
     spokenLabel: string;
     testid: string;
@@ -56,6 +62,7 @@ const props = withDefaults(
     time: '',
     faces: () => [],
     solo: false,
+    striped: false,
   }
 );
 
@@ -81,18 +88,42 @@ const DENSITY_CLASS: Record<string, string> = {
   bars: 'mx-1 rounded-full',
 };
 
-const rootClass = computed(() => [
-  DENSITY_CLASS[density.value] ?? DENSITY_CLASS.comfortable,
-  density.value === 'bars' ? '' : 'text-secondary-500 dark:text-ink',
-  props.dashed && density.value !== 'bars' ? 'border-dashed' : '',
-  props.celebrating && isRich.value ? 'is-celebration' : '',
-  // A control is also a drag source (#142): no long-press callout or text selection.
-  interactive.value
-    ? 'cursor-pointer transition-opacity select-none hover:opacity-80 [-webkit-touch-callout:none]'
-    : '',
-]);
+/** The same anatomy with no edge bar, for `striped`. Literal, for the same source scan. */
+const STRIPED_CLASS: Record<string, string> = {
+  compact:
+    'view-only-stripes font-inter w-full gap-1 overflow-hidden rounded-md pr-1 pl-1 text-left text-xs leading-none',
+  comfortable:
+    'view-only-stripes font-inter w-full gap-1 overflow-hidden rounded-md py-0.5 pr-1.5 pl-1 text-left text-xs leading-tight',
+  titles: 'view-only-stripes w-full overflow-hidden rounded-xs px-1 text-left text-xs leading-none',
+  bars: 'view-only-stripes mx-1 rounded-full',
+};
+
+/** The start time's ink: faint on the stripes, the shared muted ink elsewhere. */
+const timeInk = computed(() =>
+  props.striped ? 'text-[var(--vo-ink-faint)]' : 'text-[var(--muted-text)]'
+);
+
+const rootClass = computed(() => {
+  if (props.striped) {
+    return [
+      STRIPED_CLASS[density.value] ?? STRIPED_CLASS.comfortable,
+      interactive.value ? 'cursor-pointer select-none [-webkit-touch-callout:none]' : '',
+    ];
+  }
+  return [
+    DENSITY_CLASS[density.value] ?? DENSITY_CLASS.comfortable,
+    density.value === 'bars' ? '' : 'text-secondary-500 dark:text-ink',
+    props.dashed && density.value !== 'bars' ? 'border-dashed' : '',
+    props.celebrating && isRich.value ? 'is-celebration' : '',
+    // A control is also a drag source (#142): no long-press callout or text selection.
+    interactive.value
+      ? 'cursor-pointer transition-opacity select-none hover:opacity-80 [-webkit-touch-callout:none]'
+      : '',
+  ];
+});
 
 const rootStyle = computed(() => {
+  if (props.striped) return { '--vo-hue': props.color };
   if (density.value === 'bars') return { background: props.color };
   return props.wash
     ? { borderLeftColor: props.color, background: props.wash }
@@ -127,7 +158,8 @@ function onClick(event: MouseEvent) {
       <span class="min-w-0 flex-1 truncate text-xs font-medium">{{ label }}</span>
       <span
         v-if="showTime"
-        class="flex-shrink-0 text-xs font-normal text-[var(--muted-text)] tabular-nums"
+        class="flex-shrink-0 text-xs font-normal tabular-nums"
+        :class="timeInk"
         aria-hidden="true"
         >{{ time }}</span
       >
@@ -142,7 +174,8 @@ function onClick(event: MouseEvent) {
       }}</span>
       <span
         v-if="showTime"
-        class="flex-shrink-0 font-medium text-[var(--muted-text)] tabular-nums"
+        class="flex-shrink-0 font-medium tabular-nums"
+        :class="timeInk"
         aria-hidden="true"
       >
         {{ time }}

@@ -17,11 +17,21 @@ vi.mock('@/stores/overlapAckStore', () => ({
 import { useClash, useClashLookup } from '@/composables/useClash';
 
 const raw = (fingerprint: string): ClashInfo => ({
-  connectionId: 'conn-1',
-  calendarLabel: 'mum@example.com',
+  sourceId: 'conn-1',
+  source: 'own',
+  sourceName: 'mum@example.com',
   activityId: 'a1',
   occurrenceDate: '2026-06-11',
   fingerprint,
+});
+
+const viewedRaw = (): ClashInfo => ({
+  sourceId: 'vc-1',
+  source: 'viewed',
+  sourceName: "Grandma's calendar",
+  activityId: 'a1',
+  occurrenceDate: '2026-06-11',
+  fingerprint: 'fp-1',
 });
 
 beforeEach(() => {
@@ -40,7 +50,11 @@ describe('useClash enrichment', () => {
   it('enriches with acknowledged=false when not acknowledged', () => {
     clashForMock.mockReturnValue(raw('fp-1'));
     isAcknowledgedMock.mockReturnValue(false);
-    expect(useClash('a1', '2026-06-11').value).toEqual({ ...raw('fp-1'), acknowledged: false });
+    expect(useClash('a1', '2026-06-11').value).toEqual({
+      ...raw('fp-1'),
+      acknowledged: false,
+      label: 'your mum@example.com calendar',
+    });
     expect(isAcknowledgedMock).toHaveBeenCalledWith('a1', '2026-06-11', 'conn-1', 'fp-1');
   });
 
@@ -61,5 +75,27 @@ describe('useClash enrichment', () => {
     // Rescheduled → new fingerprint → no longer acknowledged.
     clashForMock.mockReturnValue(raw('fp-2'));
     expect(lookup('a1', '2026-06-11')?.acknowledged).toBe(false);
+  });
+});
+
+describe('useClash label', () => {
+  it('a connected calendar keeps the existing wording: "your {email} calendar"', () => {
+    clashForMock.mockReturnValue(raw('fp-1'));
+    isAcknowledgedMock.mockReturnValue(false);
+    expect(useClash('a1', '2026-06-11').value?.label).toBe('your mum@example.com calendar');
+  });
+
+  it('a viewed calendar is named exactly as stored, with no "calendar" added', () => {
+    clashForMock.mockReturnValue(viewedRaw());
+    isAcknowledgedMock.mockReturnValue(false);
+    const lookup = useClashLookup();
+    expect(lookup('a1', '2026-06-11')?.label).toBe("Grandma's calendar");
+  });
+
+  it('a viewed clash joins the ack memory under the viewed calendar id', () => {
+    clashForMock.mockReturnValue(viewedRaw());
+    isAcknowledgedMock.mockReturnValue(true);
+    expect(useClash('a1', '2026-06-11').value?.acknowledged).toBe(true);
+    expect(isAcknowledgedMock).toHaveBeenCalledWith('a1', '2026-06-11', 'vc-1', 'fp-1');
   });
 });

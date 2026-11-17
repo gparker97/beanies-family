@@ -12,6 +12,7 @@ import type {
 } from '@/utils/monthCells';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
 import type { DayItem } from '@/utils/monthDayItems';
+import type { ExternalEvent } from '@/types/externalEvents';
 
 export const FIXTURE_DATE = '2026-05-19';
 
@@ -48,6 +49,7 @@ export function cell(overrides: Partial<MonthDayCellData> = {}): MonthDayCellDat
     vacations: [],
     segments: [],
     allDayItems: [],
+    timedExternals: [],
     extras: [],
     ...overrides,
   };
@@ -146,6 +148,48 @@ export function itemIds(items: readonly DayItem[]): string[] {
         return `timed:${i.occurrence.activity.id}`;
       case 'segment':
         return `segment:${i.segment.segmentId}-${i.segment.kind}`;
+      case 'external':
+        return `external:${i.external.id}`;
     }
   });
+}
+
+/**
+ * A view-only external event (plan 2026-11-17). Timed by default (`HH:mm` local on
+ * `ymd`, one hour); pass `allDay: true` for an all-day one on `ymd`.
+ */
+export function externalEvent(
+  id: string,
+  over: Partial<ExternalEvent> & { ymd?: string; start?: string; end?: string } = {}
+): ExternalEvent {
+  const { ymd = FIXTURE_DATE, start = '15:00', end, ...rest } = over;
+  const at = (hhmm: string) => new Date(`${ymd}T${hhmm}:00`).getTime();
+  const startMs = rest.allDay ? new Date(`${ymd}T00:00:00`).getTime() : at(start);
+  const endMs = rest.allDay ? startMs + 86_400_000 : end ? at(end) : startMs + 3_600_000;
+  return {
+    id,
+    viewedCalendarId: 'vc-1',
+    calendarName: "Grandma's calendar",
+    color: '#6b7280',
+    allDay: false,
+    startMs,
+    endMs,
+    startYmd: ymd,
+    endYmd: ymd,
+    title: id,
+    busyOnly: false,
+    transparent: false,
+    ...rest,
+  };
+}
+
+/** An all-day view-only event as the shared day query emits it (one per covered day). */
+export function externalExtra(event: ExternalEvent, ymd = event.startYmd): DayExtra {
+  return {
+    kind: 'external',
+    id: `x:${event.viewedCalendarId}:${event.id}:${ymd}`,
+    ymd,
+    label: event.title ?? 'Busy',
+    external: event,
+  };
 }

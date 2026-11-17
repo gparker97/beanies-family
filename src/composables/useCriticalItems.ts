@@ -15,7 +15,10 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { useChoreStore } from '@/stores/choreStore';
 import { buildTravelBriefingRows } from '@/composables/criticalItems/travelRows';
-import { useMemberInfo } from '@/composables/useMemberInfo';
+import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { externalEventTitle, externalWindowOn } from '@/utils/calendar/externalDisplay';
+import { plannerDayLink } from '@/utils/entityDeepLink';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { buildCardBriefingRows, ymdOf, type CardBriefingRow } from '@/utils/responsibilityDeck';
 import { useTranslation } from '@/composables/useTranslation';
@@ -48,11 +51,21 @@ import { hintEmoji, isFreshHint } from '@/utils/helpfulHints';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { showToast } from '@/composables/useToast';
 import type { ChoreBlock } from '@/types/models';
+import type { ExternalEvent } from '@/types/externalEvents';
 
 export interface CriticalItem {
   id: string;
   type:
-    'todo' | 'activity' | 'medication' | 'holiday' | 'list' | 'meal' | 'card' | 'travel' | 'chores';
+    | 'todo'
+    | 'activity'
+    | 'medication'
+    | 'holiday'
+    | 'list'
+    | 'meal'
+    | 'card'
+    | 'travel'
+    | 'chores'
+    | 'external';
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
@@ -67,7 +80,8 @@ export interface CriticalItem {
   /**
    * The row's ✕ writes this per-member read key (notificationsStore.markRead): a Who
    * Owns What row's own key, else a `briefing-hide:` key for this day or occurrence.
-   * Absent only on a hint row, whose ✕ dismisses the hint itself (`dismissHint`).
+   * Absent on a hint row, whose ✕ dismisses the hint itself (`dismissHint`), and on a
+   * view-only external row, which has no ✕ (nothing about it may reach the family file).
    */
   dismissKey?: string;
   /** An un-kept Helpful Hint row: the ✕ dismisses the hint family-wide, as on the to-do page. */
@@ -208,6 +222,7 @@ export function useCriticalItems() {
   const { getMemberName, getMemberById } = useMemberInfo();
   const { t, currentLanguage } = useTranslation();
   const { today: todayStr } = useToday();
+  const externalEvents = useExternalEvents();
 
   /**
    * The full, sorted briefing list for the current member. Capping to the
@@ -585,6 +600,19 @@ export function useCriticalItems() {
       }
     }
 
+    // ── View-only external calendar rows (plan 2026-11-17, C6) ──────────────
+    // Today's events from the calendars whose "include in daily briefing" switch is on
+    // (`briefingEvents`, already filtered by the store). Family audience only: a child
+    // session (`!isAdultMember`, the audience rule the widget shares) never gets them. A
+    // timed row sorts by its start; an all-day row is untimed. Tapping opens the planner's
+    // day view (the generic `route`). Nothing about the event is ever logged.
+    if (isAdultMember(currentMember)) {
+      for (const ev of externalEvents.briefingEvents.value) {
+        if (ev.startYmd > todayStr.value || ev.endYmd < todayStr.value) continue;
+        items.push(externalItem(ev, todayStr.value));
+      }
+    }
+
     // ── Helpful Hints (#40) for the current member ─────────────────────
     // Hints ride their own loop, never the to-do loop: a hint's dueDate is its
     // nudge date, so through the overdue/today/noDue tables every hint would read
@@ -655,9 +683,14 @@ export function useCriticalItems() {
     // Every row the member can dismiss for the day gets its hide key; rows already
     // hidden drop out. Card rows carry their own keys and their own snooze rule
     // (`buildCardBriefingRows` already filtered them), so they skip this filter.
+    //
+    // A view-only external row gets NO hide key, so it has no ✕: the key is written to
+    // the family file (`notificationReads`) and synced, and an external row's id holds
+    // Google's event id, which must never reach the family file (plan Requirement 10).
+    // The member controls these rows with the calendar's "Include in daily briefing".
     const readState = notificationsStore.readState;
     return items.flatMap((item) => {
-      if (item.dismissHint || item.dismissKey) return [item];
+      if (item.dismissHint || item.dismissKey || item.type === 'external') return [item];
       const dismissKey = hideKey(item, todayStr.value);
       return readState[dismissKey] ? [] : [{ ...item, dismissKey }];
     });
@@ -726,6 +759,38 @@ export function useCriticalItems() {
     action: string
   ): void {
     logEvent({ level, surface: 'daily-briefing', message, context: { kind, action } });
+  }
+
+  /** One view-only event today → one briefing row, naming its calendar. */
+  function externalItem(ev: ExternalEvent, today: string): CriticalItem {
+    const w = ev.allDay ? null : externalWindowOn(ev, today);
+    // An end at midnight (or no end) reads "from {start}" rather than "to 12:00 AM".
+    const hasEnd = !!w && w.endTime !== '24:00' && w.endTime !== w.startTime;
+    const key: UIStringKey = ev.busyOnly
+      ? !w
+        ? 'calendarView.briefing.busyAllDay'
+        : hasEnd
+          ? 'calendarView.briefing.busyTimed'
+          : 'calendarView.briefing.busyTimedNoEnd'
+      : !w
+        ? 'calendarView.briefing.allDay'
+        : hasEnd
+          ? 'calendarView.briefing.timed'
+          : 'calendarView.briefing.timedNoEnd';
+    return {
+      id: `${ev.viewedCalendarId}:${ev.id}`,
+      type: 'external',
+      message: buildMessage(key, {
+        calendar: ev.calendarName,
+        title: externalEventTitle(ev, t),
+        from: formatTime12(w?.startTime ?? ''),
+        to: formatTime12(hasEnd ? (w?.endTime ?? '') : ''),
+      }),
+      icon: '👁️',
+      time: w?.startTime ?? '',
+      completable: false,
+      route: plannerDayLink(today),
+    };
   }
 
   /** One card row → one briefing item. No deck logic here, only copy and routing. */

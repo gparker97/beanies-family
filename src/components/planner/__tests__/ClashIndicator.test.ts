@@ -13,7 +13,7 @@ import type { ResolvedClash } from '@/composables/useClash';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string) => (key === 'calendarSync.clash.overlaps' ? 'Overlaps {calendar}' : key),
     isBeanieMode: { value: false },
     isEnglish: { value: true },
   }),
@@ -23,7 +23,9 @@ const CALENDAR = 'owner@example.com';
 
 function makeClash(overrides?: Partial<ResolvedClash>): ResolvedClash {
   return {
-    calendarLabel: CALENDAR,
+    source: 'own',
+    sourceName: CALENDAR,
+    label: `your ${CALENDAR} calendar`,
     acknowledged: false,
     ...overrides,
   } as ResolvedClash;
@@ -78,6 +80,26 @@ describe('ClashIndicator', () => {
     const marker = wrapper.find('[role="img"]');
     expect(marker.attributes('aria-label')).toContain(CALENDAR);
     expect(marker.attributes('title')).toContain(CALENDAR);
+  });
+
+  it('the tooltip reads as one sentence for both sources (no "calendar calendar")', () => {
+    // The label is resolved once in useClash; the mark only fills the template.
+    const own = mount(ClashIndicator, { props: { clash: makeClash() } });
+    expect(own.find('[role="img"]').attributes('title')).toBe(
+      'Overlaps your owner@example.com calendar'
+    );
+    const viewed = mount(ClashIndicator, {
+      props: {
+        clash: makeClash({
+          source: 'viewed',
+          sourceName: "Grandma's calendar",
+          label: "Grandma's calendar",
+        }),
+      },
+    });
+    const marker = viewed.find('[role="img"]');
+    expect(marker.attributes('title')).toBe("Overlaps Grandma's calendar");
+    expect(marker.attributes('aria-label')).toBe("Overlaps Grandma's calendar");
   });
 
   it('fades an acknowledged clash so the two states stay distinguishable', () => {

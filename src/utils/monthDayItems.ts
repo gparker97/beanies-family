@@ -7,9 +7,15 @@
 // things on" label read it, so no two surfaces can order, cap, count or call a day
 // empty differently.
 //
-// Birthdays and holidays (`cell.extras`) are deliberately NOT `DayItem`s. They
-// stay a separate list so the day contents render `BirthdayChip` / `HolidayChip`
-// inline, where `allDaySurfaces.test.ts` scans for them.
+// Birthdays, holidays and all-day view-only events (`cell.extras`) are deliberately
+// NOT `DayItem`s in the day lists. They stay a separate list so the day contents render
+// `BirthdayChip` / `HolidayChip` / `ExternalChip` inline, where `allDaySurfaces.test.ts`
+// scans for them. The one exception is the month GRID's chip stack (`gridDayItems`): a
+// grid cell has no list for extras (holidays and birthdays sit on its numeral row), so
+// its all-day external chips join the stack as `external` items.
+//
+// TIMED view-only events (`cell.timedExternals`) are `external` items on the timeline,
+// merged by start time.
 
 import type {
   CellAllDayItem,
@@ -19,6 +25,8 @@ import type {
 } from '@/utils/monthCells';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
 import type { DayExtra } from '@/utils/calendarDay';
+import type { ExternalEvent } from '@/types/externalEvents';
+import { externalWindowOn } from '@/utils/calendar/externalDisplay';
 import type { DayCaps } from '@/constants/calendarCaps';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -29,7 +37,9 @@ export type DayItem =
   | { kind: 'trip'; vacation: CellVacation }
   | { kind: 'allday'; item: CellAllDayItem; date: string }
   | { kind: 'timed'; occurrence: CellTimedOccurrence }
-  | { kind: 'segment'; segment: TravelSegmentOccurrence };
+  | { kind: 'segment'; segment: TravelSegmentOccurrence }
+  /** A view-only external event drawn on `date` (timed, or all-day in the grid stack). */
+  | { kind: 'external'; external: ExternalEvent; date: string };
 
 /** The spanning kinds: what `allDayItems` returns and what can win a grid lane. */
 export type SpanningDayItem = Extract<DayItem, { kind: 'trip' | 'allday' }>;
@@ -47,6 +57,8 @@ export function dayItemKey(item: DayItem): string {
       return `timed:${item.occurrence.activity.id}:${item.occurrence.date}`;
     case 'segment':
       return `segment:${item.segment.segmentId}-${item.segment.kind}`;
+    case 'external':
+      return `external:${item.external.viewedCalendarId}:${item.external.id}:${item.date}`;
   }
 }
 
@@ -54,21 +66,29 @@ export function dayItemKey(item: DayItem): string {
 function startOf(item: DayItem): string | null {
   if (item.kind === 'timed') return item.occurrence.activity.startTime || null;
   if (item.kind === 'segment') return item.segment.time || null;
+  if (item.kind === 'external' && !item.external.allDay) {
+    return externalWindowOn(item.external, item.date).startTime;
+  }
   return null;
 }
 
 /**
- * Timed activities and travel segments merged into one timeline by start time.
- * Untimed items go last; ties keep their input order (timed before segments),
- * because `Array.prototype.sort` is stable.
+ * Timed activities, travel segments and timed view-only events merged into one
+ * timeline by start time. Untimed items go last; ties keep their input order (timed,
+ * then segments, then view-only events, the quietest), because `Array.prototype.sort`
+ * is stable.
  */
-function mergeTimeline(
+export function mergeTimeline(
   timed: readonly CellTimedOccurrence[],
-  segments: readonly TravelSegmentOccurrence[]
+  segments: readonly TravelSegmentOccurrence[],
+  externals: readonly ExternalEvent[],
+  /** The day being built: a view-only event's start is clamped to it. */
+  date: string
 ): DayItem[] {
   const items: DayItem[] = [
     ...timed.map((occurrence): DayItem => ({ kind: 'timed', occurrence })),
     ...segments.map((segment): DayItem => ({ kind: 'segment', segment })),
+    ...externals.map((external): DayItem => ({ kind: 'external', external, date })),
   ];
   return items.sort((a, b) => {
     const ta = startOf(a);
@@ -80,9 +100,20 @@ function mergeTimeline(
   });
 }
 
-/** The day's timed activities and travel segments, merged by start time. */
+/** The day's timed activities, travel segments and timed view-only events, by start time. */
 export function byStartTime(cell: MonthDayCellData): DayItem[] {
-  return mergeTimeline(cell.timedOccurrences, cell.segments);
+  return mergeTimeline(cell.timedOccurrences, cell.segments, cell.timedExternals, cell.date);
+}
+
+/** The day's all-day view-only events (from `cell.extras`) as grid-stack items. */
+export function externalAllDayItems(cell: MonthDayCellData): DayItem[] {
+  const items: DayItem[] = [];
+  for (const extra of cell.extras) {
+    if (extra.kind === 'external' && extra.external) {
+      items.push({ kind: 'external', external: extra.external, date: cell.date });
+    }
+  }
+  return items;
 }
 
 /** Trips, then the family's all-day activities. */
@@ -101,6 +132,15 @@ export function allDayItems(cell: MonthDayCellData): SpanningDayItem[] {
 /** THE single day order: all-day things, then the timeline. */
 export function dayItems(cell: MonthDayCellData): DayItem[] {
   return [...allDayItems(cell), ...byStartTime(cell)];
+}
+
+/**
+ * The month GRID's order: `dayItems` with the all-day view-only events placed after the
+ * spanning things and before the timeline. Only the grid's lane and stack read it; every
+ * day list renders those events from `cell.extras` instead (see the header).
+ */
+export function gridDayItems(cell: MonthDayCellData): DayItem[] {
+  return [...allDayItems(cell), ...externalAllDayItems(cell), ...byStartTime(cell)];
 }
 
 /** The one "how much is on this day" rule; `=== 0` is the one "is this day empty" rule. */
@@ -135,12 +175,12 @@ export interface CappedDayContents {
   extras: DayExtra[];
   /** Trips (never capped), then the all-day activities that fit. */
   allDay: DayItem[];
-  /** Timed activities and travel segments that fit, merged by start time. */
+  /** Timed activities, travel segments and timed view-only events that fit, by start time. */
   timeline: DayItem[];
   hidden: {
     /** Hidden extras plus hidden all-day activities (the all-day "+N"). */
     allDay: number;
-    /** Hidden timed activities plus hidden travel segments (one "+N more"). */
+    /** Hidden timed activities, travel segments and view-only events (one "+N more"). */
     timeline: number;
   };
 }
@@ -174,8 +214,11 @@ export interface CappedDayContents {
  *
  * Trips are not capped. Timed activities are capped at `caps.timed` (earliest
  * first, as `prepareCellData` sorts them) and travel segments at `caps.segments`.
- * The capped kinds are filtered first and each list is then rebuilt in `dayItems`
- * order, so a cap never reorders a day.
+ * Timed view-only events take only the `caps.timed` slots the family's own activities
+ * leave free: they are somebody else's calendar, shown for information, and must never
+ * push the family's plans behind "+N". (All-day view-only events are extras, so they
+ * share the reference days' half of `caps.allDay` above.) The capped kinds are filtered
+ * first and each list is then rebuilt in `dayItems` order, so a cap never reorders a day.
  */
 export function capDayContents(cell: MonthDayCellData, caps?: DayCaps): CappedDayContents {
   if (!caps) {
@@ -198,16 +241,22 @@ export function capDayContents(cell: MonthDayCellData, caps?: DayCaps): CappedDa
 
   const visibleTimed = cell.timedOccurrences.slice(0, caps.timed);
   const visibleSegments = cell.segments.slice(0, caps.segments);
+  const visibleExternals = cell.timedExternals.slice(
+    0,
+    Math.max(0, caps.timed - visibleTimed.length)
+  );
   const hiddenTimeline =
     cell.timedOccurrences.length -
     visibleTimed.length +
     cell.segments.length -
-    visibleSegments.length;
+    visibleSegments.length +
+    cell.timedExternals.length -
+    visibleExternals.length;
 
   return {
     extras: cell.extras.slice(0, visibleReferenceCount),
     allDay: buildAllDay(cell, visibleAllDay),
-    timeline: mergeTimeline(visibleTimed, visibleSegments),
+    timeline: mergeTimeline(visibleTimed, visibleSegments, visibleExternals, cell.date),
     hidden: { allDay: hiddenAllDay, timeline: hiddenTimeline },
   };
 }

@@ -16,6 +16,8 @@ import NookMealsCard from '@/components/nook/NookMealsCard.vue';
 import MealEditModal from '@/components/mealplan/MealEditModal.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vue';
+import ExternalEventDetailsModal from '@/components/planner/ExternalEventDetailsModal.vue';
+import type { ExternalEvent } from '@/types/externalEvents';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
 import TransactionViewEditModal from '@/components/transactions/TransactionViewEditModal.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
@@ -95,6 +97,9 @@ const viewingMedication = computed(() =>
 // from the critical-items briefing stay in context — no surprise
 // navigation. Matches the View → Edit pivot pattern in BeanMedicationsTab.
 const editingMedication = ref<import('@/types/models').Medication | null>(null);
+
+// ── View-only external event details (read-only; Nook schedule taps) ───────
+const selectedExternal = ref<ExternalEvent | null>(null);
 
 // ── Activity modal ───────────────────────────────────────────────────────────
 const showActivityEditModal = ref(false);
@@ -252,6 +257,7 @@ async function handleTransactionDelete(id: string) {
       id="today-schedule"
       @open-todo="selectedTodoId = $event"
       @open-activity="(id: string, date: string) => openActivity(id, date)"
+      @open-external="selectedExternal = $event"
     />
 
     <!-- Today's meals (dev-flag-gated) -->
@@ -275,6 +281,11 @@ async function handleTransactionDelete(id: string) {
     <!-- Modals -->
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodoId = null" />
 
+    <ExternalEventDetailsModal
+      :event="selectedExternal"
+      :open="selectedExternal !== null"
+      @close="selectedExternal = null"
+    />
     <MealEditModal :open="mealEditOpen" :meal="mealEditTarget" @close="mealEditOpen = false" />
 
     <ActivityViewEditModal

@@ -35,7 +35,7 @@ import {
   formatTime12,
   extractDatePart,
 } from '@/utils/date';
-import { fillTemplate } from '@/utils/fillTemplate';
+import { fillTemplate, splitTemplate } from '@/utils/fillTemplate';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { rescheduleDelta } from '@/utils/calendar/rescheduleDelta';
 import { BaseButton } from '@/components/ui';
@@ -176,23 +176,25 @@ const clash = useClash(
   () => activity.value?.id ?? '',
   () => clashOccurrenceDate.value
 );
+/** "Overlaps {calendar}", split so the calendar's label keeps its accent. */
+const clashHeadingParts = computed(() =>
+  clash.value
+    ? splitTemplate(t('calendarSync.clash.overlaps'), { calendar: clash.value.label })
+    : []
+);
 
 function acknowledgeClash() {
   if (!clash.value || !activity.value) return;
   overlapAckStore.acknowledge(
     activity.value.id,
     clashOccurrenceDate.value,
-    clash.value.connectionId,
+    clash.value.sourceId,
     clash.value.fingerprint
   );
 }
 function unacknowledgeClash() {
   if (!clash.value || !activity.value) return;
-  overlapAckStore.unacknowledge(
-    activity.value.id,
-    clashOccurrenceDate.value,
-    clash.value.connectionId
-  );
+  overlapAckStore.unacknowledge(activity.value.id, clashOccurrenceDate.value, clash.value.sourceId);
 }
 function openClashHelp() {
   // Synchronous in the handler (PWA popup-blocker constraint).
@@ -1030,9 +1032,12 @@ async function confirmReschedule() {
           <OverlapMark class="text-primary-500 mt-0.5 h-4 w-auto flex-shrink-0" />
           <div class="min-w-0 flex-1">
             <p class="font-outfit dark:text-ink text-sm font-bold text-[var(--color-text)]">
-              {{ t('calendarSync.clash.overlapsCalendarPrefix') }}
-              <span class="text-primary-600 dark:text-accent-lift">{{ clash.calendarLabel }}</span>
-              {{ t('calendarSync.clash.calendarSuffix') }}
+              <template v-for="(part, i) in clashHeadingParts" :key="i">
+                <span v-if="part.value" class="text-primary-600 dark:text-accent-lift">{{
+                  part.text
+                }}</span>
+                <template v-else>{{ part.text }}</template>
+              </template>
             </p>
             <p class="mt-0.5 text-xs text-[var(--color-text-muted)]">
               {{ t('calendarSync.clash.dismissHint') }}
@@ -1072,7 +1077,7 @@ async function confirmReschedule() {
           <span class="min-w-0 flex-1 truncate text-xs text-[var(--color-text-muted)]">
             <span class="font-semibold text-green-600">✓</span>
             {{ t('calendarSync.clash.acknowledgedLine') }} ·
-            <span class="font-semibold">{{ clash.calendarLabel }}</span>
+            <span class="font-semibold">{{ clash.label }}</span>
           </span>
           <button
             type="button"

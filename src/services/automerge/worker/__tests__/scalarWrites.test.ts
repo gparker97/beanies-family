@@ -193,9 +193,12 @@ function leaves(node: unknown, path = '', out = new Map<string, boolean>()): Map
  *
  * +2 on 2026-11-16 (#148, 913 → 915 and 83 → 85): the `choreAwards` and `choreStarGifts` root
  * maps, one `makeMap` op each. The scripted writes themselves are unchanged.
+ *
+ * +2 on 2026-11-17 (view-only calendars, 915 → 917 and 85 → 87): the `calendarViewAccounts` and
+ * `viewedCalendars` root maps, one `makeMap` op each. The scripted writes themselves are unchanged.
  */
-const OFF_NUM_OPS = 915;
-const OFF_SET_SETTINGS_NUM_OPS = 85;
+const OFF_NUM_OPS = 917;
+const OFF_SET_SETTINGS_NUM_OPS = 87;
 
 describe('scalar writer OFF: the shipped write path, unchanged (#124 acceptance 2)', () => {
   it('the scripted sequence lands on the recorded op count, with no ImmutableString anywhere', () => {

@@ -15,13 +15,15 @@ const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned';
 // exchange NOT use this sentinel and the assertions below would fail.
 const REDIRECT_URI = 'https://beanies.family/oauth/native';
 
-const { startRedirectAuth, isNativeMock } = vi.hoisted(() => ({
+const { startRedirectAuth, isNativeMock, openOAuthPopup } = vi.hoisted(() => ({
   startRedirectAuth: vi.fn(async () => {}),
   isNativeMock: vi.fn(() => false),
+  openOAuthPopup: vi.fn(),
 }));
 
 vi.mock('@/services/google/googleAuth', () => ({
   startRedirectAuth,
+  openOAuthPopup,
   getRedirectUri: () => REDIRECT_URI,
   REDIRECT_AUTH_CODE_KEY_CALENDAR: 'beanies_redirect_auth_code:calendar',
   REDIRECT_AUTH_KEY: 'beanies_redirect_auth',
@@ -225,6 +227,191 @@ describe('calendarAuth — redirect transport (P2)', () => {
 
       expect(a).toBe(b); // same memoized promise result
       expect(exchangeCodeForTokens).toHaveBeenCalledOnce();
+    });
+  });
+});
+
+// ─── Grant kinds (view-only calendars plan 2026-11-17, A2) ──────────────────────
+
+const OWNED = 'https://www.googleapis.com/auth/calendar.events.owned';
+const READONLY = 'https://www.googleapis.com/auth/calendar.events.readonly';
+const CALENDAR_LIST = 'https://www.googleapis.com/auth/calendar.calendarlist.readonly';
+const EMAIL = 'https://www.googleapis.com/auth/userinfo.email';
+
+describe('calendarAuth: grant kinds', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.resetAllMocks();
+    isNativeMock.mockReturnValue(false);
+    sessionStorage.clear();
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'cid.apps.googleusercontent.com');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ email: 'me@example.com' }) }))
+    );
+    cal = await import('../calendarAuth');
+  });
+  afterEach(() => {
+    cal.__resetCalendarRedirectSettleForTesting();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  async function exchangeMock() {
+    const { exchangeCodeForTokens } = await import('@/services/google/oauthProxy');
+    return exchangeCodeForTokens as ReturnType<typeof vi.fn>;
+  }
+
+  /** Drive the popup flow: a fake popup window, then the callback message. */
+  async function runPopup(
+    opts: Parameters<typeof cal.connectGoogleCalendar>[0],
+    tokens: ReturnType<typeof goodTokens>
+  ) {
+    const popup = { location: { href: '' }, closed: false, close: vi.fn() };
+    openOAuthPopup.mockReturnValue(popup);
+    (await exchangeMock()).mockResolvedValue(tokens);
+    const pending = cal.connectGoogleCalendar(opts);
+    await vi.waitFor(() => expect(popup.location.href).not.toBe(''));
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: window.location.origin,
+        data: { type: 'oauth-callback', code: 'popup-code' },
+      })
+    );
+    const result = await pending;
+    return { result, url: new URL(popup.location.href) };
+  }
+
+  describe('scope table', () => {
+    it('sync is exactly today’s scopes and required scope', () => {
+      expect(cal.CALENDAR_GRANTS.sync.scopes).toEqual([...cal.CALENDAR_SCOPES]);
+      expect([...cal.CALENDAR_SCOPES]).toEqual([OWNED, CALENDAR_LIST, EMAIL]);
+      expect(cal.CALENDAR_GRANTS.sync.required).toBe(OWNED);
+    });
+
+    it('view asks for events.readonly (required), the calendar list and the email', () => {
+      expect(cal.CALENDAR_GRANTS.view.scopes).toEqual([READONLY, CALENDAR_LIST, EMAIL]);
+      expect(cal.CALENDAR_GRANTS.view.required).toBe(READONLY);
+      expect(cal.CALENDAR_GRANTS.view.scopes).not.toContain(OWNED);
+    });
+  });
+
+  describe('popup consent', () => {
+    it('defaults to sync: asks for today’s scopes, with no include_granted_scopes', async () => {
+      const { result, url } = await runPopup({ loginHint: 'a@b.com' }, goodTokens());
+      expect(url.searchParams.get('scope')).toBe(cal.CALENDAR_SCOPES.join(' '));
+      expect(url.searchParams.get('login_hint')).toBe('a@b.com');
+      expect(url.searchParams.has('include_granted_scopes')).toBe(false);
+      expect(result).toMatchObject({ status: 'connected', refreshToken: 'rt' });
+    });
+
+    it('kind view asks for the view scopes, with no include_granted_scopes', async () => {
+      const { result, url } = await runPopup(
+        { kind: 'view' },
+        goodTokens({ scope: `${READONLY} ${CALENDAR_LIST} ${EMAIL}` })
+      );
+      expect(url.searchParams.get('scope')).toBe(cal.CALENDAR_GRANTS.view.scopes.join(' '));
+      expect(url.searchParams.has('include_granted_scopes')).toBe(false);
+      expect(result).toMatchObject({
+        status: 'connected',
+        grantedScopes: expect.arrayContaining([READONLY]),
+      });
+    });
+
+    it('kind view without events.readonly granted is missing_scope', async () => {
+      const { result } = await runPopup(
+        { kind: 'view' },
+        goodTokens({ scope: `${OWNED} ${EMAIL}` })
+      );
+      expect(result).toMatchObject({
+        status: 'failed',
+        code: 'missing_scope',
+        message: cal.CALENDAR_GRANTS.view.missingScopeMessage,
+      });
+    });
+
+    it('default sync with only events.readonly granted is missing_scope (readonly is not owned)', async () => {
+      const { result } = await runPopup({}, goodTokens({ scope: `${READONLY} ${EMAIL}` }));
+      expect(result).toMatchObject({
+        status: 'failed',
+        code: 'missing_scope',
+        message: cal.CALENDAR_GRANTS.sync.missingScopeMessage,
+      });
+    });
+  });
+
+  describe('redirect start', () => {
+    it('defaults to the sync scopes', async () => {
+      await cal.startCalendarRedirectAuth('/settings?calResume=connect', undefined, 'create');
+      expect(startRedirectAuth).toHaveBeenCalledWith(
+        '/settings?calResume=connect',
+        undefined,
+        'create',
+        {
+          grant: 'calendar',
+          scope: cal.CALENDAR_SCOPES.join(' '),
+        }
+      );
+    });
+
+    it('kind view asks for the view scopes on the same calendar grant slot', async () => {
+      await cal.startCalendarRedirectAuth('/settings?calResume=view', 'a@b.com', 'create', 'view');
+      expect(startRedirectAuth).toHaveBeenCalledWith(
+        '/settings?calResume=view',
+        'a@b.com',
+        'create',
+        {
+          grant: 'calendar',
+          scope: cal.CALENDAR_GRANTS.view.scopes.join(' '),
+        }
+      );
+    });
+  });
+
+  describe('redirect completion', () => {
+    it('defaults to sync: a view-only grant is missing_scope', async () => {
+      (await exchangeMock()).mockResolvedValue(goodTokens({ scope: `${READONLY} ${EMAIL}` }));
+      sessionStorage.setItem(CALENDAR_CODE_KEY, 'code');
+      expect(await cal.completeCalendarRedirectAuth()).toMatchObject({
+        status: 'failed',
+        code: 'missing_scope',
+      });
+    });
+
+    it('kind view accepts a view grant', async () => {
+      (await exchangeMock()).mockResolvedValue(goodTokens({ scope: `${READONLY} ${EMAIL}` }));
+      sessionStorage.setItem(CALENDAR_CODE_KEY, 'code');
+      expect(await cal.completeCalendarRedirectAuth('view')).toMatchObject({
+        status: 'connected',
+        refreshToken: 'rt',
+        email: 'me@example.com',
+      });
+    });
+
+    it('kind view rejects a sync-only grant as missing_scope', async () => {
+      (await exchangeMock()).mockResolvedValue(goodTokens());
+      sessionStorage.setItem(CALENDAR_CODE_KEY, 'code');
+      expect(await cal.completeCalendarRedirectAuth('view')).toMatchObject({
+        status: 'failed',
+        code: 'missing_scope',
+        message: cal.CALENDAR_GRANTS.view.missingScopeMessage,
+      });
+    });
+
+    it('redeems the one-time code once even when callers pass different kinds', async () => {
+      const exchange = await exchangeMock();
+      exchange.mockResolvedValue(goodTokens({ scope: `${READONLY} ${EMAIL}` }));
+      sessionStorage.setItem(CALENDAR_CODE_KEY, 'code');
+
+      const [asSync, asView] = await Promise.all([
+        cal.completeCalendarRedirectAuth('sync'),
+        cal.completeCalendarRedirectAuth('view'),
+      ]);
+
+      expect(exchange).toHaveBeenCalledOnce();
+      // Each kind is judged against its own required scope, whichever came first.
+      expect(asSync).toMatchObject({ status: 'failed', code: 'missing_scope' });
+      expect(asView).toMatchObject({ status: 'connected' });
     });
   });
 });

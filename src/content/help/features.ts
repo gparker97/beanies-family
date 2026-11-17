@@ -1,5 +1,139 @@
 import type { HelpArticle } from './types';
 
+// View-only external calendars (#145). Built and ready, but NOT published: the feature
+// ships behind the `viewOnlyCalendars` flag, which stays off until Google approves the
+// `calendar.events.readonly` scope. Flip this to true in the same change that flips that
+// flag in `src/config/featureFlags.committed.ts`. The spread at the end of
+// FEATURES_ARTICLES keeps the article out of the index, search, sitemap and llms-full
+// until then (the same pattern as `CALENDAR_SYNC_HELP_LIVE` in security.ts).
+const VIEW_ANOTHER_CALENDAR_HELP_LIVE = false;
+const VIEW_ANOTHER_CALENDAR_ARTICLE: HelpArticle = {
+  slug: 'view-another-calendar',
+  category: 'features',
+  title: 'View Someone Else’s Google Calendar',
+  excerpt:
+    'Add a calendar that is shared with you, like a grandparent’s or a work calendar, so its events show on your family calendar. View only: beanies.family never changes it.',
+  icon: '\u{1F440}',
+  readTime: 5,
+  updatedDate: '2026-11-17',
+  sections: [
+    {
+      type: 'paragraph',
+      content:
+        'Some of the plans that matter most to your family live in a calendar you do not own: a grandparent’s babysitting days, a partner’s work calendar. If you are working out who has school pickup, it helps to see those events right next to your own. <strong>View only</strong> lets you add a calendar that is shared with you, so its events show on your family calendar, the Nook and the beanie wall.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'By the end of this guide you will have someone else’s calendar showing on yours, set up the way you like, and you will know exactly what beanies.family reads from it.',
+    },
+    { type: 'heading', content: 'Before you start', level: 2, id: 'before-you-start' },
+    {
+      type: 'paragraph',
+      content:
+        'The calendar has to be <strong>shared with you in Google</strong> first, and added to <strong>your own Google Calendar list</strong>. Ask its owner to share it with your Google account (they can choose <strong>See all event details</strong> or <strong>See only free/busy</strong>), then accept the invitation or add it in Google Calendar so it appears under <strong>Other calendars</strong>. beanies.family can only offer calendars that are already in your list.',
+    },
+    { type: 'heading', content: 'Adding the calendar', level: 2, id: 'adding' },
+    {
+      type: 'steps',
+      content: '',
+      items: [
+        'Go to <strong>Settings</strong> and open the <strong>Google Calendar</strong> card',
+        'Tap <strong>Connect Another Google Calendar</strong> (or <strong>Connect a Google Calendar</strong> if nothing is connected yet)',
+        'Under <strong>How Should beanies.family Use It?</strong>, choose <strong>View Only</strong>',
+        'Pick the Google account the calendar is shared with, or tap <strong>Use a Different Google Account</strong>, then follow Google’s sign-in',
+        'Choose the calendar from the list and tap <strong>Connect Calendar</strong>',
+      ],
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Only a member who manages the family can add, remove or change a view only calendar. Everyone else sees them but cannot change them.',
+    },
+    { type: 'heading', content: 'What view only means', level: 2, id: 'what-it-means' },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        'Its events appear with <strong>soft stripes</strong> and the calendar’s name, so you can tell them from your own activities at a glance.',
+        'They <strong>cannot be changed in beanies.family</strong>: no editing, deleting, dragging or resizing. Tap one to see its details, with a link to open it in Google Calendar.',
+        'beanies.family <strong>never changes anything in Google</strong>, and never adds your activities to a view only calendar.',
+        'On the beanie wall, tapping one opens its details with no PIN and no link to Google.',
+      ],
+    },
+    { type: 'heading', content: 'Show Details or Show as Busy Only', level: 2, id: 'detail-level' },
+    {
+      type: 'paragraph',
+      content:
+        'Each calendar has a detail setting in <strong>Settings → Google Calendar</strong>. <strong>Show Details</strong> shows the title, time and place. <strong>Show as Busy Only</strong> shows just the time and the calendar’s name, which suits a work calendar. A calendar that was shared with you as <strong>busy times only</strong> always shows as busy, and the setting is locked. An event the owner marked private also shows as busy only. Events Google added from an email, such as a dinner booking or a flight, show their details on a calendar you own, even though Google marks them private by default.',
+    },
+    { type: 'heading', content: 'The two switches and color', level: 2, id: 'color-and-switches' },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        '<strong>Include in Daily Briefing</strong>: adds that calendar’s events for today to your daily briefing. Off by default.',
+        '<strong>Include in Home-Screen Widgets</strong>: shows them in your home-screen widgets. Off by default. To do this, beanies.family saves that calendar’s events <strong>on that device</strong> for the widget. They stay on the device and never go to your family file or a server.',
+      ],
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Pick a <strong>Color</strong> for each view only calendar so you can tell several apart. The first one starts out a soft gray.',
+    },
+    { type: 'heading', content: 'Who sees these events', level: 2, id: 'who-sees' },
+    {
+      type: 'callout',
+      content:
+        'Everyone in your family sees the events of a view only calendar. Before you add one, check with its owner. beanies.family does not contact them. A child’s widget and daily briefing never include these events.',
+      title: 'Check with the calendar’s owner',
+      icon: '\u{1F465}',
+    },
+    { type: 'heading', content: 'What beanies.family reads', level: 2, id: 'what-it-reads' },
+    {
+      type: 'paragraph',
+      content:
+        'For a view only calendar, beanies.family reads each event’s <strong>title, time, location and link</strong>. It never reads descriptions or guest lists. The events are kept only on each device while the app is in use, and never in your family file or on a beanies.family server.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Signing in lets your family’s devices read <strong>that Google account’s calendars</strong>, but beanies.family only fetches the ones you add.',
+    },
+    { type: 'heading', content: 'Clashes', level: 2, id: 'clashes' },
+    {
+      type: 'paragraph',
+      content:
+        'If a family activity overlaps an event on a view only calendar, you see the same small overlap mark as for your other calendars. Open the activity and the message names the calendar it overlaps. <strong>This is OK</strong> works as it does for any clash. Read more in <a href="/help/security/external-calendar-clash-nudge">Clash Warnings From Your Other Calendars</a>.',
+    },
+    { type: 'heading', content: 'If something looks off', level: 2, id: 'messages' },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        '<strong>No longer shared with you</strong>: the owner stopped sharing the calendar. Tap <strong>Disconnect</strong>, and ask them to share it again if you still need it.',
+        '<strong>Sign in again to keep seeing this calendar</strong>: Google needs you to approve access again. Tap <strong>Reconnect</strong> and sign in.',
+        '<strong>Couldn’t refresh just now. Showing the last update.</strong>: a hiccup reaching Google. It tries again by itself.',
+      ],
+    },
+    { type: 'heading', content: 'Removing a calendar', level: 2, id: 'disconnect' },
+    {
+      type: 'paragraph',
+      content:
+        'In <strong>Settings → Google Calendar</strong>, tap the calendar under <strong>View Only</strong> to open it, then tap <strong>Disconnect</strong> and confirm. Its events disappear for the whole family. Nothing changes in Google, and a calendar you also sync to keeps working.',
+    },
+    { type: 'heading', content: 'What’s next?', level: 2, id: 'whats-next' },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        '<a href="/help/features/import-your-google-calendar">Import your Google Calendar</a>: bring your own events across, once',
+        '<a href="/help/security/google-calendar-sync">How beanies Syncs Your Activities to Google Calendar</a>: how your activities get to your calendar',
+      ],
+    },
+  ],
+};
+
 export const FEATURES_ARTICLES: HelpArticle[] = [
   {
     slug: 'transfers-and-credit-card-payments',
@@ -3245,7 +3379,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Import the events you already have in Google, once, choosing exactly which ones come across and what happens to each afterwards.',
     icon: '\u{1F4C5}',
     readTime: 5,
-    updatedDate: '2026-10-06',
+    updatedDate: '2026-11-17',
     sections: [
       {
         type: 'paragraph',
@@ -3276,7 +3410,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         items: [
           'Go to <strong>Settings</strong> and open the <strong>Google Calendar</strong> card',
           'On your connected account, tap <strong>Import my events</strong>',
-          'Tick the calendars you want beanies to read. Calendars you only subscribe to, like a holidays feed, are greyed out because beanies is not allowed to read them',
+          'Tick the calendars you want beanies to read. Only calendars you own can be ticked. A calendar someone else owns, or one you only subscribe to, like a holidays feed, is greyed out',
           'Tap <strong>Find events to import</strong>. beanies reads the next 12 months. Nothing is written yet',
           'Everything it found is already ticked. Untick anything you do not want imported',
           'Tap <strong>Import N events</strong>, and confirm',
@@ -3348,7 +3482,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         items: [
           'It reads the <strong>title, description, place, times and repeat pattern</strong> of your events.',
           'It does <strong>not</strong> read your guest lists. Other people’s email addresses are never requested and never stored in your family file.',
-          'It reads only the calendars you tick. That can include a calendar someone has shared with you, as long as they have given you permission to edit it — a shared family calendar is usually the one you most want.',
+          'It reads only the calendars you tick, and only calendars you own can be ticked. A calendar someone else owns is greyed out in the import, even when it is shared with you.',
+          'beanies reads the content of your events only when you ask it to, such as when you run this import.',
         ],
       },
       {
@@ -4313,4 +4448,5 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  ...(VIEW_ANOTHER_CALENDAR_HELP_LIVE ? [VIEW_ANOTHER_CALENDAR_ARTICLE] : []),
 ];

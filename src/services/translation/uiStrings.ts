@@ -13200,7 +13200,6 @@ const STRING_DEFS = {
     beanie:
       'connect a google calendar and your family beans are pushed to it automatically. beanies stays your source of truth. edits always happen here.',
   },
-  'calendarSync.destinationLabel': { en: 'Calendar', beanie: 'calendar' },
   'calendarSync.primaryCalendar': { en: 'Primary calendar', beanie: 'primary calendar' },
   // #34 clash nudge — toggle and the activity indicator.
   'calendarSync.clashNudge.title': {
@@ -13212,12 +13211,14 @@ const STRING_DEFS = {
     beanie: 'beanies only reads when your events are, never what they are.',
   },
   'calendarSync.clashNudge.label': { en: 'Clash warnings', beanie: 'clash warnings' },
-  'calendarSync.clash.tooltipPrefix': { en: 'May clash with', beanie: 'may clash with' },
-  // #34 active/quiet redesign — drawer callout + quiet ack line. The calendar's
-  // own name (account email) is concatenated between prefix/suffix, never
-  // interpolated (t() takes no params).
-  'calendarSync.clash.overlapsCalendarPrefix': { en: 'Overlaps your', beanie: 'overlaps your' },
-  'calendarSync.clash.calendarSuffix': { en: 'calendar', beanie: 'calendar' },
+  // #34 drawer callout + overlap-mark tooltip. `{calendar}` is the label resolved
+  // in `useClash`: `ownCalendarLabel` for a connected calendar, a view-only
+  // calendar's own name as stored (plan 2026-11-17 A5).
+  'calendarSync.clash.overlaps': { en: 'Overlaps {calendar}', beanie: 'overlaps {calendar}' },
+  'calendarSync.clash.ownCalendarLabel': {
+    en: 'your {email} calendar',
+    beanie: 'your {email} calendar',
+  },
   'calendarSync.clash.dismissHint': {
     en: 'Dismiss if you expected it.',
     beanie: 'dismiss if you expected it.',
@@ -13253,16 +13254,140 @@ const STRING_DEFS = {
   },
   'calendarSync.reconnect.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
   'calendarSync.status.ok': { en: 'Synced', beanie: 'synced' },
-  'calendarSync.status.needsReconnect': { en: 'Reconnect needed', beanie: 'reconnect needed' },
-  'calendarSync.status.error': { en: 'Sync error', beanie: 'sync error' },
+  'calendarSync.status.needsReconnect': { en: 'Reconnect Needed', beanie: 'reconnect needed' },
+  'calendarSync.status.error': { en: 'Sync Error', beanie: 'sync error' },
   'calendar.error.connectRetry': {
     en: 'We couldn’t finish connecting your calendar. Please tap Connect and try again.',
     beanie: 'we couldn’t finish connecting your calendar. please tap connect and try again.',
   },
+  'calendar.error.popupBlocked': {
+    en: 'Your browser blocked the Google sign-in window. Allow pop-ups and try again.',
+    beanie: 'your browser blocked the google sign-in window. allow pop-ups and try again.',
+  },
   'calendarSync.status.disconnecting': { en: 'Removing…', beanie: 'removing…' },
   'calendarSync.action.connect': {
-    en: 'Connect a Google calendar',
+    en: 'Connect a Google Calendar',
     beanie: 'connect a google calendar',
+  },
+  'calendarSync.action.connectAnother': {
+    en: 'Connect Another Google Calendar',
+    beanie: 'connect another google calendar',
+  },
+  // The add step (CalendarConnectModal): consent, then pick the calendar.
+  'calendarSync.connect.expectation': {
+    en: 'When Google asks, pick your account and keep the calendar boxes ticked so beanies.family can add your family activities.',
+    beanie:
+      'when google asks, pick your account and keep the calendar boxes ticked so beanies.family can add your family activities.',
+  },
+  'calendarSync.connect.continue': {
+    en: 'Continue with Google',
+    beanie: 'continue with google',
+  },
+  'calendarSync.connect.loading': {
+    en: 'Looking up your calendars…',
+    beanie: 'looking up your calendars…',
+  },
+  'calendarSync.connect.chooseLabel': { en: 'Which Calendar?', beanie: 'which calendar?' },
+  'calendarSync.connect.account': {
+    en: 'Calendars in {account}',
+    beanie: 'calendars in {account}',
+  },
+  'calendarSync.connect.reason.alreadyConnected': {
+    en: 'Already connected',
+    beanie: 'already connected',
+  },
+  'calendarSync.connect.reason.viewOnly': {
+    en: 'You can only view this calendar in Google',
+    beanie: 'you can only view this calendar in google',
+  },
+  'calendarSync.connect.noneEligible': {
+    en: 'None of these calendars can take your family activities. Close this and continue with a different Google account.',
+    beanie:
+      'none of these calendars can take your family activities. close this and continue with a different google account.',
+  },
+  'calendarSync.connect.confirm': { en: 'Connect Calendar', beanie: 'connect calendar' },
+  'calendarSync.connect.connecting': { en: 'Connecting…', beanie: 'connecting…' },
+  // View-only calendars (plan 2026-11-17, B): the drawer's two groups and the add
+  // step's role choice, account choice and view-only sentences. Consent surface:
+  // real nouns in beanie mode.
+  'calendarSync.introWithView': {
+    en: 'Connect a Google calendar to send your family activities to it, or to view its events here. beanies.family never changes a calendar you only view.',
+    beanie:
+      'connect a google calendar to send your family activities to it, or to view its events here. beanies.family never changes a calendar you only view.',
+  },
+  'calendarSync.group.synced': {
+    en: 'Synced from beanies.family',
+    beanie: 'synced from beanies.family',
+  },
+  'calendarSync.group.viewOnly': { en: 'View Only', beanie: 'view only' },
+  // The group for settings that apply to every connected calendar (the clash toggle).
+  'calendarSync.group.all': { en: 'All Calendars', beanie: 'all calendars' },
+  // The quiet link after "Synced from beanies.family": opens the sync help article's
+  // section on why the sync is one-way. The aria label says where it goes.
+  'calendarSync.pushOnly.link': { en: '(push only)', beanie: '(push only)' },
+  'calendarSync.pushOnly.ariaLabel': {
+    en: 'Why sync is push only (opens help)',
+    beanie: 'why sync is push only (opens help)',
+  },
+  'calendarSync.connect.roleLabel': {
+    en: 'How Should beanies.family Use It?',
+    beanie: 'how should beanies.family use it?',
+  },
+  'calendarSync.connect.role.sync.title': {
+    en: 'Sync from beanies.family',
+    beanie: 'sync from beanies.family',
+  },
+  'calendarSync.connect.role.sync.body': {
+    en: 'Your family activities are added to this calendar.',
+    beanie: 'your family activities are added to this calendar.',
+  },
+  'calendarSync.connect.role.view.title': { en: 'View Only', beanie: 'view only' },
+  'calendarSync.connect.role.view.body': {
+    en: 'Its events show on the family calendar for information. beanies.family never changes it.',
+    beanie:
+      'its events show on the family calendar for information. beanies.family never changes it.',
+  },
+  'calendarSync.connect.accountLabel': {
+    en: 'Which Google Account?',
+    beanie: 'which google account?',
+  },
+  'calendarSync.connect.differentAccount': {
+    en: 'Use a Different Google Account',
+    beanie: 'use a different google account',
+  },
+  'calendarSync.connect.next': { en: 'Continue', beanie: 'continue' },
+  'calendarSync.connect.viewBreadth': {
+    en: "Signing in lets your family's devices read this account's calendars. beanies.family only fetches the ones you add.",
+    beanie:
+      "signing in lets your family's devices read this account's calendars. beanies.family only fetches the ones you add.",
+  },
+  'calendarSync.connect.viewReminder': {
+    en: "Everyone in your pod will see these events, so it's kind to let the calendar's owner know.",
+    beanie:
+      "everyone in your pod will see these events, so it's kind to let the calendar's owner know.",
+  },
+  'calendarSync.connect.access.reader': { en: 'You can view it', beanie: 'you can view it' },
+  'calendarSync.connect.access.freeBusy': { en: 'Busy times only', beanie: 'busy times only' },
+  'calendarSync.connect.access.edit': { en: 'You can edit it', beanie: 'you can edit it' },
+  'calendarSync.connect.viewNoneEligible': {
+    en: 'All of these calendars are already connected. Close this and use a different Google account.',
+    beanie:
+      'all of these calendars are already connected. close this and use a different google account.',
+  },
+  'calendarSync.connect.viewMissingScope': {
+    en: "Permission to see the events on your calendars wasn't granted, so no calendar was added. Try again and keep the calendar boxes ticked.",
+    beanie:
+      "permission to see the events on your calendars wasn't granted, so no calendar was added. try again and keep the calendar boxes ticked.",
+  },
+  'calendarSync.connect.syncMissingScope': {
+    en: "Permission to add events to your calendar wasn't granted, so no calendar was connected. Try again and keep the calendar box ticked.",
+    beanie:
+      "permission to add events to your calendar wasn't granted, so no calendar was connected. try again and keep the calendar box ticked.",
+  },
+  'calendarSync.connect.viewNoListScope': {
+    en: "Permission to see your list of calendars wasn't granted, so there is nothing to choose from. Try again and keep the calendar boxes ticked.",
+    beanie:
+      "permission to see your list of calendars wasn't granted, so there is nothing to choose from. try again and keep the calendar boxes ticked.",
   },
   'calendarSync.action.reconnect': { en: 'Reconnect', beanie: 'reconnect' },
   'calendarSync.action.syncNow': { en: 'Sync now', beanie: 'sync now' },
@@ -13319,15 +13444,196 @@ const STRING_DEFS = {
     beanie: "some events couldn't be removed yet. beanies will finish next time you open this.",
   },
   'calendarSync.toast.connectFailed.title': { en: "Couldn't connect", beanie: "couldn't connect" },
-  'calendarSync.toast.destinationFailed.title': {
-    en: "Couldn't switch calendar",
-    beanie: "couldn't switch calendar",
+  'calendarSync.toast.confirmFailed.message': {
+    en: "This calendar wasn't connected, and nothing was sent to it. Please try again.",
+    beanie: "this calendar wasn't connected, and nothing was sent to it. please try again.",
   },
-  'calendarSync.toast.destinationFailed.message': {
-    en: 'Some events could not be removed from the old calendar, so the change was undone. Please try again.',
+  // View-only calendars (plan 2026-11-17): health and action-failure toasts from
+  // `calendarViewStore`. Important surface: real nouns in beanie mode.
+  'calendarView.toast.openSettings': { en: 'Open Settings', beanie: 'open settings' },
+  'calendarView.toast.unavailable.title': {
+    en: 'A calendar is no longer shared',
+    beanie: 'a calendar is no longer shared',
+  },
+  'calendarView.toast.unavailable.message': {
+    en: 'A view-only calendar is no longer shared with you, so its events are hidden. You can remove it in Settings.',
     beanie:
-      'some events could not be removed from the old calendar, so the change was undone. please try again.',
+      'a view-only calendar is no longer shared with you, so its events are hidden. you can remove it in settings.',
   },
+  'calendarView.toast.needsReconnect.title': { en: 'Sign in again', beanie: 'sign in again' },
+  'calendarView.toast.needsReconnect.message': {
+    en: 'Sign in to the Google account again to keep seeing a view-only calendar.',
+    beanie: 'sign in to the google account again to keep seeing a view-only calendar.',
+  },
+  'calendarView.toast.reconnected.title': { en: 'Reconnected', beanie: 'reconnected' },
+  'calendarView.toast.reconnected.message': {
+    en: 'This calendar will show its events again.',
+    beanie: 'this calendar will show its events again.',
+  },
+  'calendarView.toast.connectFailed.title': { en: "Couldn't connect", beanie: "couldn't connect" },
+  'calendarView.toast.connectFailed.message': {
+    en: "Signing in to the Google account didn't finish. Please try again.",
+    beanie: "signing in to the google account didn't finish. please try again.",
+  },
+  'calendarView.toast.listFailed.title': {
+    en: "Couldn't load calendars",
+    beanie: "couldn't load calendars",
+  },
+  'calendarView.toast.listFailed.message': {
+    en: "The calendars on this Google account couldn't be loaded. Please try again.",
+    beanie: "the calendars on this google account couldn't be loaded. please try again.",
+  },
+  'calendarView.toast.saveFailed.title': { en: "Couldn't save", beanie: "couldn't save" },
+  'calendarView.toast.addFailed.message': {
+    en: "This calendar wasn't added. Please try again.",
+    beanie: "this calendar wasn't added. please try again.",
+  },
+  'calendarView.toast.updateFailed.message': {
+    en: "This change to the calendar wasn't saved. Please try again.",
+    beanie: "this change to the calendar wasn't saved. please try again.",
+  },
+  'calendarView.toast.removeFailed.message': {
+    en: "This calendar wasn't removed. Please try again.",
+    beanie: "this calendar wasn't removed. please try again.",
+  },
+  'calendarView.toast.calendarGone.message': {
+    en: 'This calendar was removed on another device, so nothing was changed.',
+    beanie: 'this calendar was removed on another device, so nothing was changed.',
+  },
+  'calendarView.toast.accountGone.message': {
+    en: 'This Google account is no longer connected, so nothing was changed. Please sign in to it again.',
+    beanie:
+      'this google account is no longer connected, so nothing was changed. please sign in to it again.',
+  },
+  'calendarView.toast.consentGone.message': {
+    en: 'The Google sign-in is no longer waiting, so no calendar was added. Please sign in again.',
+    beanie:
+      'the google sign-in is no longer waiting, so no calendar was added. please sign in again.',
+  },
+  'calendarView.toast.added.title': { en: 'Calendar added', beanie: 'calendar added' },
+  'calendarView.toast.added.message': {
+    en: 'Its events will show on the family calendar.',
+    beanie: 'its events will show on the family calendar.',
+  },
+  'calendarView.toast.disconnected.title': {
+    en: 'Calendar disconnected',
+    beanie: 'calendar disconnected',
+  },
+  'calendarView.toast.disconnected.message': {
+    en: 'Its events no longer show in beanies.family. Nothing changed in Google.',
+    beanie: 'its events no longer show in beanies.family. nothing changed in google.',
+  },
+  // The view-only calendar's settings card (ViewedCalendarCard) and its disconnect
+  // confirm. Connection and loss surface: real nouns in beanie mode.
+  'calendarView.card.sharedWith': { en: 'Shared with {email}', beanie: 'shared with {email}' },
+  'calendarView.card.connected': { en: 'Connected', beanie: 'connected' },
+  // The closed row's status pill for a calendar that needs attention (Heritage Orange).
+  'calendarView.card.status.unavailable': { en: 'No Longer Shared', beanie: 'no longer shared' },
+  'calendarView.card.status.needsReconnect': { en: 'Sign In Again', beanie: 'sign in again' },
+  'calendarView.card.showDetails': { en: 'Show Details', beanie: 'show details' },
+  'calendarView.card.busyOnly': { en: 'Show as Busy Only', beanie: 'show as busy only' },
+  'calendarView.card.busyLocked': {
+    en: 'This calendar only shares busy times with you.',
+    beanie: 'this calendar only shares busy times with you.',
+  },
+  'calendarView.card.colorLabel': { en: 'Color', beanie: 'color' },
+  'calendarView.card.inBriefing': {
+    en: 'Include in Daily Briefing',
+    beanie: 'include in daily briefing',
+  },
+  'calendarView.card.inWidgets': {
+    en: 'Include in Home-Screen Widgets',
+    beanie: 'include in home-screen widgets',
+  },
+  'calendarView.card.inWidgetsHint': {
+    en: "Saves this calendar's events on this device for the widget.",
+    beanie: "saves this calendar's events on this device for the widget.",
+  },
+  'calendarView.card.state.unavailable': {
+    en: 'No longer shared with you',
+    beanie: 'no longer shared with you',
+  },
+  'calendarView.card.state.needsReconnect': {
+    en: 'Sign in again to keep seeing this calendar',
+    beanie: 'sign in again to keep seeing this calendar',
+  },
+  'calendarView.card.state.stale': {
+    en: "Couldn't refresh just now. Showing the last update.",
+    beanie: "couldn't refresh just now. showing the last update.",
+  },
+  'calendarView.card.state.truncated': {
+    en: 'This calendar is very busy, so some events may be missing.',
+    beanie: 'this calendar is very busy, so some events may be missing.',
+  },
+  'calendarView.disconnect.title': {
+    en: 'Disconnect this calendar?',
+    beanie: 'disconnect this calendar?',
+  },
+  'calendarView.disconnect.message': {
+    en: 'Its events will disappear from beanies.family for the whole family. Nothing changes in Google.',
+    beanie:
+      'its events will disappear from beanies.family for the whole family. nothing changes in google.',
+  },
+  // View-only events on the planner (plan 2026-11-17, C1/C2)
+  'calendarView.event.busy': { en: 'Busy', beanie: 'busy' },
+  'calendarView.event.viewOnly': { en: 'View Only', beanie: 'view only' },
+  'calendarView.event.spoken': {
+    en: '{title}, view only, {calendar}',
+    beanie: '{title}, view only, {calendar}',
+  },
+  'calendarView.event.spokenTimed': {
+    en: '{title}, {time}, view only, {calendar}',
+    beanie: '{title}, {time}, view only, {calendar}',
+  },
+  'calendarView.event.when': { en: 'When', beanie: 'when' },
+  'calendarView.event.where': { en: 'Where', beanie: 'where' },
+  'calendarView.event.allDayOn': { en: '{date}, all day', beanie: '{date}, all day' },
+  'calendarView.event.timedOn': { en: '{date}, {from} to {to}', beanie: '{date}, {from} to {to}' },
+  'calendarView.event.range': { en: '{from} to {to}', beanie: '{from} to {to}' },
+  'calendarView.event.note': {
+    en: "View only. This event lives in Google Calendar, so it can't be changed in beanies.family.",
+    beanie:
+      "view only. this event lives in google calendar, so it can't be changed in beanies.family.",
+  },
+  'calendarView.event.noteBusy': {
+    en: 'View only. This calendar shares busy times only, so the title and place stay private.',
+    beanie: 'view only. this calendar shares busy times only, so the title and place stay private.',
+  },
+  'calendarView.event.openInGoogle': {
+    en: 'Open in Google Calendar',
+    beanie: 'open in google calendar',
+  },
+  // View-only events in search, the daily briefing and widgets (plan 2026-11-17, C5-C7)
+  'calendarView.search.group': { en: 'View-Only Events', beanie: 'view-only events' },
+  'calendarView.search.subtitle': {
+    en: '{date} · {calendar} · {marker}',
+    beanie: '{date} · {calendar} · {marker}',
+  },
+  'calendarView.briefing.timed': {
+    en: '{calendar}: {title}, {from} to {to}',
+    beanie: '{calendar}: {title}, {from} to {to}',
+  },
+  'calendarView.briefing.timedNoEnd': {
+    en: '{calendar}: {title}, from {from}',
+    beanie: '{calendar}: {title}, from {from}',
+  },
+  'calendarView.briefing.allDay': {
+    en: '{calendar}: {title}, all day',
+    beanie: '{calendar}: {title}, all day',
+  },
+  'calendarView.briefing.busyTimed': {
+    en: '{calendar}: busy {from} to {to}',
+    beanie: '{calendar}: busy {from} to {to}',
+  },
+  'calendarView.briefing.busyTimedNoEnd': {
+    en: '{calendar}: busy from {from}',
+    beanie: '{calendar}: busy from {from}',
+  },
+  'calendarView.briefing.busyAllDay': {
+    en: '{calendar}: busy all day',
+    beanie: '{calendar}: busy all day',
+  },
+  'calendarView.widget.title': { en: '{title} · {calendar}', beanie: '{title} · {calendar}' },
   'settings.ai.tierLabel': {
     en: 'How documents are processed',
     beanie: 'how documents are processed',

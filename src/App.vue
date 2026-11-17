@@ -25,6 +25,7 @@ import { useHelpfulHints } from '@/composables/useHelpfulHints';
 import { useCardReminders } from '@/composables/useCardReminders';
 import { useNotifications } from '@/composables/useNotifications';
 import { useCalendarRedirectResume } from '@/composables/useCalendarRedirectResume';
+import { useCalendarViewHealthToast } from '@/composables/useCalendarViewHealthToast';
 import { useUnifiedRedirectResume } from '@/composables/useUnifiedRedirectResume';
 import { handleReminderTap, useReminderTapResume } from '@/composables/useReminderTapResume';
 import { onPushTap } from '@/services/native/pushRegistration';
@@ -2068,6 +2069,10 @@ useNotifications();
 // intent. Reactive + SPA-safe; instantiates the calendar store only when a
 // resume is actually pending (zero-cost when the feature is off). See ADR-032.
 useCalendarRedirectResume();
+// View-only calendars: one toast per session per unhealthy kind (sharing stopped,
+// sign-in needed), never on the wall. Lives here, not in the store, because it
+// navigates. Instantiates the view store only when the flag is on.
+useCalendarViewHealthToast();
 useShareTargets();
 useUnifiedRedirectResume();
 

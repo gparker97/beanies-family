@@ -418,6 +418,36 @@ const SUPPLEMENT: Record<string, Json[]> = {
       origin: 'adopted',
     },
   ],
+  // View-only calendars (plan 2026-11-17): a credential-only account (no status) and one
+  // calendar read through it, with the optional `connectedBy` / `addedBy` set.
+  calendarViewAccounts: [
+    {
+      id: 'view-acct-1',
+      provider: 'google',
+      accountEmail: 'joe.work@example.com',
+      refreshToken: 'wrapped-token',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
+      connectedBy: 'm1',
+      createdAt: T,
+      updatedAt: T,
+    },
+  ],
+  viewedCalendars: [
+    {
+      id: 'viewed-1',
+      viewAccountId: 'view-acct-1',
+      calendarId: 'boss@example.com',
+      name: 'Work',
+      accessRole: 'freeBusyReader',
+      detailLevel: 'busy',
+      color: '#94A3B8',
+      inBriefing: false,
+      inWidgets: false,
+      addedBy: 'm1',
+      createdAt: T,
+      updatedAt: T,
+    },
+  ],
   driveConnections: [
     {
       id: 'drive-1',

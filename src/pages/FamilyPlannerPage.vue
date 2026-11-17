@@ -38,6 +38,10 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import HolidayDetailsModal from '@/components/planner/HolidayDetailsModal.vue';
 import BirthdayDetailsModal from '@/components/planner/BirthdayDetailsModal.vue';
+import ExternalEventDetailsModal from '@/components/planner/ExternalEventDetailsModal.vue';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { spanKeyOf, widenByPeriod } from '@/utils/calendar/externalEvents';
+import type { ExternalEvent } from '@/types/externalEvents';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useToday } from '@/composables/useToday';
 import { useActivityStore } from '@/stores/activityStore';
@@ -233,6 +237,22 @@ const clashWindow = computed(() => {
   };
 });
 
+// ── View-only external calendars (plan 2026-11-17, C2) ──────────────────────
+// This page is the ONLY planner place that sets the fetch window: the period on screen
+// plus one period before and one after (Requirement 6), in the active view's unit, so
+// paging shows no gap and a jump a year ahead fetches only that window. Every surface
+// below only reads (`useDayExtras`, `useExternalEvents().timedForDate`). The window is
+// owner-scoped and cleared when this page unmounts. Inert unless a calendar is viewed.
+const externalEvents = useExternalEvents();
+const externalWindow = computed(() =>
+  widenByPeriod(visibleRange.value, activeView.value, settingsStore.weekStartDay)
+);
+watch(
+  () => spanKeyOf(externalWindow.value),
+  () => externalEvents.setScreenWindow(externalWindow.value),
+  { immediate: true }
+);
+
 // Debounced so rapid prev/next navigation collapses to a single free/busy query.
 let clashDebounce: ReturnType<typeof setTimeout> | null = null;
 watch(
@@ -327,6 +347,13 @@ const selectedBirthday = ref<BirthdayOccurrence | null>(null);
 function handleBirthdayClick(birthday: BirthdayOccurrence) {
   selectedBirthday.value = birthday;
 }
+// Read-only details of a view-only external event: no edit, no delete, and never the
+// activity drawer (the event lives in someone's Google Calendar).
+const selectedExternal = ref<ExternalEvent | null>(null);
+function handleExternalClick(event: ExternalEvent) {
+  selectedExternal.value = event;
+}
+
 function openBeanProfile(memberId: string) {
   selectedBirthday.value = null;
   void router.push(`/pod/${memberId}/overview`);
@@ -1228,6 +1255,7 @@ function handleActivitySwapped(newId: string) {
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
       @holiday-click="handleHolidayClick"
       @birthday-click="handleBirthdayClick"
+      @external-click="handleExternalClick"
     />
 
     <WeeklyCalendarView
@@ -1245,6 +1273,7 @@ function handleActivitySwapped(newId: string) {
       @view-segment="handleViewSegment"
       @holiday-click="handleHolidayClick"
       @birthday-click="handleBirthdayClick"
+      @external-click="handleExternalClick"
     />
 
     <DailyCalendarView
@@ -1263,6 +1292,7 @@ function handleActivitySwapped(newId: string) {
       @view-segment="handleViewSegment"
       @holiday-click="handleHolidayClick"
       @birthday-click="handleBirthdayClick"
+      @external-click="handleExternalClick"
     />
 
     <!-- ⚠️ Anything rendered here, between the month grid and the modals, must be counted
@@ -1324,6 +1354,7 @@ function handleActivitySwapped(newId: string) {
       @vacation-click="handleVacationClick"
       @holiday-click="handleHolidayClick"
       @birthday-click="handleBirthdayClick"
+      @external-click="handleExternalClick"
     />
 
     <!-- Birthday details popup (read-only - see BirthdayDetailsModal) -->
@@ -1340,6 +1371,13 @@ function handleActivitySwapped(newId: string) {
       :holiday="selectedHoliday"
       :open="selectedHoliday !== null"
       @close="selectedHoliday = null"
+    />
+
+    <!-- View-only external event details (read-only, never the activity drawer) -->
+    <ExternalEventDetailsModal
+      :event="selectedExternal"
+      :open="selectedExternal !== null"
+      @close="selectedExternal = null"
     />
 
     <!-- Activity modal -->

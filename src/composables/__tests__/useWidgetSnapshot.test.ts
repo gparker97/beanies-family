@@ -5,19 +5,30 @@ import { addDaysYmd } from '@/utils/date';
 
 // `vi.mock` factories are hoisted above the module body, so everything they
 // close over must come from `vi.hoisted`.
-const { plugin, reportError, logEvent, showToast, reminderInput, today, isVisible, weather } =
-  vi.hoisted(() => ({
-    plugin: { publish: vi.fn(), clear: vi.fn() },
-    reportError: vi.fn(),
-    logEvent: vi.fn(),
-    showToast: vi.fn(),
-    // Filled in `beforeEach` with real Vue refs (vue is not importable inside `vi.hoisted`).
-    reminderInput: { current: null as unknown as { value: unknown } },
-    today: { current: null as unknown as { value: string } },
-    isVisible: { current: null as unknown as { value: boolean } },
-    // A fake weather store (`fakeWeatherStore`), rebuilt in `beforeEach`.
-    weather: { current: null as unknown as FakeWeatherStore },
-  }));
+const {
+  plugin,
+  reportError,
+  logEvent,
+  showToast,
+  reminderInput,
+  today,
+  isVisible,
+  weather,
+  calView,
+} = vi.hoisted(() => ({
+  plugin: { publish: vi.fn(), clear: vi.fn() },
+  reportError: vi.fn(),
+  logEvent: vi.fn(),
+  showToast: vi.fn(),
+  // Filled in `beforeEach` with real Vue refs (vue is not importable inside `vi.hoisted`).
+  reminderInput: { current: null as unknown as { value: unknown } },
+  today: { current: null as unknown as { value: string } },
+  isVisible: { current: null as unknown as { value: boolean } },
+  // A fake weather store (`fakeWeatherStore`), rebuilt in `beforeEach`.
+  weather: { current: null as unknown as FakeWeatherStore },
+  // A fake calendarViewStore (view-only calendars), rebuilt in `beforeEach`.
+  calView: { current: null as unknown as FakeCalendarView },
+}));
 
 vi.mock('@/services/sync/capabilities', () => ({ isNative: () => true }));
 vi.mock('@/services/native/widgetBridgePlugin', () => ({ WidgetBridge: plugin }));
@@ -34,6 +45,7 @@ vi.mock('@/composables/useToday', () => ({
   useToday: () => ({ today: today.current, isVisible: isVisible.current }),
 }));
 vi.mock('@/stores/weatherStore', () => ({ useWeatherStore: () => weather.current }));
+vi.mock('@/stores/calendarViewStore', () => ({ useCalendarViewStore: () => calView.current }));
 
 import {
   haltWidgetPublishingForSignOut,
@@ -73,6 +85,13 @@ function fakeWeatherStore(): FakeWeatherStore {
     nowMs,
     atom: computed(() => ({ ageText: `as of ${nowMs.value}` })),
   });
+}
+
+/** The calendarViewStore surface the publisher reads. */
+interface FakeCalendarView {
+  calendars: { id: string; inWidgets: boolean }[];
+  standingSettled: boolean;
+  widgetEvents: unknown[];
 }
 
 /** A reading with an entry for every day around TODAY, so any test machine's zone finds one. */
@@ -150,6 +169,11 @@ beforeEach(() => {
   today.current = ref(TODAY);
   isVisible.current = ref(true);
   weather.current = fakeWeatherStore();
+  calView.current = reactive({
+    calendars: [],
+    standingSettled: false,
+    widgetEvents: [],
+  }) as FakeCalendarView;
   plugin.publish.mockResolvedValue({ placements: {} });
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -478,5 +502,177 @@ describe('publishWidgetSnapshot: failures and relayed native state', () => {
     await publishWidgetSnapshot(null, 'data-change', now);
     expect(plugin.publish).not.toHaveBeenCalled();
     expect(logEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('useWidgetSnapshot: view-only calendars on a cold start', () => {
+  beforeEach(() => vi.useFakeTimers());
+
+  async function settle(): Promise<void> {
+    await vi.advanceTimersByTimeAsync(1000);
+    await nextTick();
+  }
+
+  it('adds no wait when no viewed calendar is in the widgets', async () => {
+    calView.current.calendars = [{ id: 'c1', inWidgets: false }];
+    calView.current.standingSettled = false;
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds the first publish until the standing fetch has settled, then publishes once', async () => {
+    calView.current.calendars = [{ id: 'c1', inWidgets: true }];
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await settle();
+    expect(plugin.publish).not.toHaveBeenCalled();
+
+    calView.current.widgetEvents = [];
+    calView.current.standingSettled = true;
+    await nextTick();
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('never holds the family rows indefinitely: past the bound it publishes without external rows, then again once settled', async () => {
+    // A hidden native wake: the read never starts (or is slow), so it never settles.
+    calView.current.calendars = [{ id: 'c1', inWidgets: true }];
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await settle();
+    expect(plugin.publish).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(4000);
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+    expect((plugin.publish.mock.calls[0]![0] as { json: string }).json).not.toContain('external:');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'external-wait-expired' } })
+    );
+
+    calView.current.widgetEvents = [
+      {
+        id: 'e1',
+        viewedCalendarId: 'c1',
+        calendarName: 'Work',
+        color: '#6B7280',
+        allDay: true,
+        startMs: new Date(`${TODAY}T00:00:00`).getTime(),
+        endMs: new Date(`${TODAY}T23:59:00`).getTime(),
+        startYmd: TODAY,
+        endYmd: TODAY,
+        title: 'Offsite',
+        busyOnly: false,
+        transparent: false,
+      },
+    ];
+    calView.current.standingSettled = true;
+    await nextTick();
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(2);
+    expect((plugin.publish.mock.calls[1]![0] as { json: string }).json).toContain('external:');
+  });
+
+  it('R5: a sign-out during the hold never publishes afterwards, whether the read settles or the bound passes', async () => {
+    calView.current.calendars = [{ id: 'c1', inWidgets: true }];
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await settle();
+    expect(plugin.publish).not.toHaveBeenCalled();
+
+    await haltWidgetPublishingForSignOut();
+    // During the rest of sign-out the departing family is still loaded: the first read
+    // settles, and the hold's bound passes.
+    calView.current.standingSettled = true;
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(5000);
+    await settle();
+    expect(plugin.publish).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'external-wait-expired' } })
+    );
+
+    // Sign-out completes, then the next member signs in: publishing resumes.
+    reminderInput.current.value = null;
+    calView.current.calendars = [];
+    await nextTick();
+    await settle();
+    reminderInput.current.value = reminders(JO);
+    await nextTick();
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+    expect(publishedViewer(0)).toBe('jo');
+  });
+
+  it('R5: the bound passing during sign-out (before the read settles) cannot re-arm publishing', async () => {
+    calView.current.calendars = [{ id: 'c1', inWidgets: true }];
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await vi.advanceTimersByTimeAsync(3000); // 1 s short of the bound
+    await haltWidgetPublishingForSignOut();
+    await vi.advanceTimersByTimeAsync(4000);
+    await settle();
+    expect(plugin.publish).not.toHaveBeenCalled();
+  });
+
+  it('R3: a view-store update that keeps widgetEvents (an unchanged poll) publishes nothing more', async () => {
+    const rows: unknown[] = [];
+    calView.current.calendars = [{ id: 'c1', inWidgets: false }];
+    calView.current.standingSettled = true;
+    calView.current.widgetEvents = rows;
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+    // The store's contract (calendarViewStore R3 tests): N polls with unchanged data keep
+    // the SAME array, and nothing else the publisher reads changes.
+    for (let i = 0; i < 5; i++) {
+      calView.current.widgetEvents = rows;
+      await nextTick();
+      await settle();
+    }
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed fetch still settles, so the snapshot publishes without external rows', async () => {
+    // The store sets `standingSettled` when the attempt finishes, success or failure,
+    // leaving no events behind.
+    calView.current.calendars = [{ id: 'c1', inWidgets: true }];
+    calView.current.standingSettled = true;
+    calView.current.widgetEvents = [];
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+    const json = (plugin.publish.mock.calls[0]![0] as { json: string }).json;
+    expect(json).not.toContain('external:');
+  });
+
+  it('publishes the widget events of a settled calendar as rows', async () => {
+    const ev = {
+      id: 'e1',
+      viewedCalendarId: 'c1',
+      calendarName: 'Work',
+      color: '#6B7280',
+      allDay: true,
+      startMs: new Date(`${TODAY}T00:00:00`).getTime(),
+      endMs: new Date(`${TODAY}T23:59:00`).getTime(),
+      startYmd: TODAY,
+      endYmd: TODAY,
+      title: 'Offsite',
+      busyOnly: false,
+      transparent: false,
+    };
+    calView.current.calendars = [{ id: 'c1', inWidgets: true }];
+    calView.current.standingSettled = true;
+    calView.current.widgetEvents = [ev];
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await settle();
+    const json = (plugin.publish.mock.calls[0]![0] as { json: string }).json;
+    expect(json).toContain('external:');
+    expect(json).toContain('Offsite');
   });
 });

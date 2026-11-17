@@ -56,6 +56,7 @@ import {
   type WidgetSnapshot,
 } from '@/types/widgetSnapshot';
 import type { WeatherReading } from '@/types/weather';
+import type { ExternalEvent } from '@/types/externalEvents';
 import { addDaysYmd } from '@/utils/date';
 import { AGE_SHOW_MS, CURRENT_MAX_MS } from '@/utils/weather/weatherReading';
 
@@ -1634,5 +1635,99 @@ describe('buildWidgetSnapshot: chore rows (#146)', () => {
     expect(build({ chores: null }).snapshot).toEqual(build().snapshot);
     expect(withChores([], NOW, []).days).toEqual(build().snapshot.days);
     expect(withChores().version).toBe(4);
+  });
+});
+
+describe('buildWidgetSnapshot: view-only external rows (plan 2026-11-17, C7)', () => {
+  const at = (ymd: string, hhmm: string) => new Date(`${ymd}T${hhmm}:00`).getTime();
+  const EXT: ExternalEvent = {
+    id: 'g-evt-1',
+    viewedCalendarId: 'vc-1',
+    calendarName: "Grandma's calendar",
+    color: '#6B7280',
+    allDay: false,
+    startMs: at(TODAY, '14:30'),
+    endMs: at(TODAY, '15:30'),
+    startYmd: TODAY,
+    endYmd: TODAY,
+    title: 'Babysitting',
+    busyOnly: false,
+    transparent: false,
+  };
+  const BUSY: ExternalEvent = {
+    ...EXT,
+    id: 'g-evt-2',
+    calendarName: "Dad's work",
+    title: undefined,
+    location: undefined,
+    busyOnly: true,
+  };
+  const externalRows = (s: WidgetSnapshot, i = 0) =>
+    s.days[i]!.view.rows.filter((r) => r.id.startsWith('external:'));
+
+  it('appends widget events as existing-kind event rows: no dot, not mine', () => {
+    const rows = externalRows(build({ externalEvents: [EXT] }).snapshot);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: 'event',
+      dot: null,
+      mine: false,
+      title: "Babysitting · Grandma's calendar",
+      who: '',
+      startsAt: EXT.startMs,
+      endsAt: EXT.endMs,
+    });
+  });
+
+  it('titles a busy-only event "Busy" and the file holds no event id or location', () => {
+    const snap = build({ externalEvents: [BUSY] }).snapshot;
+    expect(externalRows(snap)[0]!.title).toBe("Busy · Dad's work");
+    expect(JSON.stringify(snap)).not.toContain('g-evt-2');
+  });
+
+  it('sorts a timed external row among the day’s events by start time', () => {
+    const rows = today(build({ externalEvents: [EXT] }).snapshot).view.rows.filter(
+      (r) => r.kind === 'event' && r.startsAt !== null
+    );
+    const starts = rows.map((r) => r.startsAt as number);
+    expect(starts).toEqual([...starts].sort((a, b) => a - b));
+    expect(rows.some((r) => r.id.startsWith('external:'))).toBe(true);
+  });
+
+  it('puts an all-day multi-day event on each day it covers, untimed', () => {
+    const allDay: ExternalEvent = {
+      ...EXT,
+      allDay: true,
+      startMs: at(TODAY, '00:00'),
+      endMs: at(TOMORROW, '23:59'),
+      endYmd: TOMORROW,
+    };
+    const snap = build({ externalEvents: [allDay] }).snapshot;
+    expect(externalRows(snap, 0)[0]).toMatchObject({ time: '', startsAt: null, endsAt: null });
+    expect(externalRows(snap, 1)).toHaveLength(1);
+    expect(externalRows(snap, 2)).toHaveLength(0);
+  });
+
+  it('never puts external rows in a child session’s snapshot', () => {
+    const snap = buildWidgetSnapshot(
+      familyInput({ currentMember: AVA, externalEvents: [EXT, BUSY] }),
+      NOW
+    ).snapshot;
+    expect(snap.days.every((d) => externalRows({ days: [d] } as WidgetSnapshot).length === 0)).toBe(
+      true
+    );
+  });
+
+  it('adds no row and changes nothing when no external events are passed', () => {
+    expect(build({ externalEvents: [] }).snapshot).toEqual(build().snapshot);
+  });
+
+  it('keeps the snapshot version and the row kind set', () => {
+    const snap = build({ externalEvents: [EXT] }).snapshot;
+    expect(snap.version).toBe(WIDGET_SNAPSHOT_VERSION);
+    expect(WIDGET_SNAPSHOT_VERSION).toBe(4);
+    expect(new Set(snap.days.flatMap((d) => d.view.rows.map((r) => r.kind)))).toEqual(
+      new Set(['event', 'trip', 'birthday'])
+    );
   });
 });

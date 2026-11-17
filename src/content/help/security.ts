@@ -12,13 +12,30 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
     'Connect a Google calendar and your family activities appear there automatically — one-way, with beanies as the source of truth.',
   icon: '\u{1F4C5}',
   readTime: 5,
-  updatedDate: '2026-10-06',
+  updatedDate: '2026-11-17',
   sections: [
     { type: 'heading', content: 'How it works', level: 2, id: 'how-it-works' },
     {
       type: 'paragraph',
       content:
         'Connect a Google calendar in <strong>Settings → Google Calendar</strong> and beanies pushes your family activities straight into the calendar you already use. It is <strong>one-way</strong>: beanies stays the single source of truth and your activities flow out to your calendars, never the other way around. Make every change in beanies; the calendar simply mirrors it.',
+    },
+    { type: 'heading', content: 'Why the sync is push only', level: 2, id: 'push-only' },
+    {
+      type: 'paragraph',
+      content:
+        'The sync is <strong>push only</strong>: beanies sends your activities to Google Calendar, and nothing comes back the other way. That keeps one place where your family’s plans are decided. If changes flowed both ways, an edit made in Google and a different edit made in beanies could quietly overwrite each other, and nobody would know which one was right.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'So make every change in beanies, and the calendar shows the result. Nothing you change in Google is copied back into beanies: if you edit a synced event there, beanies puts its own version back on the next sync. beanies never changes anything else in your calendar.',
+    },
+    { type: 'heading', content: 'Choosing the calendar', level: 2, id: 'choosing' },
+    {
+      type: 'paragraph',
+      content:
+        'In <strong>Settings → Google Calendar</strong>, tap <strong>Connect a Google Calendar</strong> (it reads <strong>Connect Another Google Calendar</strong> once one is connected). You choose which calendar beanies adds your activities to as part of connecting, then tap <strong>Connect Calendar</strong>. Once it is connected, the calendar is shown as fixed text, not a list you can change. To use a different calendar, connect another one, or disconnect this one and connect again.',
     },
     { type: 'heading', content: 'It covers the whole family', level: 2, id: 'family-wide' },
     {
@@ -69,7 +86,7 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
     {
       type: 'paragraph',
       content:
-        'beanies only ever creates and updates <strong>its own</strong> events; it never reads or changes anything else in your calendar. Events go from your device straight to your own Google account and never pass through a beanies server.',
+        'beanies only ever creates and updates <strong>its own</strong> events, and never changes anything else in your calendar. It reads the content of your events only when you ask it to, such as when you run the <a href="/help/features/import-your-google-calendar">one-time import</a>. Events go from your device straight to your own Google account and never pass through a beanies server.',
     },
     { type: 'heading', content: 'Reconnecting when access lapses', level: 2, id: 'reconnecting' },
     {
@@ -80,7 +97,12 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
     {
       type: 'paragraph',
       content:
-        'Reconnecting is <strong>one tap on any device</strong> — your phone, the installed app, or a desktop browser all work the same way. Tap <strong>Reconnect</strong> on the prompt (or open <strong>Settings → Google Calendar</strong> and tap Reconnect there), approve access with Google, and syncing resumes on its own. The prompt and the notification clear themselves the moment the connection recovers.',
+        'Reconnecting is <strong>one tap on any device</strong> — your phone, the installed app, or a desktop browser all work the same way. Tap <strong>Reconnect</strong> on the prompt (or open <strong>Settings → Google Calendar</strong>, tap the calendar to open it, and tap Reconnect there), approve access with Google, and syncing resumes on its own. The prompt and the notification clear themselves the moment the connection recovers.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'If you have two calendars connected on the same Google account, disconnecting one leaves the other working.',
     },
     {
       type: 'paragraph',

@@ -23,6 +23,7 @@ import { dayCountLabel } from '@/utils/monthDayItems';
 import type { MonthDayCellData } from '@/utils/monthCells';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import type { HolidayOccurrence } from '@/types/models';
+import type { ExternalEvent } from '@/types/externalEvents';
 import MonthDayContents from '@/components/planner/MonthDayContents.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { FOCUS_RING } from '@/constants/tileStyles';
@@ -36,6 +37,7 @@ const emit = defineEmits<{
   'view-segment': [vacationId: string, segmentIndex: number];
   'holiday-click': [holiday: HolidayOccurrence];
   'birthday-click': [birthday: BirthdayOccurrence];
+  'external-click': [event: ExternalEvent];
   /** The header's close button: fold the row back to the plain grid. */
   close: [];
   /** The capped list's "+N more": the grid opens the Day view. */
@@ -86,6 +88,7 @@ const { t } = useTranslation();
       @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
       @holiday-click="(h) => emit('holiday-click', h)"
       @birthday-click="(b) => emit('birthday-click', b)"
+      @external-click="(e) => emit('external-click', e)"
     />
   </div>
 </template>

@@ -21,14 +21,23 @@ import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
  * view leaves it off, so a long-press there never lifts a chip with nowhere to go). The parent's `useCalendarDrag` (this
  * timeline sits inside its root) does the gesture; `dropSlot` is its `overSlot`, drawn here
  * as the slot preview when it falls on this day.
+ *
+ * View-only external events (plan 2026-11-17): all-day ones are striped `ExternalChip`s
+ * in the all-day row, timed ones `ExternalTimedBlock`s packed into the same lanes as the
+ * activities (`assignLanes`), so an overlap reads side by side. Neither is a drag source
+ * nor carries `data-activity-id`; a tap opens the read-only details (`external-click`).
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import {
   useTimeGrid,
   groupOverlapping,
-  plannerExtent,
+  assignLanes,
+  externalCards,
+  isExternalCard,
   timedCards,
+  type ExternalCard,
+  type PlannerCard,
   type TimedCard,
 } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
@@ -46,6 +55,9 @@ import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
+import ExternalChip from '@/components/planner/ExternalChip.vue';
+import ExternalTimedBlock from '@/components/planner/ExternalTimedBlock.vue';
+import type { ExternalEvent } from '@/types/externalEvents';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
@@ -90,6 +102,10 @@ interface Props {
   dropSlot?: TimelineSlot | null;
   /** All-day chips are drag sources (#142): only where the parent renders day targets. */
   allDayDraggable?: boolean;
+  /** View-only external events on this day: the timed ones (any all-day ones are ignored). */
+  externalTimed?: readonly ExternalEvent[];
+  /** View-only external all-day events on this day (from the shared day-extras query). */
+  externalAllDay?: readonly ExternalEvent[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -99,6 +115,8 @@ const props = withDefaults(defineProps<Props>(), {
   birthdays: () => [],
   dropSlot: null,
   allDayDraggable: false,
+  externalTimed: () => [],
+  externalAllDay: () => [],
 });
 
 const emit = defineEmits<{
@@ -109,6 +127,8 @@ const emit = defineEmits<{
   'view-segment': [vacationId: string, segmentIndex: number];
   'add-activity': [date: string, time?: string];
   'holiday-click': [holiday: HolidayOccurrence];
+  /** A view-only external event was tapped; the host opens its read-only details. */
+  'external-click': [event: ExternalEvent];
 }>();
 
 const { t } = useTranslation();
@@ -125,10 +145,12 @@ const segmentBuckets = computed(() => splitTimedUntimed(props.segments));
 // hour grid auto-extends past the 7am-7pm default for early/late flights.
 /** The day's timed cards, built once for the time range and the lane packer. */
 const cards = computed(() => timedCards(props.activities));
+/** The day's timed view-only events, clamped to this day like `cards`. */
+const extCards = computed(() => externalCards(props.externalTimed, props.dateStr));
 
 const timedRef = computed(() => {
   // The DRAWN windows: a 00:00 continuation must pull the day's range up too.
-  const items: { startTime?: string; endTime?: string }[] = [...cards.value];
+  const items: { startTime?: string; endTime?: string }[] = [...cards.value, ...extCards.value];
   for (const seg of segmentBuckets.value.timed) {
     if (seg.time) items.push({ startTime: seg.time, endTime: addHourToTime(seg.time) });
   }
@@ -149,66 +171,48 @@ const untimedActivities = computed(() =>
 const hasUntimedRow = computed(
   () =>
     props.birthdays.length > 0 ||
+    props.externalAllDay.length > 0 ||
     props.vacations.length > 0 ||
     props.todos.length > 0 ||
     untimedActivities.value.length > 0 ||
     segmentBuckets.value.untimed.length > 0
 );
 
-// ── Timed activities, lane-packed per overlap cluster ──
-interface PositionedEvent {
-  card: TimedCard;
+// ── Timed cards (activities AND view-only events), lane-packed per overlap cluster ──
+interface PositionedEvent<C extends PlannerCard = TimedCard> {
+  card: C;
   lane: number;
   totalLanes: number;
   top: string;
   height: string;
 }
 
-const positionedEvents = computed<PositionedEvent[]>(() => {
+const positioned = computed<PositionedEvent<PlannerCard>[]>(() => {
   // Cards, not bare activities: a continuation draws 00:00 to its end, and a
-  // daily overnight series puts two cards of one activity on a day.
-  if (cards.value.length === 0) return [];
-  const result: PositionedEvent[] = [];
-
-  for (const cluster of groupOverlapping(cards.value)) {
-    // Greedy lane assignment inside the cluster.
-    const laneEnd: number[] = []; // minute offset when each lane becomes free
-    const laneOfEvent: number[] = [];
-    for (const card of cluster) {
-      // The card's RENDERED extent (floored, overnight clamped), the same one the
-      // clusters were built from. Unreadable starts share one cluster at the top
-      // of the grid; an end of Infinity gives each its own lane, never dropped.
-      const extent = plannerExtent(card);
-      const start = extent?.start ?? 0;
-      const end = extent?.end ?? Number.POSITIVE_INFINITY;
-      let placed = -1;
-      for (let l = 0; l < laneEnd.length; l++) {
-        if ((laneEnd[l] ?? 0) <= start) {
-          laneEnd[l] = end;
-          placed = l;
-          break;
-        }
-      }
-      if (placed === -1) {
-        laneEnd.push(end);
-        placed = laneEnd.length - 1;
-      }
-      laneOfEvent.push(placed);
-    }
-    const totalLanes = laneEnd.length;
+  // daily overnight series puts two cards of one activity on a day. Both kinds go
+  // into ONE packing, so an activity and a view-only event that overlap share the
+  // column side by side (the shared greedy packer, `assignLanes`).
+  const all: PlannerCard[] = [...cards.value, ...extCards.value];
+  if (all.length === 0) return [];
+  const result: PositionedEvent<PlannerCard>[] = [];
+  for (const cluster of groupOverlapping(all)) {
+    const { lanes, laneCount } = assignLanes(cluster);
     cluster.forEach((card, i) => {
       const pos = getPosition(card.startTime!, card.endTime);
-      result.push({
-        card,
-        lane: laneOfEvent[i] ?? 0,
-        totalLanes,
-        top: pos.top,
-        height: pos.height,
-      });
+      result.push({ card, lane: lanes[i] ?? 0, totalLanes: laneCount, ...pos });
     });
   }
   return result;
 });
+
+/** The activity cards, positioned. */
+const positionedEvents = computed(() =>
+  positioned.value.filter((ev): ev is PositionedEvent => !isExternalCard(ev.card))
+);
+/** The view-only cards, positioned in the same lanes. */
+const positionedExternals = computed(() =>
+  positioned.value.filter((ev): ev is PositionedEvent<ExternalCard> => isExternalCard(ev.card))
+);
 
 // ── Now indicator ──
 const nowMinutes = ref(0);
@@ -292,6 +296,15 @@ const isAllDaySource = (activity: FamilyActivity) =>
         :birthday="b"
         class="block w-full"
         @click="emit('birthday-click', b)"
+      />
+
+      <!-- View-only external all-day events: striped, quieter than the family's own. -->
+      <ExternalChip
+        v-for="e in externalAllDay"
+        :key="'ext-' + e.viewedCalendarId + '-' + e.id"
+        :event="e"
+        :date="dateStr"
+        @open="(ev) => emit('external-click', ev)"
       />
 
       <!-- Vacations -->
@@ -458,6 +471,20 @@ const isAllDaySource = (activity: FamilyActivity) =>
           <PlannerResizeHandle v-if="isDragSource(ev.card)" />
         </button>
 
+        <!-- View-only external events, in the same lanes as the activities. -->
+        <ExternalTimedBlock
+          v-for="ev in positionedExternals"
+          :key="ev.card.key"
+          :event="ev.card.external"
+          :start-time="ev.card.startTime"
+          :end-time="ev.card.endTime"
+          :lane-index="ev.lane"
+          :lane-count="ev.totalLanes"
+          :get-position="getPosition"
+          class="z-[2]"
+          @open="(e) => emit('external-click', e)"
+        />
+
         <!-- Where the lifted block would land (#142). -->
         <PlannerSlotPreview
           v-if="dropSlot && dropSlot.date === dateStr"
@@ -491,9 +518,7 @@ const isAllDaySource = (activity: FamilyActivity) =>
 
         <!-- Empty state -->
         <div
-          v-if="
-            positionedEvents.length === 0 && !hasUntimedRow && segmentBuckets.timed.length === 0
-          "
+          v-if="positioned.length === 0 && !hasUntimedRow && segmentBuckets.timed.length === 0"
           class="pointer-events-none absolute inset-0 flex items-center justify-center"
         >
           <p class="font-outfit text-secondary-500/30 dark:text-ink-faint text-sm">

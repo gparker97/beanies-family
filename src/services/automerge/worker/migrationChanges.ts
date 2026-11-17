@@ -86,5 +86,10 @@ export const MIGRATION_CHANGES: Record<MigratedRootKey, string> = {
   choreAwards: 'hW9Kg1HzHGQBLgAIe7wYo48dzjcBAQAAAAUVDTQBQgJWAnACfwtjaG9yZUF3YXJkcwF/AH8AfwA=',
   choreStarGifts:
     'hW9Kg9J8UMABMQAI3HT6U9YUeTUBAQAAAAUVEDQBQgJWAnACfw5jaG9yZVN0YXJHaWZ0cwF/AH8AfwA=',
+  // Appended 2026-11-17 with @automerge/automerge 3.5.0.
+  calendarViewAccounts:
+    'hW9Kg+ZWAsoBNwAIVjtOiwbh/Q4BAQAAAAUVFjQBQgJWAnACfxRjYWxlbmRhclZpZXdBY2NvdW50cwF/AH8AfwA=',
+  viewedCalendars:
+    'hW9KgwZAHikBMgAI126R6LyN7h8BAQAAAAUVETQBQgJWAnACfw92aWV3ZWRDYWxlbmRhcnMBfwB/AH8A',
   // generateMigrationChanges.mjs appends new entries above this line.
 };

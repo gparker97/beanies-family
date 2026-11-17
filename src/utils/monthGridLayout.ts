@@ -15,7 +15,7 @@ import { weekRows, type MonthDayCellData } from '@/utils/monthCells';
 import {
   allDayItems,
   dayItemKey,
-  dayItems,
+  gridDayItems,
   type DayItem,
   type SpanningDayItem,
 } from '@/utils/monthDayItems';
@@ -51,7 +51,7 @@ export type LaneItem = SpanningDayItem;
 export interface CellLayout {
   /** The spanning bar on this cell's lane, if a run won it. */
   lane: { item: LaneItem; run: LaneRun } | null;
-  /** Everything else on the day, in `dayItems` order. */
+  /** Everything else on the day, in `gridDayItems` order (all-day view-only events included). */
   stack: DayItem[];
 }
 
@@ -102,8 +102,9 @@ function rowRuns(row: readonly MonthDayCellData[]): RowRun[] {
  *
  * Per row: trips first, then earlier start, then longer run. A run whose columns
  * are all still free takes the lane on every cell it covers; otherwise it stays in
- * each cell's stack. A cell's stack is `dayItems(cell)` without its lane winner,
- * so a losing trip or all-day item leads the stack, as `dayItems` orders them.
+ * each cell's stack. A cell's stack is `gridDayItems(cell)` without its lane winner,
+ * so a losing trip or all-day item leads the stack, then any all-day view-only event
+ * (which never takes the lane: it is not a family plan), then the timeline.
  */
 export function assignMonthLayout(days: readonly MonthDayCellData[]): CellLayout[] {
   const layouts: CellLayout[] = [];
@@ -128,7 +129,7 @@ export function assignMonthLayout(days: readonly MonthDayCellData[]): CellLayout
       const laneKey = lane ? dayItemKey(lane.item) : null;
       layouts.push({
         lane,
-        stack: dayItems(cell).filter((item) => dayItemKey(item) !== laneKey),
+        stack: gridDayItems(cell).filter((item) => dayItemKey(item) !== laneKey),
       });
     });
   }

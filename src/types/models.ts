@@ -1727,6 +1727,95 @@ export type UpdateCalendarConnectionInput = Partial<
 >;
 
 /**
+ * A Google account the family READS calendars from (view-only calendars, plan
+ * 2026-11-17). Family-wide and stored in the CRDT like `CalendarConnection`, so
+ * every family device (the wall tablet included) can fetch the viewed calendars
+ * with the same refresh token.
+ *
+ * ⚠️ DELIBERATELY NOT A `calendarConnections` RECORD. Every build, older ones
+ * included, treats each record in `calendarConnections` as a PUSH target and
+ * writes family activities into it, so a view credential stored there would make
+ * an older build push into someone's work account. It lives in its own collection,
+ * `calendarViewAccounts`, which older builds do not know and never write to, and a
+ * sync connection's token and scopes stay untouched.
+ *
+ * The grant is `calendar.events.readonly` (Google classifies it "sensitive"), which
+ * can read every calendar on the account; beanies only fetches the calendars listed
+ * in `viewedCalendars`. An account used for both syncing and viewing holds two
+ * refresh tokens under ONE Google grant, so revoking either kills both: removals go
+ * through `anotherGrantSharesAccount`.
+ *
+ * A CREDENTIAL ONLY: there is no status field. Whether a calendar can be read is
+ * per device and held in memory, never written to the family file (#124: no
+ * unattended doc writes). The one automatic write is the token resolver's rotation
+ * write-back of `refreshToken`, as for sync connections.
+ */
+export interface CalendarViewAccount {
+  id: UUID;
+  provider: CalendarProvider;
+  accountEmail: string;
+  /** Long-lived OAuth refresh token (lives in the encrypted .beanpod). */
+  refreshToken: string;
+  /** Scopes actually granted (granular consent can drop some, e.g. calendarlist). */
+  grantedScopes: string[];
+  /** The family member who added the first calendar from this account. See `CalendarConnection.connectedBy`. */
+  connectedBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateCalendarViewAccountInput = Omit<
+  CalendarViewAccount,
+  'id' | 'createdAt' | 'updatedAt'
+>;
+export type UpdateCalendarViewAccountInput = Partial<
+  Omit<CalendarViewAccount, 'id' | 'createdAt' | 'updatedAt'>
+>;
+
+/** The account's role on a calendar, as Google's `calendarList` reports it. */
+export type ViewedCalendarAccessRole = 'reader' | 'freeBusyReader' | 'writer' | 'owner';
+
+/** How much of a viewed calendar's events the family sees. */
+export type ViewedCalendarDetailLevel = 'details' | 'busy';
+
+/**
+ * One external calendar shown, view only, on the family calendar (plan
+ * 2026-11-17). Read through its `CalendarViewAccount`; nothing is ever written
+ * to it. Separate from `calendarConnections` for the same reason as the account:
+ * older builds treat every record there as a push target.
+ *
+ * Its events are never stored: they are fetched into memory per device. A
+ * `freeBusyReader` calendar returns time-only events (no title, location,
+ * transparency or event type) rather than an error, so it is always `'busy'`.
+ */
+export interface ViewedCalendar {
+  id: UUID;
+  /** The `CalendarViewAccount` whose token reads this calendar. */
+  viewAccountId: UUID;
+  /** Google's calendar id (for a shared calendar, usually its owner's email). */
+  calendarId: string;
+  /** The calendar's name from Google's calendar list, shown as its label. */
+  name: string;
+  accessRole: ViewedCalendarAccessRole;
+  /** `'busy'` drops titles and locations before events reach any surface. */
+  detailLevel: ViewedCalendarDetailLevel;
+  color: string;
+  /** Show this calendar's events in the daily briefing. */
+  inBriefing: boolean;
+  /** Show this calendar's events in the home-screen widgets (the on-device snapshot file). */
+  inWidgets: boolean;
+  /** The family member who added the calendar. */
+  addedBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateViewedCalendarInput = Omit<ViewedCalendar, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateViewedCalendarInput = Partial<
+  Omit<ViewedCalendar, 'id' | 'createdAt' | 'updatedAt'>
+>;
+
+/**
  * Maps a beanies activity to the Google event beanies created for it within a
  * connection. Lives in the CRDT → shared across devices; with the deterministic
  * event id this yields cross-device dedup. `id` is the composite

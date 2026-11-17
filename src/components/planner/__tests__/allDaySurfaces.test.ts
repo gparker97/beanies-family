@@ -271,3 +271,71 @@ describe('one definition of all-day', () => {
     ).toBe(true);
   });
 });
+
+/**
+ * View-only external events (plan 2026-11-17, C2), stated as the same kind of law.
+ *
+ * Adding `'external'` to `DayExtraKind` breaks only the two exhaustive switches
+ * (`KIND_ORDER` and the wall's `refColour`). The planner surfaces pick kinds with
+ * `.find` / `.filter`, so a new kind COMPILES everywhere and is silently missing from
+ * every surface nobody edited by hand. Birthdays shipped on one surface out of six that
+ * way. So both halves are asserted as source:
+ *  - every planner surface that shows a public holiday also renders `ExternalChip`
+ *    (the all-day view-only event rides the same all-day pipeline);
+ *  - every planner surface that renders TIMED activities also renders timed view-only
+ *    events (a block, a chip or an agenda row).
+ */
+describe('every planner surface shows view-only external events', () => {
+  const files = readdirSync(PLANNER_DIR).filter((f) => f.endsWith('.vue'));
+
+  /** Renders a timed activity: a grid block, a month chip, its own timeline cards, an agenda card. */
+  const TIMED_ACTIVITY = /<PlannerTimedBlock|<MonthChip[\s>/]|timedCards\(|<ActivityListCard/;
+  /** Renders a view-only external event in any of its forms. */
+  const EXTERNAL = /<ExternalTimedBlock|<ExternalChip|<ExternalEventRow/;
+
+  it('has no surface showing a public holiday but no view-only all-day event', () => {
+    const missing: string[] = [];
+    for (const file of files) {
+      if (file in EXEMPT) continue;
+      const src = readFileSync(join(PLANNER_DIR, file), 'utf8');
+      if (showsHoliday(src) && !/<ExternalChip/.test(src)) missing.push(file);
+    }
+    expect(
+      missing,
+      `these render a public holiday but no view-only event: ${missing.join(', ')}`
+    ).toEqual([]);
+  });
+
+  it('has no surface rendering timed activities but no timed view-only event', () => {
+    const missing: string[] = [];
+    let checked = 0;
+    for (const file of files) {
+      const src = readFileSync(join(PLANNER_DIR, file), 'utf8');
+      if (!TIMED_ACTIVITY.test(src)) continue;
+      checked += 1;
+      if (!EXTERNAL.test(src)) missing.push(file);
+    }
+    expect(
+      missing,
+      `these render timed activities but no view-only event: ${missing.join(', ')}`
+    ).toEqual([]);
+    // Week, day, the phone timeline, the agenda and the month dispatcher today. If this
+    // collapses toward 0 the scan has stopped matching and is asserting nothing.
+    expect(checked).toBeGreaterThanOrEqual(5);
+  });
+
+  it('every <ExternalChip>, <ExternalTimedBlock> and <ExternalEventRow> is wired to open', () => {
+    const unwired: string[] = [];
+    for (const file of files) {
+      if (/^External/.test(file)) continue;
+      const src = readFileSync(join(PLANNER_DIR, file), 'utf8');
+      for (const tag of src.match(/<External(?:Chip|TimedBlock|EventRow)[\s\S]*?\/>/g) ?? []) {
+        if (!/@open=/.test(tag)) unwired.push(file);
+      }
+    }
+    expect(
+      unwired,
+      `these render a view-only item that does nothing: ${unwired.join(', ')}`
+    ).toEqual([]);
+  });
+});

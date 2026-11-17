@@ -25,6 +25,7 @@ import { tripTypeEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import { relativeWeekLabelKey, type RelativeWeekLabelKey } from '@/utils/calendarWeek';
 import type { FamilyActivity, FamilyVacation } from '@/types/models';
 import type { DayExtra } from '@/utils/calendarDay';
+import type { ExternalEvent } from '@/types/externalEvents';
 import { isAllDayActivity, spanOffsetDays } from '@/utils/calendar/activityDays';
 
 // ── Cell types ─────────────────────────────────────────────────────────────
@@ -80,8 +81,14 @@ export interface MonthDayCellData {
   vacations: CellVacation[];
   segments: TravelSegmentOccurrence[];
   allDayItems: CellAllDayItem[];
-  /** Birthdays, public holidays, trips: one list, from `useDayExtras`. */
+  /** Birthdays, public holidays, all-day view-only events, trips: one list, from `useDayExtras`. */
   extras: DayExtra[];
+  /**
+   * TIMED events from view-only external calendars on this day (plan 2026-11-17), in
+   * start order; an overnight event appears on each day it covers. Empty unless a
+   * calendar is viewed. All-day ones ride `extras` instead.
+   */
+  timedExternals: ExternalEvent[];
 }
 
 /**
@@ -124,6 +131,8 @@ export interface MonthCellsInput {
    * being separate arrays.
    */
   extras: DayExtra[];
+  /** View-only external events by local day (`useExternalEvents().eventsByDate`); only the timed ones are read. */
+  externalsByDate?: ReadonlyMap<string, readonly ExternalEvent[]>;
 }
 
 /**
@@ -142,6 +151,8 @@ export interface PreparedCellData {
   vacations: Map<string, CellVacation[]>;
   vacationDates: Set<string>;
   extras: Map<string, DayExtra[]>;
+  /** Timed view-only external events by day (all-day ones are in `extras`). */
+  externalTimed: Map<string, ExternalEvent[]>;
   /** Dates carrying a public holiday — drives the cell tint, not the chips. */
   holidayDates: Set<string>;
 }
@@ -151,6 +162,8 @@ export interface PrepareCellDataInput {
   segments: TravelSegmentOccurrence[];
   vacations: FamilyVacation[];
   extras: DayExtra[];
+  /** View-only external events by local day; only the timed ones inside the span are kept. */
+  externalsByDate?: ReadonlyMap<string, readonly ExternalEvent[]>;
   /** Inclusive window bounds — vacations are clipped to this, so a trip with a
    *  mistyped multi-decade end date cannot expand into a six-figure loop. */
   spanStart: string;
@@ -224,6 +237,15 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
     if (extra.kind === 'holiday') holidayDates.add(extra.ymd);
   }
 
+  // The store's lists are already in start order per day (a tail from the night before
+  // leads), so they are kept as they come.
+  const externalTimed = new Map<string, ExternalEvent[]>();
+  for (const [ymd, events] of input.externalsByDate ?? []) {
+    if (ymd < input.spanStart || ymd > input.spanEnd) continue;
+    const timedOnDay = events.filter((e) => !e.allDay);
+    if (timedOnDay.length) externalTimed.set(ymd, timedOnDay);
+  }
+
   return {
     timed,
     allDay,
@@ -231,6 +253,7 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
     vacations,
     vacationDates,
     extras,
+    externalTimed,
     holidayDates,
   };
 }
@@ -282,6 +305,7 @@ export function monthCells(input: MonthCellsInput): MonthCellsResult {
       segments: input.segments,
       vacations: input.vacations,
       extras: input.extras,
+      externalsByDate: input.externalsByDate,
       spanStart: startYmd,
       spanEnd: endYmd,
     })
@@ -303,6 +327,7 @@ export function monthCellsFrom(
   const dateSegments = data.segments;
   const dateVacations = data.vacations;
   const dateExtras = data.extras;
+  const dateExternalTimed = data.externalTimed;
 
   const pushCell = (dateStr: string, day: number, isCurrentMonth: boolean): void => {
     days.push({
@@ -316,6 +341,7 @@ export function monthCellsFrom(
       segments: dateSegments.get(dateStr) ?? [],
       allDayItems: [],
       extras: dateExtras.get(dateStr) ?? [],
+      timedExternals: dateExternalTimed.get(dateStr) ?? [],
     });
   };
 

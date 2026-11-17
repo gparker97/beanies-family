@@ -7,6 +7,7 @@
 import type { Chore, ChoreBlock, FamilyList, TodoItem } from '@/types/models';
 import type { BeanChoreDay } from '@/utils/chores';
 import type { PlateClock, ShownPlate } from '@/utils/todoPlate';
+import type { ExternalEvent } from '@/types/externalEvents';
 
 /**
  * `chores` is the choreboard's lanes (#146), offered only while the `choreboard` gate is on
@@ -241,6 +242,16 @@ export type WallSheetTarget =
   | { kind: 'todos' }
   | { kind: 'list'; listId: string }
   | { kind: 'trip' }
-  | { kind: 'meals'; ymd: string };
+  | { kind: 'meals'; ymd: string }
+  /**
+   * A view-only external event (plan 2026-11-17, C4). NOT a drawer: the page opens the
+   * shared read-only `ExternalEventDetailsModal` for it, with no edit controls, no PIN
+   * prompt and no Google link. The event itself rides along because it lives in memory
+   * only and has no id the wall could look up later.
+   */
+  | { kind: 'external'; event: ExternalEvent };
+
+/** The targets that open the wall's drill-in `WallSheet` (everything but a view-only event). */
+export type WallDrawerTarget = Exclude<WallSheetTarget, { kind: 'external' }>;
 
 export type WallNightBehaviour = 'clock' | 'stay-on';

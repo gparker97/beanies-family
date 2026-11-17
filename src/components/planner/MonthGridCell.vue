@@ -46,6 +46,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import type { MonthDayCellData } from '@/utils/monthCells';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import type { FamilyMember, HolidayOccurrence } from '@/types/models';
+import type { ExternalEvent } from '@/types/externalEvents';
 import {
   CALENDAR_TODAY,
   calendarDayBackground,
@@ -82,6 +83,7 @@ const emit = defineEmits<{
   'view-segment': [vacationId: string, segmentIndex: number];
   'holiday-click': [holiday: HolidayOccurrence];
   'birthday-click': [birthday: BirthdayOccurrence];
+  'external-click': [event: ExternalEvent];
 }>();
 
 const { t } = useTranslation();
@@ -199,6 +201,9 @@ function membersOf(item: DayItem): FamilyMember[] {
       return pick(
         resolveSegmentTravellers(item.segment.travellerIds, item.segment.tripAssigneeIds)
       );
+    // A view-only external event belongs to no member of this family.
+    case 'external':
+      return [];
   }
 }
 
@@ -300,6 +305,7 @@ function forwardViewActivity(id: string, date: string): void {
         @view-activity="forwardViewActivity"
         @vacation-click="(vid) => emit('vacation-click', vid)"
         @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
+        @external-click="(e) => emit('external-click', e)"
       />
       <!-- Faces (phone): who is busy, wrapped (never overlapped), instead of the stack.
            Decorative here: the cell's own label counts the day and the row names it. -->
@@ -330,6 +336,7 @@ function forwardViewActivity(id: string, date: string): void {
           @view-activity="forwardViewActivity"
           @vacation-click="(vid) => emit('vacation-click', vid)"
           @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
+          @external-click="(e) => emit('external-click', e)"
         />
         <template v-if="capacity.hidden > 0">
           <span

@@ -34,14 +34,17 @@
 // depending on whether it clashes, breaking the vertical scan down a column.
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import OverlapMark from './OverlapMark.vue';
 import type { ResolvedClash } from '@/composables/useClash';
 
 const props = defineProps<{ clash?: ResolvedClash }>();
 const { t } = useTranslation();
 
+// The drawer callout's own sentence ("Overlaps your <x> calendar" / "Overlaps
+// <viewed calendar>"), so the tooltip and the drawer name the calendar alike.
 const tooltip = computed(() =>
-  props.clash ? `${t('calendarSync.clash.tooltipPrefix')} ${props.clash.calendarLabel}` : ''
+  props.clash ? fillTemplate(t('calendarSync.clash.overlaps'), { calendar: props.clash.label }) : ''
 );
 </script>
 

@@ -91,6 +91,21 @@ vi.mock('@/stores/notificationsStore', () => ({
   }),
 }));
 
+// View-only external events: the briefing reads `briefingEvents` (already filtered by the
+// store to calendars whose briefing switch is on). Driven per test.
+const { externalBox } = vi.hoisted(() => ({
+  externalBox: { briefing: [] as unknown[] },
+}));
+vi.mock('@/composables/useExternalEvents', () => ({
+  useExternalEvents: () => ({
+    briefingEvents: {
+      get value() {
+        return externalBox.briefing;
+      },
+    },
+  }),
+}));
+
 vi.mock('@/composables/useToday', async () => {
   const { ref, computed } = await import('vue');
   const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
@@ -202,6 +217,7 @@ describe('useCriticalItems', () => {
     flagState.helpfulHints = true;
     flagState.choreboard = true;
     readStateBox.value = {};
+    externalBox.briefing = [];
 
     familyStore = useFamilyStore();
     activityStore = useActivityStore();
@@ -1891,6 +1907,87 @@ describe('useCriticalItems', () => {
       const hintAt = items.findIndex((i) => i.id === 'hint-1');
       expect(choreAt).toBeGreaterThanOrEqual(0);
       expect(hintAt).toBeGreaterThan(choreAt);
+    });
+  });
+  describe('view-only external calendar rows (plan 2026-11-17, C6)', () => {
+    const at = (ymd: string, hhmm: string) => new Date(`${ymd}T${hhmm}:00`).getTime();
+    function ext(over: Record<string, unknown> = {}) {
+      return {
+        id: 'e1',
+        viewedCalendarId: 'vc1',
+        calendarName: "Grandma's calendar",
+        color: '#6B7280',
+        allDay: false,
+        startMs: at(TODAY, '15:00'),
+        endMs: at(TODAY, '17:00'),
+        startYmd: TODAY,
+        endYmd: TODAY,
+        title: 'Babysitting',
+        busyOnly: false,
+        transparent: false,
+        ...over,
+      };
+    }
+    const extRows = () =>
+      useCriticalItems().criticalItems.value.filter((i) => i.type === 'external');
+
+    it("lists today's briefing events, naming the calendar, routed to the planner day", () => {
+      familyStore.setCurrentMember('parent-1');
+      externalBox.briefing = [ext()];
+      const rows = extRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.message).toContain("Grandma's calendar");
+      expect(rows[0]!.message).toContain('Babysitting');
+      expect(rows[0]!.message).toMatch(/3pm to 5pm/i);
+      expect(rows[0]!.time).toBe('15:00');
+      expect(rows[0]!.route).toEqual({ path: '/activities', query: { view: 'day', d: TODAY } });
+    });
+
+    it('words a busy-only event as busy, with no title', () => {
+      familyStore.setCurrentMember('parent-1');
+      externalBox.briefing = [
+        ext({ calendarName: "Dad's work", busyOnly: true, title: undefined }),
+      ];
+      const msg = extRows()[0]!.message;
+      expect(msg).toMatch(/^Dad's work: busy 3pm to 5pm$/i);
+    });
+
+    it('words an all-day event as all day and leaves it untimed', () => {
+      familyStore.setCurrentMember('parent-1');
+      externalBox.briefing = [ext({ allDay: true, startMs: at(TODAY, '00:00') })];
+      const row = extRows()[0]!;
+      expect(row.message).toMatch(/Babysitting, all day$/i);
+      expect(row.time).toBe('');
+    });
+
+    it('shows today only: an event on another day is not a briefing row', () => {
+      familyStore.setCurrentMember('parent-1');
+      externalBox.briefing = [ext({ startYmd: '2026-03-11', endYmd: '2026-03-11' })];
+      expect(extRows()).toEqual([]);
+    });
+
+    it('adds no row when no calendar is in the briefing', () => {
+      familyStore.setCurrentMember('parent-1');
+      externalBox.briefing = [];
+      expect(extRows()).toEqual([]);
+    });
+
+    it('never gives a child session an external row', () => {
+      familyStore.setCurrentMember('child-1');
+      externalBox.briefing = [ext()];
+      expect(extRows()).toEqual([]);
+    });
+
+    it('has no dismiss key, so nothing derived from the Google event reaches the family file', async () => {
+      familyStore.setCurrentMember('parent-1');
+      externalBox.briefing = [ext({ id: 'google-event-id-123' })];
+      const { criticalItems, dismissItem } = useCriticalItems();
+      const row = criticalItems.value.find((i) => i.type === 'external')!;
+      expect(row.dismissKey).toBeUndefined();
+      expect(await dismissItem(row)).toBe(false);
+      for (const [key] of markRead.mock.calls)
+        expect(String(key)).not.toContain('google-event-id-123');
+      expect(markRead).not.toHaveBeenCalled();
     });
   });
 });

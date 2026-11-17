@@ -11,11 +11,17 @@ import ActivityListCard from '@/components/planner/ActivityListCard.vue';
 import TodoItemRow from '@/components/todo/TodoItemRow.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
+import ExternalChip from '@/components/planner/ExternalChip.vue';
+import ExternalEventRow from '@/components/planner/ExternalEventRow.vue';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { externalWindowOn } from '@/utils/calendar/externalDisplay';
+import type { ExternalEvent } from '@/types/externalEvents';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useDayExtras } from '@/composables/useDayExtras';
+import { externalExtras } from '@/utils/calendarDay';
 import { useTranslation } from '@/composables/useTranslation';
 import {
   toDateInputValue,
@@ -40,6 +46,8 @@ const emit = defineEmits<{
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
   'holiday-click': [holiday: HolidayOccurrence];
+  /** A view-only external event was tapped; the page opens its read-only details. */
+  'external-click': [event: ExternalEvent];
 }>();
 
 const { t } = useTranslation();
@@ -64,6 +72,13 @@ const birthdaysForDay = computed(() =>
     .map((e) => e.birthday!)
 );
 
+/** All-day view-only external events on the selected day, from the shared query. */
+const externalsAllDay = computed<ExternalEvent[]>(() =>
+  externalExtras(extrasByDate.value.get(props.date))
+);
+/** The timed ones come from the read-only selector (the page sets the fetch window). */
+const { timedForDate: externalTimedFor } = useExternalEvents();
+
 /** Format the selected date as a readable header (e.g. "Wed, 6 Mar") */
 const dateHeader = computed(() => {
   return formatDateWithDay(props.date);
@@ -81,6 +96,32 @@ const dayActivities = computed(() => {
     .sort((a, b) =>
       (occurrenceWindow(a).startTime ?? '').localeCompare(occurrenceWindow(b).startTime ?? '')
     );
+});
+
+/**
+ * The day's list: the family's activities and the timed view-only events, in time
+ * order (a view-only event at the same time as an activity follows it: the sort is
+ * stable and activities go in first).
+ */
+type DayEntry =
+  | { kind: 'activity'; key: string; start: string; occ: ActivityOccurrence }
+  | { kind: 'external'; key: string; start: string; event: ExternalEvent };
+const dayEntries = computed<DayEntry[]>(() => {
+  const entries: DayEntry[] = dayActivities.value.map((occ) => ({
+    kind: 'activity',
+    key: occurrenceKey(occ),
+    start: occurrenceWindow(occ).startTime ?? '',
+    occ,
+  }));
+  for (const event of externalTimedFor(props.date)) {
+    entries.push({
+      kind: 'external',
+      key: `external:${event.viewedCalendarId}:${event.id}`,
+      start: externalWindowOn(event, props.date).startTime,
+      event,
+    });
+  }
+  return entries.sort((a, b) => a.start.localeCompare(b.start));
 });
 
 /** Todos due on the selected day */
@@ -215,6 +256,17 @@ function formatGroupDate(dateStr: string): string {
       @click="emit('holiday-click', holidayForDay)"
     />
 
+    <!-- View-only external all-day events (read-only, from someone's Google Calendar) -->
+    <div v-if="externalsAllDay.length > 0" class="mb-4 space-y-1">
+      <ExternalChip
+        v-for="e in externalsAllDay"
+        :key="'ext-' + e.viewedCalendarId + '-' + e.id"
+        :event="e"
+        :date="date"
+        @open="(ev) => emit('external-click', ev)"
+      />
+    </div>
+
     <!-- Vacation context banner -->
     <div
       v-if="activeVacation"
@@ -245,15 +297,22 @@ function formatGroupDate(dateStr: string): string {
       </div>
     </div>
 
-    <!-- Day's activities -->
-    <div v-if="dayActivities.length > 0" class="space-y-1.5">
-      <ActivityListCard
-        v-for="occ in dayActivities"
-        :key="occurrenceKey(occ)"
-        :activity="occ.activity"
-        :date="eventDateOf(occ)"
-        @click="emit('edit-activity', occ.activity.id, eventDateOf(occ))"
-      />
+    <!-- Day's activities and timed view-only events, in time order -->
+    <div v-if="dayEntries.length > 0" class="space-y-1.5">
+      <template v-for="entry in dayEntries" :key="entry.key">
+        <ActivityListCard
+          v-if="entry.kind === 'activity'"
+          :activity="entry.occ.activity"
+          :date="eventDateOf(entry.occ)"
+          @click="emit('edit-activity', entry.occ.activity.id, eventDateOf(entry.occ))"
+        />
+        <ExternalEventRow
+          v-else
+          :event="entry.event"
+          :date="date"
+          @open="(ev) => emit('external-click', ev)"
+        />
+      </template>
     </div>
 
     <!-- Empty state -->

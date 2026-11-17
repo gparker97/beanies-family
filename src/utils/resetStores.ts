@@ -16,6 +16,8 @@ import { useStarStore } from '@/stores/starStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useCalendarClashStore } from '@/stores/calendarClashStore';
+import { useCalendarViewStore } from '@/stores/calendarViewStore';
+import { pendingCredential } from '@/services/calendar/pendingCredential';
 import { isFlagEnabled } from '@/config/flags';
 import { clearDemoSession } from '@/utils/reviewDemo';
 import { clearChoreAddDraft } from '@/composables/useChoreAddDraft';
@@ -52,6 +54,12 @@ export function resetAllAppStores(): void {
   if (isFlagEnabled('googleCalendarSync')) useCalendarSyncStore().stop();
   // Clear the read-only clash engine's ephemeral busy cache + decoration (#34).
   if (isFlagEnabled('calendarClashNudge')) useCalendarClashStore().stop();
+  // View-only calendars (plan 2026-11-17): the in-memory event cache, poller and
+  // session toasts. The events are another family's calendar content.
+  if (isFlagEnabled('viewOnlyCalendars')) useCalendarViewStore().stop();
+  // A consented-but-unconfirmed calendar credential (memory only) belongs to this
+  // session's family: it must not survive into the next one.
+  pendingCredential.clear();
   // REVIEW-DEMO: drop the demo-session flag. Sign-out here does NOT reload the
   // page (AppHeader does router.replace), so a demo banner would otherwise
   // follow the user to /login and onto the next real pod in this JS session.

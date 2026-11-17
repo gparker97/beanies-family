@@ -78,6 +78,7 @@ function makeCell(overrides: Partial<MonthDayCellData> = {}): MonthDayCellData {
     vacations: [],
     segments: [],
     allDayItems: [],
+    timedExternals: [],
     extras: [],
     ...overrides,
   };

@@ -38,6 +38,8 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useDayExtras } from '@/composables/useDayExtras';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import type { ExternalEvent } from '@/types/externalEvents';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useTranslation } from '@/composables/useTranslation';
 import { monthCells, monthSpan, weekRows, type MonthDayCellData } from '@/utils/monthCells';
@@ -91,6 +93,8 @@ const emit = defineEmits<{
   'view-activity': [activityId: string, date: string];
   'holiday-click': [holiday: HolidayOccurrence];
   'birthday-click': [birthday: BirthdayOccurrence];
+  /** A view-only external event was tapped; the page opens its read-only details. */
+  'external-click': [event: ExternalEvent];
   /** Swipe navigation — the page advances the shared reference date. */
   prev: [];
   next: [];
@@ -158,6 +162,8 @@ const { extras: dayExtras } = useDayExtras(
   computed(() => gridSpan.value.startYmd),
   computed(() => gridSpan.value.endYmd)
 );
+/** View-only external events: read only; the page sets the fetch window. */
+const { eventsByDate: externalsByDate } = useExternalEvents();
 
 const monthData = computed(() => {
   const { startYmd, endYmd } = gridSpan.value;
@@ -172,6 +178,7 @@ const monthData = computed(() => {
     vacations: vacationStore.vacations,
     // Derived from each member's date of birth over the SAME span as everything else.
     extras: dayExtras.value,
+    externalsByDate: externalsByDate.value,
   });
 });
 
@@ -515,6 +522,7 @@ useCalendarSlide(swipeRef, {
             @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
             @holiday-click="(h) => emit('holiday-click', h)"
             @birthday-click="(b) => emit('birthday-click', b)"
+            @external-click="(e) => emit('external-click', e)"
           />
         </div>
         <!-- Phone: the tapped day's row, a block between week rows. The fit subtracts its
@@ -532,6 +540,7 @@ useCalendarSlide(swipeRef, {
           @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
           @holiday-click="(h) => emit('holiday-click', h)"
           @birthday-click="(b) => emit('birthday-click', b)"
+          @external-click="(e) => emit('external-click', e)"
         />
       </template>
     </div>
@@ -546,6 +555,7 @@ useCalendarSlide(swipeRef, {
       @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
       @holiday-click="(h) => emit('holiday-click', h)"
       @birthday-click="(b) => emit('birthday-click', b)"
+      @external-click="(e) => emit('external-click', e)"
     />
   </div>
 </template>

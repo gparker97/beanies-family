@@ -25,6 +25,8 @@ import type {
   EmergencyContact,
   CalendarConnection,
   CalendarEventLink,
+  CalendarViewAccount,
+  ViewedCalendar,
   DriveConnection,
   OverlapAck,
   ListCycle,
@@ -142,6 +144,14 @@ export interface FamilyDocument {
    * `bonus` already holds their net). Write surface: `starRepository.ts`.
    */
   choreStarGifts: Record<string, ChoreStarGift>;
+  /**
+   * View-only external calendars (plan 2026-11-17): the Google accounts the family reads from
+   * and the calendars shown from them. Their own collections, NOT `calendarConnections`, because
+   * every build treats each record there as a push target. Written only when a family uses the
+   * feature (plus the token rotation write-back). Write surface: `calendarViewRepository.ts`.
+   */
+  calendarViewAccounts: Record<string, CalendarViewAccount>;
+  viewedCalendars: Record<string, ViewedCalendar>;
   settings: Settings | null;
   /**
    * Which HISTORY this document descends from — see `PodLineage` and ADR-036.
@@ -261,6 +271,8 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
   choreWeeks: 0,
   choreAwards: 0,
   choreStarGifts: 0,
+  calendarViewAccounts: 0,
+  viewedCalendars: 0,
 };
 export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];
 

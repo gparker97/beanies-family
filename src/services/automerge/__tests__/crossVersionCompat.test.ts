@@ -204,11 +204,13 @@ describe('cross-version .beanpod compatibility (current engine <-> automerge-leg
 const CHORE_ROOTS = ['chores', 'choreMarks'];
 /** Collections added after the choreboard (#148 stars and rewards). */
 const STAR_ROOTS = ['choreWeeks', 'choreAwards', 'choreStarGifts'];
+/** Collections added after stars and rewards (view-only calendars, plan 2026-11-17). */
+const VIEW_ROOTS = ['calendarViewAccounts', 'viewedCalendars'];
 type OldDocOps = typeof import('../worker/docOps');
 
 /** `docOps` as the build before the choreboard had it. See the block comment above. */
 async function loadPreChoreboardDocOps(): Promise<OldDocOps> {
-  return loadDocOpsWithout([...CHORE_ROOTS, ...STAR_ROOTS]);
+  return loadDocOpsWithout([...CHORE_ROOTS, ...STAR_ROOTS, ...VIEW_ROOTS]);
 }
 
 /** `docOps` as a build that did not yet know `roots` had it (same source, fewer collections). */
@@ -278,7 +280,10 @@ describe('a build that does not know chores / choreMarks (#146 rollout)', () => 
 
   const withoutChoreRoots = (deltas: ProjectionDelta[]) =>
     deltas.filter(
-      (x) => !(x.kind === 'bulk' && [...CHORE_ROOTS, ...STAR_ROOTS].includes(x.collection))
+      (x) =>
+        !(
+          x.kind === 'bulk' && [...CHORE_ROOTS, ...STAR_ROOTS, ...VIEW_ROOTS].includes(x.collection)
+        )
     );
 
   it('the simulated older build really does not know the two collections', () => {
@@ -432,7 +437,7 @@ describe('a build that does not know chores / choreMarks (#146 rollout)', () => 
 describe('a build that does not know the star collections (#148 rollout)', () => {
   let oldOps: OldDocOps;
   beforeAll(async () => {
-    oldOps = await loadDocOpsWithout(STAR_ROOTS);
+    oldOps = await loadDocOpsWithout([...STAR_ROOTS, ...VIEW_ROOTS]);
   });
 
   const WEEK = {
@@ -465,7 +470,9 @@ describe('a build that does not know the star collections (#148 rollout)', () =>
   }
 
   const withoutStarRoots = (deltas: ProjectionDelta[]) =>
-    deltas.filter((x) => !(x.kind === 'bulk' && STAR_ROOTS.includes(x.collection)));
+    deltas.filter(
+      (x) => !(x.kind === 'bulk' && [...STAR_ROOTS, ...VIEW_ROOTS].includes(x.collection))
+    );
 
   it('projects a merged doc holding a frozen week, rebuilds on it, keeps writing, and saves it whole', () => {
     const podBytes = olderPodBytes();
@@ -652,5 +659,101 @@ describe('a build that does not know the star collections (#148 rollout)', () =>
       living
     );
     expect(withReward).toEqual(plainDay);
+  });
+});
+
+// ─── A build that does not know the view-only calendar collections (plan 2026-11-17) ──
+//
+// The 1.5.2 build knows every chore and star collection but not `calendarViewAccounts` /
+// `viewedCalendars`. A newer device adds a view-only calendar; the older build must project
+// everything it knows exactly as before, fall back to a full rebuild on a merge carrying the
+// records, keep writing its own data, and save both records back WHOLE. It never sees the view
+// account as a calendar connection, so it never pushes into it.
+
+describe('a build that does not know the view-only calendar collections (plan 2026-11-17)', () => {
+  let oldOps: OldDocOps;
+  beforeAll(async () => {
+    oldOps = await loadDocOpsWithout(VIEW_ROOTS);
+  });
+
+  const T = '2026-11-17T08:00:00.000Z';
+  const ACCOUNT = {
+    id: 'va1',
+    provider: 'google',
+    accountEmail: 'mum.work@example.com',
+    refreshToken: 'view-rt',
+    grantedScopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
+    connectedBy: 'mom',
+    createdAt: T,
+    updatedAt: T,
+  };
+  const VIEWED = {
+    id: 'vc1',
+    viewAccountId: 'va1',
+    calendarId: 'boss@example.com',
+    name: 'Work',
+    accessRole: 'freeBusyReader',
+    detailLevel: 'busy',
+    color: '#94A3B8',
+    inBriefing: false,
+    inWidgets: false,
+    addedBy: 'mom',
+    createdAt: T,
+    updatedAt: T,
+  };
+
+  /** A pod written by the older build: no view maps at all. */
+  function olderPodBytes(): Uint8Array {
+    let d = oldOps.migrateDoc(AmNew.init<FamilyDocument>()) as AnyDoc;
+    d = oldOps.applyMutation(d, {
+      op: 'set',
+      collection: 'todos',
+      id: 't1',
+      entity: { id: 't1', title: 'buy beans' },
+    }).doc as AnyDoc;
+    expect(d.calendarViewAccounts).toBeUndefined();
+    expect(d.viewedCalendars).toBeUndefined();
+    return saveDoc(d);
+  }
+
+  const withoutViewRoots = (deltas: ProjectionDelta[]) =>
+    deltas.filter((x) => !(x.kind === 'bulk' && VIEW_ROOTS.includes(x.collection)));
+
+  it('projects a merged doc holding a view account and calendar, rebuilds on it, keeps writing, and saves both whole', () => {
+    const podBytes = olderPodBytes();
+    let onOld = AmNew.load<FamilyDocument>(podBytes) as AnyDoc;
+    const beforeMerge = AmNew.getHeads(onOld);
+
+    let newer = migrateDoc(AmNew.load<FamilyDocument>(podBytes));
+    newer = set(newer, 'calendarViewAccounts', ACCOUNT.id, ACCOUNT);
+    newer = set(newer, 'viewedCalendars', VIEWED.id, VIEWED);
+    onOld = oldOps.mergeDocs(onOld, AmNew.load<FamilyDocument>(saveDoc(newer))).doc as AnyDoc;
+
+    const projected = oldOps.buildFullProjection(onOld);
+    expect(normalize(projected)).toEqual(withoutViewRoots(projectDoc(onOld)));
+    // Not a push target: the older build's connections are exactly what they were (none).
+    const connections = projected.find(
+      (x) => x.kind === 'bulk' && x.collection === 'calendarConnections'
+    );
+    expect(connections?.kind === 'bulk' ? connections.entities : null).toEqual([]);
+    // A diff carrying the records: the delta path answers null (the caller does a full rebuild).
+    expect(oldOps.projectionDeltasBetween(onOld, beforeMerge, AmNew.getHeads(onOld))).toBeNull();
+
+    // Its own edit still takes the delta path, and the write lands.
+    const ownEditFrom = AmNew.getHeads(onOld);
+    onOld = oldOps.applyMutation(onOld, {
+      op: 'set',
+      collection: 'todos',
+      id: 't2',
+      entity: { id: 't2', title: 'water plants' },
+    }).doc as AnyDoc;
+    expect(
+      oldOps.projectionDeltasBetween(onOld, ownEditFrom, AmNew.getHeads(onOld))
+    ).not.toBeNull();
+
+    const saved = AmNew.load<FamilyDocument>(oldOps.saveDoc(onOld));
+    expect(JSON.parse(JSON.stringify(saved.calendarViewAccounts?.va1))).toEqual(ACCOUNT);
+    expect(JSON.parse(JSON.stringify(saved.viewedCalendars?.vc1))).toEqual(VIEWED);
+    expect(saved.todos?.t2?.title).toBe('water plants');
   });
 });

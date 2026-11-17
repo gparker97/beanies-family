@@ -20,7 +20,11 @@ import WallNightScreen from '@/components/wall/WallNightScreen.vue';
 import WallSheet from '@/components/wall/WallSheet.vue';
 import WallMemoriesViewer from '@/components/wall/WallMemoriesViewer.vue';
 import BirthdayDetailsModal from '@/components/planner/BirthdayDetailsModal.vue';
+import ExternalEventDetailsModal from '@/components/planner/ExternalEventDetailsModal.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
+import type { ExternalEvent } from '@/types/externalEvents';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { spanKeyOf, widenByPeriod } from '@/utils/calendar/externalEvents';
 import WallTickBurst from '@/components/wall/WallTickBurst.vue';
 import WallNavArrow from '@/components/wall/WallNavArrow.vue';
 import WallBackButton from '@/components/wall/WallBackButton.vue';
@@ -73,7 +77,13 @@ import {
   railFits,
   wallWeatherSize,
 } from '@/components/wall/wallLayout';
-import type { WallJob, WallPeripheralData, WallSheetTarget, WallViewId } from '@/types/wall';
+import type {
+  WallDrawerTarget,
+  WallJob,
+  WallPeripheralData,
+  WallSheetTarget,
+  WallViewId,
+} from '@/types/wall';
 import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 import { preloadChoreCelebrationWhenIdle } from '@/components/ui/choreCelebrationLoader';
 
@@ -123,7 +133,7 @@ function onBeanTap(id: string, source: Extract<WallMemoriesOpenSource, `${string
   else onFocusMember(id);
 }
 /** The open drill-in sheet, or null. One at a time — this is a wall, not a desktop. */
-const sheet = ref<WallSheetTarget | null>(null);
+const sheet = ref<WallDrawerTarget | null>(null);
 
 /**
  * The read-only birthday drawer, shared with the planner. A birthday is derived
@@ -136,6 +146,16 @@ function onOpenBirthday(birthday: BirthdayOccurrence) {
   lock.noteActivity();
   birthdaySheet.value = birthday;
 }
+
+/**
+ * The read-only details of a view-only external event (plan 2026-11-17, C4), the
+ * shared `ExternalEventDetailsModal` reused the way `BirthdayDetailsModal` is above.
+ * Requirement 9: no edit controls (the modal has none), no Google link (this is a
+ * kiosk read by children, and leaving the wall for a browser tab is not on offer), and
+ * NO lock interaction at all: there is nothing to unlock for, so a locked wall opens it
+ * and no PIN prompt can follow. See `openSheet`.
+ */
+const selectedExternal = ref<ExternalEvent | null>(null);
 
 /**
  * The choreboard gate (#146), read ONCE for the whole wall. Off, the wall is exactly what it
@@ -929,18 +949,62 @@ function onToggle(job: WallJob, anchor: ChoreCelebrationAnchor | null = null) {
 }
 
 function openSheet(target: WallSheetTarget) {
-  lock.noteActivity();
-  sheet.value = target;
   logEvent({
     level: 'info',
     surface: SURFACE,
     message: 'wall_sheet_open',
     context: { action: 'sheet_open', kind: target.kind },
   });
+  // A view-only event never touches the lock: read-only details, nothing to unlock.
+  if (target.kind === 'external') {
+    selectedExternal.value = target.event;
+    return;
+  }
+  lock.noteActivity();
+  sheet.value = target;
 }
 
 /** A view switch must not leave a sheet from the previous view floating. */
 watch(activeView, () => (sheet.value = null));
+
+/**
+ * ── View-only external calendars (plan 2026-11-17, C4) ──────────────────────
+ *
+ * This page is the wall's ONLY fetch-window setter; the views and the grid only read
+ * (`useExternalEvents().timedForDate`, and `useDayExtras` for the band). The window is
+ * the days the wall is drawing plus one period each side (Requirement 6): the days
+ * view's week strip widened by a week, a single-day view's day widened by a day. A
+ * board view (no dates) keeps the window of the calendar view it was opened from, so
+ * glancing at the chores does not refetch a different span on the way back.
+ *
+ * Inert unless the `viewOnlyCalendars` flag is on and a calendar is viewed (the store
+ * fetches nothing otherwise); owner-scoped, so it clears when the wall unmounts. The
+ * tablet reads with the family's stored view credential and needs no sign-in of its own.
+ */
+const externalEvents = useExternalEvents();
+const windowView = computed<WallViewId>(() =>
+  currentView.value.stepUnit ? activeView.value : lastCalendarView.value
+);
+const externalWindow = computed(() => {
+  if (windowView.value === 'days') {
+    const days = weekDays.value;
+    return widenByPeriod(
+      { startYmd: days[0] ?? anchorYmd.value, endYmd: days[days.length - 1] ?? anchorYmd.value },
+      'week',
+      settingsStore.weekStartDay
+    );
+  }
+  return widenByPeriod(
+    { startYmd: anchorYmd.value, endYmd: anchorYmd.value },
+    'day',
+    settingsStore.weekStartDay
+  );
+});
+watch(
+  () => spanKeyOf(externalWindow.value),
+  () => externalEvents.setScreenWindow(externalWindow.value),
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -1209,6 +1273,13 @@ watch(activeView, () => (sheet.value = null));
         :today-ymd="today"
         :can-open-profile="false"
         @close="birthdaySheet = null"
+      />
+
+      <ExternalEventDetailsModal
+        :event="selectedExternal"
+        :open="selectedExternal !== null"
+        :show-google-link="false"
+        @close="selectedExternal = null"
       />
 
       <WallSheet

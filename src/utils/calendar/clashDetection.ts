@@ -18,14 +18,23 @@ export interface BusyMs {
   endMs: number;
 }
 
-/** A single activity↔calendar clash. Names the connected calendar, never the
- *  other event's details. Carries `activityId`/`occurrenceDate`/`fingerprint` so
- *  the `useClash` seam can self-containedly join it to the acknowledge memory (#34)
- *  without threading the lookup keys in separately. */
+/** Where a busy source comes from: a sync connection the family pushes to
+ *  (`'own'`), or a view-only calendar (`'viewed'`, plan 2026-11-17 A5). */
+export type ClashSourceKind = 'own' | 'viewed';
+
+/** A single activity↔calendar clash. Names the calendar, never the other event's
+ *  details. Carries `activityId`/`occurrenceDate`/`fingerprint` so the `useClash`
+ *  seam can self-containedly join it to the acknowledge memory (#34) without
+ *  threading the lookup keys in separately. Display wording is NOT here: i18n
+ *  stays out of the store and this util, and `useClash` resolves the label. */
 export interface ClashInfo {
-  connectionId: string;
-  /** Human label of the connected calendar (e.g. the account email / calendar name). */
-  calendarLabel: string;
+  /** The busy source: a calendar connection id (`'own'`) or a viewed calendar id
+   *  (`'viewed'`). The third segment of `overlapAckKey`. */
+  sourceId: string;
+  source: ClashSourceKind;
+  /** Raw name of the source: the account email (`'own'`) or the viewed calendar's
+   *  name as stored (`'viewed'`). */
+  sourceName: string;
   /** The clashing activity. */
   activityId: string;
   /** `YYYY-MM-DD` of the clashing occurrence. */
@@ -39,15 +48,16 @@ export interface ClashInfo {
 /** One occurrence of an activity on a concrete date: the shared shape. */
 export type { ActivityOccurrence };
 
-/** Busy intervals (absolute ms) + the display label, per connected calendar. */
-export interface ConnectionBusy {
-  connectionId: string;
-  calendarLabel: string;
+/** Busy intervals (absolute ms) + the source's identity, per busy source. */
+export interface BusySource {
+  sourceId: string;
+  source: ClashSourceKind;
+  sourceName: string;
   intervals: BusyMs[];
 }
 
 /**
- * From a connection's raw event times, keep only the OTHER, busy commitments:
+ * From a busy source's raw event times, keep only the OTHER, busy commitments:
  * drop transparent (owner-marked "free") and beanies-OWNED events (whose `id` or
  * `recurringEventId` is in the supplied set — the self-clash fix). Returns
  * absolute-ms intervals ready for `computeClashes`. Pure. (#34)
@@ -74,15 +84,19 @@ export function clashKey(activityId: string, occurrenceDate: string): string {
 }
 
 /** Stable map key for an acknowledged overlap (#34): one entry per
- *  (activity, occurrence-date, connection). The ONLY place this format is defined
+ *  (activity, occurrence-date, busy source). The ONLY place this format is defined
  *  — used on both the write (overlapAckStore) and read (isAcknowledged) sides so
- *  the two never drift. Positional + same `:`-join style as `clashKey`. */
+ *  the two never drift. Positional + same `:`-join style as `clashKey`.
+ *
+ *  PERSISTED FORMAT: keys in the family file were written as
+ *  `activity:date:connectionId`; a viewed calendar's id takes the same third slot.
+ *  Never change this string, or every stored acknowledgement re-raises. */
 export function overlapAckKey(
   activityId: string,
   occurrenceDate: string,
-  connectionId: string
+  sourceId: string
 ): string {
-  return `${activityId}:${occurrenceDate}:${connectionId}`;
+  return `${activityId}:${occurrenceDate}:${sourceId}`;
 }
 
 /** Local wall-time `YYYY-MM-DD` + `HH:MM` → absolute ms. */
@@ -121,13 +135,14 @@ export function intervalsOverlap(
 }
 
 /**
- * For each timed occurrence, find the FIRST connected calendar whose busy
- * intervals overlap it. Pure. Returns a map keyed by `clashKey`. All-day
- * occurrences and connections with no busy data simply produce no entry.
+ * For each timed occurrence, find the FIRST busy source whose intervals overlap
+ * it. Pure. Returns a map keyed by `clashKey`. All-day occurrences and sources
+ * with no busy data simply produce no entry. First source wins, so the caller's
+ * order decides which calendar a clash names (and acknowledges under).
  */
 export function computeClashes(
   occurrences: ActivityOccurrence[],
-  busyByConnection: ConnectionBusy[]
+  busySources: BusySource[]
 ): Map<string, ClashInfo> {
   const clashes = new Map<string, ClashInfo>();
   // Intervals arrive already in absolute ms (the events.list path converts once) —
@@ -144,8 +159,8 @@ export function computeClashes(
     counted.add(key);
     const range = activityTimeRange(occ.activity, date);
     if (!range) continue;
-    for (const conn of busyByConnection) {
-      const hit = conn.intervals.some(
+    for (const src of busySources) {
+      const hit = src.intervals.some(
         (iv) =>
           Number.isFinite(iv.startMs) &&
           Number.isFinite(iv.endMs) &&
@@ -153,13 +168,14 @@ export function computeClashes(
       );
       if (hit) {
         clashes.set(key, {
-          connectionId: conn.connectionId,
-          calendarLabel: conn.calendarLabel,
+          sourceId: src.sourceId,
+          source: src.source,
+          sourceName: src.sourceName,
           activityId: occ.activity.id,
           occurrenceDate: date,
           fingerprint: `${range.startMs}-${range.endMs}`,
         });
-        break; // first overlapping calendar wins
+        break; // first overlapping source wins
       }
     }
   }

@@ -20,6 +20,10 @@ const holidaysInRange = vi.fn((a: string, b: string) =>
 
 vi.mock('@/stores/familyStore', () => ({ useFamilyStore: () => ({ members }) }));
 vi.mock('@/stores/holidayStore', () => ({ useHolidayStore: () => ({ holidaysInRange }) }));
+// Nothing viewed (plan 2026-11-17): the day query's view-only source is empty.
+vi.mock('@/composables/useExternalEvents', () => ({
+  useExternalEvents: () => ({ isActive: { value: false }, allDayForDate: () => [] }),
+}));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));

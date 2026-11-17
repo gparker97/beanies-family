@@ -153,6 +153,7 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'acknowledgedBy',
   'lastReconciledBy',
   'administeredBy',
+  'addedBy', // who added a view-only calendar
   'by',
   'completedBy',
   'connectedBy',
@@ -214,6 +215,8 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'tripPurpose',
   'tripType',
   'block', // a chore's time of day: 'morning' | 'afternoon' | 'evening' | 'anytime'
+  'accessRole', // a viewed calendar's Google role: 'reader' | 'freeBusyReader' | 'writer' | 'owner'
+  'detailLevel', // a viewed calendar's detail level: 'details' | 'busy'
   // codes: currency, country, time zone, OAuth scopes, airports and airlines (picked from
   // reference data; a rare "Other" typed value is still one value, never edited in place)
   'baseCurrency',

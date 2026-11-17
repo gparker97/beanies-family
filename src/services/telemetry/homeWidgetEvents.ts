@@ -207,6 +207,17 @@ export function emitSignOutHaltIncomplete(outcome: 'timeout' | 'failed'): void {
   emit('warn', 'sign-out halt incomplete', { error_code: 'halt_' + outcome, stage: 'sign-out' });
 }
 
+/**
+ * A launch stopped waiting for the view-only calendars' first read and published the
+ * family's own rows without their events; it publishes again once the read settles.
+ * Frequent = the read is slow or never starts (a hidden native wake).
+ */
+export function emitExternalRowsWaitExpired(): void {
+  emit('info', 'published without view-only calendar rows (wait expired)', {
+    action: 'external-wait-expired',
+  });
+}
+
 /** A widget tap opened the app (`?src=widget&w=<size>`, size already validated). */
 export function emitWidgetOpened(payload: { size: WidgetSize; routePath: string }): void {
   emit('info', 'opened from widget', { kind: payload.size, route_path: payload.routePath });

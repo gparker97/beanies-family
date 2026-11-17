@@ -128,6 +128,34 @@ export interface EventTime {
 }
 
 /**
+ * One event on a calendar someone else owns, as a VIEW-ONLY calendar needs it
+ * (plan 2026-11-17). Expanded instances (`singleEvents=true`), so a series arrives
+ * as its occurrences, each carrying `recurringEventId`.
+ *
+ * Exactly the masked fields and nothing more: no `description`, no `attendees`, no
+ * organizer or creator, so neither notes nor other people's addresses are read.
+ * Raw Google shapes, unnormalized: the caller decides what to drop (cancelled,
+ * beanies-origin) and what to strip (titles of a busy-only calendar) once, at its
+ * store boundary. Held in memory only; never written to the family file.
+ */
+export interface CalendarViewEvent {
+  id: string;
+  recurringEventId?: string;
+  status?: string;
+  /** `'default'`, `'outOfOffice'` or `'fromGmail'` (the types requested). */
+  eventType?: string;
+  summary?: string;
+  location?: string;
+  start?: { date?: string; dateTime?: string; timeZone?: string };
+  end?: { date?: string; dateTime?: string; timeZone?: string };
+  /** `'transparent'` when the owner marked the event "free". */
+  transparency?: string;
+  /** `'default' | 'public' | 'private' | 'confidential'`. */
+  visibility?: string;
+  htmlLink?: string;
+}
+
+/**
  * Mints short-lived access tokens per connection. The Google impl reads the
  * connection's refresh token from the CRDT, refreshes via the OAuth proxy, caches
  * the access token, and writes back a rotated refresh token (never silent). A
@@ -137,6 +165,13 @@ export interface TokenProvider {
   getAccessToken(connectionId: string): Promise<string>;
   /** Drop any cached access token for a connection (e.g. after disconnect / reconnect). */
   invalidate(connectionId: string): void;
+  /**
+   * Has Google permanently rejected THIS refresh token for this credential this
+   * session (the latched `invalid_grant`)? Read-only. A latch recorded for an older
+   * refresh token (replaced by a reconnect, on any device) reads as `false`.
+   * Optional so a test provider need not implement it (absent reads as `false`).
+   */
+  isPermanentlyFailed?(connectionId: string, refreshToken: string): boolean;
 }
 
 /**
@@ -151,11 +186,22 @@ export interface CalendarClient {
    * in-flight refresh, and — critically — the latched permanent-failure state.
    *
    * MUST be called after a successful reconnect. The Google provider latches an
-   * `invalid_grant` so a dead grant stops hammering the OAuth proxy; that latch
-   * survives for the session and only this clears it. Skip the call and calendar
-   * sync stays dead until a page reload, even after the user re-consents.
+   * `invalid_grant` so a dead grant stops hammering the OAuth proxy; the latch is
+   * pinned to the rejected refresh token, so a NEW stored token (a reconnect synced
+   * from another device) is tried again without this call. Call it anyway on the
+   * reconnecting device, so the cached access token and latch go at once.
    */
   invalidateConnection(connectionId: string): void;
+
+  /**
+   * Is this credential's refresh token latched as permanently rejected (a real
+   * `invalid_grant`, not a transient or a single 401)? The view-only store reads it
+   * to tell "sign in again" apart from "could not refresh just now": a double 401
+   * throws `auth` without setting the latch, and that is only stale. Pass the
+   * credential's CURRENT stored refresh token: a latch for an older token (a
+   * reconnect on another device) does not count. Cleared by `invalidateConnection`.
+   */
+  hasPermanentAuthFailure(credentialId: string, refreshToken: string): boolean;
 
   /** Insert with a caller-supplied event id. Throws `conflict` if the id already exists. */
   insertEvent(
@@ -243,4 +289,27 @@ export interface CalendarClient {
     timeMinIso: string,
     timeMaxIso: string
   ): Promise<CalendarEventFull[]>;
+  /**
+   * List events on a VIEW-ONLY calendar over `[timeMinIso, timeMaxIso)` (plan
+   * 2026-11-17). `credentialId` is a view account id, and the pair
+   * (`credentialId`, `calendarId`) must be a calendar the family added
+   * (`viewedCalendars`): any other pair, the in-memory pending credential included,
+   * is refused with a `CalendarApiError` of kind `invalid` before any request (the
+   * grant can read every calendar on the account; beanies reads only those added).
+   * That refusal is a programming error, never a network state.
+   *
+   * Recurring events expanded (`singleEvents=true`), cancelled excluded, only
+   * `default`, `outOfOffice` and `fromGmail` event types (no focus time, no working location),
+   * and a field mask without description or attendees (see
+   * {@link CalendarViewEvent}). `truncated` is true when the page cap stopped the
+   * read early, so the caller can say "some events may be missing" instead of
+   * presenting a partial calendar as complete. Errors are classified
+   * `CalendarApiError`s from the shared `authedFetch`.
+   */
+  listEventsForView(
+    credentialId: string,
+    calendarId: string,
+    timeMinIso: string,
+    timeMaxIso: string
+  ): Promise<{ events: CalendarViewEvent[]; truncated: boolean }>;
 }

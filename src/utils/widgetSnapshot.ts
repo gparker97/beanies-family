@@ -103,7 +103,9 @@ import {
 } from '@/utils/entityDeepLink';
 import { shareableOrigin } from '@/utils/shareableOrigin';
 import { formatUiDate } from '@/utils/uiLocale';
-import { addDaysYmd, extractDatePart, formatTime12 } from '@/utils/date';
+import { addDaysYmd, extractDatePart, formatTime12, parseLocalDate } from '@/utils/date';
+import { externalEventTitle, externalWindowOn } from '@/utils/calendar/externalDisplay';
+import type { ExternalEvent } from '@/types/externalEvents';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { firstName, formatNameList, listAssignees, normalizeAssignees } from '@/utils/assignees';
 import { firstWord } from '@/utils/firstWord';
@@ -162,6 +164,12 @@ export interface WidgetSnapshotInput extends Pick<
    * model (`beanChoreDay`) at `now`.
    */
   chores?: WidgetChoreInput | null;
+  /**
+   * View-only external events from the calendars whose "include in home-screen widgets"
+   * switch is on (`calendarViewStore.widgetEvents`; busy-only events already have no title or
+   * location). Absent or empty changes nothing. Family audience only (`showsExternal`).
+   */
+  externalEvents?: readonly ExternalEvent[];
 }
 
 /** What the chore rows read: the store's chores and marks, the block hours, who can have chores. */
@@ -219,6 +227,8 @@ interface AudienceRules {
   tripsForViewerOnly: boolean;
   /** Whether "coming up" counts down only the viewer's own birthday (the child view). */
   birthdaysForViewerOnly: boolean;
+  /** Whether view-only external calendar rows are listed (the family view only). */
+  showsExternal: boolean;
 }
 
 /**
@@ -240,6 +250,7 @@ const AUDIENCE_RULES: Readonly<Record<AudienceKey, AudienceRules>> = Object.free
     // Every family trip, whoever is going. The row names who is going.
     tripsForViewerOnly: false,
     birthdaysForViewerOnly: false,
+    showsExternal: true,
   },
   // A child session: the child's own rows only; no to-dos, no hints.
   child: {
@@ -250,6 +261,8 @@ const AUDIENCE_RULES: Readonly<Record<AudienceKey, AudienceRules>> = Object.free
     dueNamesViewer: false,
     tripsForViewerOnly: true,
     birthdaysForViewerOnly: true,
+    // A child sees only their own rows; an external calendar is the family's, not theirs.
+    showsExternal: false,
   },
 });
 
@@ -671,6 +684,59 @@ function birthdayRows(ctx: DayContext): WidgetRow[] {
       link: widgetLink(ctx.origin, entityDeepLink('member', b.memberId)),
     };
   });
+}
+
+/**
+ * View-only external calendar rows for one day (plan 2026-11-17, C7): the EXISTING `'event'`
+ * kind, `dot: null` (the native readers treat it as optional) and `mine: false`, titled
+ * "{title} · {calendar}" ("Busy" for a busy-only event, which has no title to leak).
+ *
+ * THIS IS THE ONE PATH THAT WRITES EXTERNAL EVENT CONTENT OUTSIDE MEMORY: the rows end up in
+ * the on-device widget snapshot file the native widgets read (ADR-042). It is opt-in per
+ * calendar (`inWidgets`, enforced upstream by `widgetEvents`), device-local, and never reaches
+ * the family file or a server. See docs/adr/048-view-only-external-calendars.md.
+ */
+function externalRows(ctx: DayContext): WidgetRow[] {
+  const events = ctx.input.externalEvents;
+  if (!ctx.rules.showsExternal || !events?.length) return [];
+  const { t } = ctx.input;
+  const dayStart = parseLocalDate(ctx.ymd).getTime();
+  const rows: WidgetRow[] = [];
+  for (const ev of events) {
+    if (ev.startYmd > ctx.ymd || ev.endYmd < ctx.ymd) continue;
+    const w = ev.allDay ? null : externalWindowOn(ev, ctx.ymd);
+    const title = fillTemplate(t('calendarView.widget.title'), {
+      title: externalEventTitle(ev, t),
+      calendar: ev.calendarName,
+    });
+    rows.push({
+      // Position, not the event's id: the file holds nothing that names the event.
+      id: `external:${ctx.ymd}:${rows.length}`,
+      kind: 'event',
+      todayOnly: false,
+      time: w ? formatTime12(w.startTime) : '',
+      // A multi-day timed event is drawn from midnight on a later day, as the planner does.
+      startsAt: w ? Math.max(ev.startMs, dayStart) : null,
+      endsAt: w ? ev.endMs : null,
+      title,
+      who: '',
+      ...rowWords(ctx, title, []),
+      dot: null,
+      mine: false,
+      isDone: false,
+      handoff: null,
+      link: widgetLink(ctx.origin, plannerDayLink(ctx.ymd)),
+    });
+  }
+  return rows;
+}
+
+/** Timed rows by start, then untimed, ties keeping their order (the calendar's order). */
+function mergeByTime(rows: WidgetRow[]): WidgetRow[] {
+  const timed = rows.filter((r) => r.startsAt !== null);
+  const untimed = rows.filter((r) => r.startsAt === null);
+  timed.sort((a, b) => (a.startsAt as number) - (b.startsAt as number));
+  return [...timed, ...untimed];
 }
 
 const tripsPart: DayPart = {
@@ -1142,7 +1208,20 @@ function buildWidgetDay(
     }
   }
   // The calendar: trips, then birthdays, then the day's events (timed, then untimed).
-  day.rows = [...ctx.tripRows, ...ctx.birthdayRows, ...ctx.entries.map((e) => e.row)];
+  let eventRows = ctx.entries.map((e) => e.row);
+  // External rows join the day's events and sort with them by time. Isolated like a part:
+  // a malformed event drops its rows, never the widget.
+  try {
+    const external = externalRows(ctx);
+    if (external.length > 0) eventRows = mergeByTime([...eventRows, ...external]);
+  } catch (err) {
+    skipped++;
+    console.warn(
+      `[buildWidgetSnapshot] dropped 'external' for ${audience} (malformed event):`,
+      err
+    );
+  }
+  day.rows = [...ctx.tripRows, ...ctx.birthdayRows, ...eventRows];
   day.thingsText = thingsText(ctx, day.rows.length);
   day.ownThingsText = thingsText(ctx, day.rows.filter((r) => r.mine).length);
   return { day, skipped };

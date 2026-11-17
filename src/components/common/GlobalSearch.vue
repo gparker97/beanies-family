@@ -18,10 +18,20 @@ import { isHint } from '@/utils/helpfulHints';
 import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience } from '@/utils/audience';
 import { getTransactionVisual } from '@/utils/transactionLabel';
-import { entityDeepLink } from '@/utils/entityDeepLink';
+import { entityDeepLink, plannerDayLink } from '@/utils/entityDeepLink';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { externalEventTitle } from '@/utils/calendar/externalDisplay';
 
 type ResultType =
-  'activity' | 'vacation' | 'todo' | 'account' | 'transaction' | 'goal' | 'asset' | 'member';
+  | 'activity'
+  | 'vacation'
+  | 'todo'
+  | 'account'
+  | 'transaction'
+  | 'goal'
+  | 'asset'
+  | 'member'
+  | 'externalEvent';
 
 interface Props {
   open: boolean;
@@ -40,6 +50,7 @@ const transactionsStore = useTransactionsStore();
 const goalsStore = useGoalsStore();
 const assetsStore = useAssetsStore();
 const familyStore = useFamilyStore();
+const externalEvents = useExternalEvents();
 
 const query = ref('');
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -67,6 +78,8 @@ interface SearchResult {
   subtitle?: string;
   icon: string;
   color?: string;
+  /** `externalEvent` only: the day its planner view opens on. */
+  ymd?: string;
 }
 
 function matches(q: string, ...fields: (string | undefined | null)[]): boolean {
@@ -233,6 +246,27 @@ const results = computed<SearchResult[]>(() => {
     }
   }
 
+  // View-only events: whatever is loaded in memory (the standing window plus the planner's
+  // screen window). Match the title (a busy-only event has none) or the calendar's name.
+  // Pushed last, so the 25-row cap drops them before any family result.
+  for (const ev of externalEvents.events.value) {
+    if (matches(q, ev.busyOnly ? undefined : ev.title, ev.calendarName)) {
+      all.push({
+        id: `${ev.viewedCalendarId}:${ev.id}`,
+        type: 'externalEvent',
+        title: externalEventTitle(ev, t),
+        subtitle: fillTemplate(t('calendarView.search.subtitle'), {
+          date: formatDateShort(ev.startYmd),
+          calendar: ev.calendarName,
+          marker: t('calendarView.event.viewOnly'),
+        }),
+        icon: '👁️',
+        color: ev.color,
+        ymd: ev.startYmd,
+      });
+    }
+  }
+
   return all.slice(0, 25);
 });
 
@@ -245,6 +279,7 @@ const groupOrder: { type: ResultType; labelKey: string }[] = [
   { type: 'goal', labelKey: 'search.goals' },
   { type: 'asset', labelKey: 'search.assets' },
   { type: 'member', labelKey: 'search.members' },
+  { type: 'externalEvent', labelKey: 'calendarView.search.group' },
 ];
 
 const groupedResults = computed(() => {
@@ -260,6 +295,12 @@ const groupedResults = computed(() => {
 
 function selectResult(result: SearchResult) {
   emit('close');
+  if (result.type === 'externalEvent') {
+    // Event ids live only in memory, so there is nothing to deep-link to: open the planner's
+    // day view on the event's date. (No `ENTITY_DEEP_LINKS` row: the native manifest lists it.)
+    router.push(plannerDayLink(result.ymd));
+    return;
+  }
   // Path/query map shared with notification "Open" — see utils/entityDeepLink.
   router.push(entityDeepLink(result.type, result.id));
 }

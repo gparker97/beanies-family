@@ -25,6 +25,8 @@ import {
 } from '@/utils/calendar/occurrence';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import type { FamilyActivity } from '@/types/models';
+import type { ExternalEvent } from '@/types/externalEvents';
+import { externalWindowOn } from '@/utils/calendar/externalDisplay';
 import { logEvent } from '@/services/telemetry/logEvent';
 
 // ── Day Navigation ─────────────────────────────────────────────────────────
@@ -145,10 +147,11 @@ const MIN_CARD_MINUTES = (MIN_CARD_HEIGHT * 60) / ROW_HEIGHT;
 
 const SURFACE = 'planner-time-grid';
 
-interface TimedFields {
+/** What every card on a planner time grid carries: the window it is DRAWN in. */
+export interface TimedFields {
   startTime?: string;
   endTime?: string;
-  /** An overnight event's next-morning tail (set by `timedCards`). */
+  /** An overnight event's next-morning tail (set by `timedCards` / `externalCards`). */
   isTail?: boolean;
 }
 
@@ -336,6 +339,40 @@ export function timedCards(occurrences: readonly ActivityOccurrence[]): TimedCar
 }
 
 /**
+ * One timed VIEW-ONLY external event on a planner grid (plan 2026-11-17): the part of it
+ * drawn on one day, clamped there exactly as `timedCards` clamps an overnight activity
+ * (the start day draws to midnight, each following day from 00:00). Carries no activity,
+ * so nothing that edits, drags or resizes activities can take it.
+ */
+export interface ExternalCard extends TimedFields {
+  startTime: string;
+  endTime: string;
+  isTail: boolean;
+  /** Unique within a day, and never equal to an activity card's key. */
+  key: string;
+  external: ExternalEvent;
+}
+
+/** A day's timed view-only events as grid cards (all-day ones are dropped). */
+export function externalCards(events: readonly ExternalEvent[], ymd: string): ExternalCard[] {
+  return events
+    .filter((e) => !e.allDay)
+    .map((e) => ({
+      ...externalWindowOn(e, ymd),
+      key: `external:${e.viewedCalendarId}:${e.id}:${ymd}`,
+      external: e,
+    }));
+}
+
+/** Either kind of card a planner grid draws. */
+export type PlannerCard = TimedCard | ExternalCard;
+
+/** Narrow a grid card to the view-only kind (it is the one carrying `external`). */
+export function isExternalCard(card: PlannerCard): card is ExternalCard {
+  return 'external' in card;
+}
+
+/**
  * Group items into clusters that must share a column side by side.
  *
  * Built on the shared sweep (`clusterOverlapping`, `calendar/timeSpans.ts`, which
@@ -361,4 +398,35 @@ export function groupOverlapping<T extends TimedFields>(items: T[]): T[][] {
   }
   const groups = clusterOverlapping(parsed).map((c) => c.map((p) => p.item));
   return unreadable.length ? [...groups, unreadable] : groups;
+}
+
+/**
+ * Greedy lanes inside ONE overlap cluster (from `groupOverlapping`): each card takes the
+ * first lane free at its start, so a card that ends before another starts reuses its
+ * lane. Generic over the card kind, so an activity and a view-only event that overlap get
+ * two lanes and sit side by side. Uses the RENDERED extent (`plannerExtent`), the same
+ * one the clusters were built from; an unreadable start sits at the top with an end of
+ * Infinity, so each such card gets its own lane and is never dropped.
+ *
+ * Returns each card's lane (in input order) and the cluster's lane count.
+ */
+export function assignLanes<T extends TimedFields>(
+  cluster: readonly T[]
+): { lanes: number[]; laneCount: number } {
+  const laneEnd: number[] = []; // minute offset when each lane becomes free
+  const lanes: number[] = [];
+  for (const card of cluster) {
+    const extent = plannerExtent(card);
+    const start = extent?.start ?? 0;
+    const end = extent?.end ?? Number.POSITIVE_INFINITY;
+    let placed = laneEnd.findIndex((free) => free <= start);
+    if (placed === -1) {
+      laneEnd.push(end);
+      placed = laneEnd.length - 1;
+    } else {
+      laneEnd[placed] = end;
+    }
+    lanes.push(placed);
+  }
+  return { lanes, laneCount: laneEnd.length };
 }

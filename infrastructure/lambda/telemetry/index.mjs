@@ -56,6 +56,7 @@ export const SLACK_ESCALATE_SURFACES = new Set([
   'cache-replay', // cache replay dropped increments: unsynced local edits may be lost
   'calendar-import', // calendar import failed to save
   'calendar-sync', // calendar sync failed for a non-auth reason (auth class stays at error)
+  'calendar-view', // a view-only calendar add, remove or settings change failed to save
   'change-password', // credential rotation half-applied: possible lockout
   'chore-stars', // turning stars off could not record the week first: the turn-off was refused
   'createPod.adoptExisting', // adopting an existing pod during create failed

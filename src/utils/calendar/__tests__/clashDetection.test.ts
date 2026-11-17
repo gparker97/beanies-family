@@ -8,7 +8,7 @@ import {
   clashKey,
   overlapAckKey,
   type ActivityOccurrence,
-  type ConnectionBusy,
+  type BusySource,
 } from '../clashDetection';
 import type { EventTime } from '@/services/calendar/CalendarClient';
 
@@ -92,17 +92,19 @@ describe('computeClashes', () => {
   it('flags an overlapping timed occurrence, keyed via clashKey, naming the connection', () => {
     const date = '2026-06-10';
     const occurrences = [occ('a1', date, '14:00', '15:00')];
-    const busy: ConnectionBusy[] = [
+    const busy: BusySource[] = [
       {
-        connectionId: 'conn-1',
-        calendarLabel: 'mum@example.com',
+        sourceId: 'conn-1',
+        source: 'own',
+        sourceName: 'mum@example.com',
         intervals: [{ startMs: localMs(date, '14:30'), endMs: localMs(date, '16:00') }],
       },
     ];
     const clashes = computeClashes(occurrences, busy);
     expect(clashes.get(clashKey('a1', date))).toEqual({
-      connectionId: 'conn-1',
-      calendarLabel: 'mum@example.com',
+      sourceId: 'conn-1',
+      source: 'own',
+      sourceName: 'mum@example.com',
       activityId: 'a1',
       occurrenceDate: date,
       fingerprint: `${localMs(date, '14:00')}-${localMs(date, '15:00')}`,
@@ -113,17 +115,19 @@ describe('computeClashes', () => {
     // Activity 14:00–15:00 local. Busy block expressed in absolute ms that covers
     // the SAME instant as the local 14:30, regardless of the host timezone.
     const date = '2026-06-10';
-    const busy: ConnectionBusy[] = [
+    const busy: BusySource[] = [
       {
-        connectionId: 'conn-1',
-        calendarLabel: 'work',
+        sourceId: 'conn-1',
+        source: 'own',
+        sourceName: 'work',
         intervals: [{ startMs: localMs(date, '14:30'), endMs: localMs(date, '16:00') }],
       },
     ];
     const clashes = computeClashes([occ('a1', date, '14:00', '15:00')], busy);
     expect(clashes.get(clashKey('a1', date))).toEqual({
-      connectionId: 'conn-1',
-      calendarLabel: 'work',
+      sourceId: 'conn-1',
+      source: 'own',
+      sourceName: 'work',
       activityId: 'a1',
       occurrenceDate: date,
       fingerprint: `${localMs(date, '14:00')}-${localMs(date, '15:00')}`,
@@ -132,10 +136,11 @@ describe('computeClashes', () => {
 
   it('does not flag an adjacent-but-not-overlapping busy block', () => {
     const date = '2026-06-10';
-    const busy: ConnectionBusy[] = [
+    const busy: BusySource[] = [
       {
-        connectionId: 'conn-1',
-        calendarLabel: 'work',
+        sourceId: 'conn-1',
+        source: 'own',
+        sourceName: 'work',
         intervals: [{ startMs: localMs(date, '15:00'), endMs: localMs(date, '16:00') }],
       },
     ];
@@ -150,10 +155,11 @@ describe('computeClashes', () => {
       startTime: '22:00',
       endTime: '01:00',
     });
-    const busy: ConnectionBusy[] = [
+    const busy: BusySource[] = [
       {
-        connectionId: 'conn-1',
-        calendarLabel: 'work',
+        sourceId: 'conn-1',
+        source: 'own',
+        sourceName: 'work',
         // Busy on the NEXT evening: only a (wrong) 22:00 reading of the tail hits it.
         intervals: [
           { startMs: localMs('2026-06-11', '22:30'), endMs: localMs('2026-06-11', '23:00') },
@@ -177,10 +183,11 @@ describe('computeClashes', () => {
       startTime: '22:00',
       endTime: '01:00',
     });
-    const busy: ConnectionBusy[] = [
+    const busy: BusySource[] = [
       {
-        connectionId: 'conn-1',
-        calendarLabel: 'work',
+        sourceId: 'conn-1',
+        source: 'own',
+        sourceName: 'work',
         intervals: [
           { startMs: localMs('2026-06-11', '00:30'), endMs: localMs('2026-06-11', '00:45') },
         ],
@@ -197,16 +204,56 @@ describe('computeClashes', () => {
     const occurrences: ActivityOccurrence[] = [
       { activity: makeActivity({ id: 'a1', isAllDay: true }), date: '2026-06-10' },
     ];
-    const busy: ConnectionBusy[] = [
+    const busy: BusySource[] = [
       {
-        connectionId: 'conn-1',
-        calendarLabel: 'work',
+        sourceId: 'conn-1',
+        source: 'own',
+        sourceName: 'work',
         intervals: [
           { startMs: localMs('2026-06-10', '00:00'), endMs: localMs('2026-06-11', '00:00') },
         ],
       },
     ];
     expect(computeClashes(occurrences, busy).size).toBe(0);
+  });
+
+  it('names a viewed-calendar source by its calendar name', () => {
+    const date = '2026-06-10';
+    const busy: BusySource[] = [
+      {
+        sourceId: 'vc-1',
+        source: 'viewed',
+        sourceName: "Grandma's",
+        intervals: [{ startMs: localMs(date, '14:30'), endMs: localMs(date, '16:00') }],
+      },
+    ];
+    expect(
+      computeClashes([occ('a1', date, '14:00', '15:00')], busy).get(clashKey('a1', date))
+    ).toMatchObject({ sourceId: 'vc-1', source: 'viewed', sourceName: "Grandma's" });
+  });
+
+  it('first source wins: an own connection listed first beats an overlapping viewed calendar', () => {
+    const date = '2026-06-10';
+    const block = [{ startMs: localMs(date, '14:30'), endMs: localMs(date, '16:00') }];
+    const own: BusySource = {
+      sourceId: 'conn-1',
+      source: 'own',
+      sourceName: 'mum@example.com',
+      intervals: block,
+    };
+    const viewed: BusySource = {
+      sourceId: 'vc-1',
+      source: 'viewed',
+      sourceName: "Grandma's",
+      intervals: block,
+    };
+    const occurrences = [occ('a1', date, '14:00', '15:00')];
+    expect(computeClashes(occurrences, [own, viewed]).get(clashKey('a1', date))?.sourceId).toBe(
+      'conn-1'
+    );
+    expect(computeClashes(occurrences, [viewed, own]).get(clashKey('a1', date))?.sourceId).toBe(
+      'vc-1'
+    );
   });
 });
 
@@ -256,5 +303,17 @@ describe('overlapAckKey', () => {
     // Exact string so a silent argument transposition fails CI rather than
     // corrupting acknowledge keys at runtime.
     expect(overlapAckKey('act', '2026-06-11', 'conn')).toBe('act:2026-06-11:conn');
+  });
+
+  it('PERSISTED FORMAT: a key written before the sourceId rename is byte-identical', () => {
+    // Acknowledgements already in families' files were stored under this exact
+    // string. Any change here re-raises every quieted overlap.
+    expect(overlapAckKey('3f2a9c1e-0b7d-4e55-9a1f-2c6b8d0e4f11', '2026-11-17', 'c-7b1e2d9a')).toBe(
+      '3f2a9c1e-0b7d-4e55-9a1f-2c6b8d0e4f11:2026-11-17:c-7b1e2d9a'
+    );
+  });
+
+  it('a viewed calendar id takes the same third slot', () => {
+    expect(overlapAckKey('act', '2026-06-11', 'vc-1')).toBe('act:2026-06-11:vc-1');
   });
 });

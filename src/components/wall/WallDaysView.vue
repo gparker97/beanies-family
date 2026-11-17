@@ -29,6 +29,8 @@ import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import { wallExternalItems } from '@/utils/wallExternalEvents';
 import type { FamilyActivity } from '@/types/models';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
@@ -93,6 +95,8 @@ const emit = defineEmits<{
 
 const activityStore = useActivityStore();
 const { identityFor } = useActivityIdentity();
+/** Read only: the page sets the fetch window (plan 2026-11-17, C4). */
+const externalEvents = useExternalEvents();
 
 /**
  * As many days as fit at a READABLE width; the rest go to the strip below.
@@ -131,12 +135,27 @@ function eventsFor(ymd: string) {
   return eventsByDay.value.get(ymd) ?? [];
 }
 
+/**
+ * Each visible day's timed view-only events. They belong to no member, so the person
+ * filter leaves them in place, as it leaves a family-wide activity. Empty unless a
+ * calendar is viewed.
+ */
+const externalsByDay = computed(() => {
+  const map = new Map<string, ReturnType<typeof wallExternalItems>>();
+  if (!externalEvents.isActive.value) return map;
+  for (const ymd of visible.value) {
+    map.set(ymd, wallExternalItems(externalEvents.timedForDate(ymd), ymd));
+  }
+  return map;
+});
+
 const gridColumns = computed(() =>
   visible.value.map((ymd) => ({
     key: ymd,
     // Timed only — the all-day items go to the band, via `wallDayAllDay`. All
     // three views pass the same shape, so the grid's contract does not vary.
     occurrences: eventsFor(ymd).filter((e) => !isAllDayActivity(e.activity)),
+    externals: externalsByDay.value.get(ymd) ?? [],
     isToday: ymd === props.todayYmd,
   }))
 );
@@ -179,7 +198,14 @@ const allDaySpans = computed(() => {
 const showsToday = computed(() => visible.value.includes(props.todayYmd));
 
 /** Content-derived, never layout-derived — see `wallPeripheralVariant`. */
-const busiest = computed(() => Math.max(0, ...visible.value.map((ymd) => eventsFor(ymd).length)));
+const busiest = computed(() =>
+  Math.max(
+    0,
+    ...visible.value.map(
+      (ymd) => eventsFor(ymd).length + (externalsByDay.value.get(ymd)?.length ?? 0)
+    )
+  )
+);
 
 /** The rest-of-week strip still needs a colour per pip. */
 function colourFor(activity: FamilyActivity) {

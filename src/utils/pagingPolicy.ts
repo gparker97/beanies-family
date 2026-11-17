@@ -230,6 +230,10 @@ export const PAGING_SURFACES = {
     impact: 'journey-blocked',
     why: 'calendar reconcile failed past the sustained threshold for a non-auth reason',
   },
+  'calendar-view': {
+    impact: 'journey-blocked',
+    why: 'adding, removing or changing a view-only calendar could not be saved',
+  },
   'feedback-submit': {
     impact: 'data-at-risk',
     why: 'this build has no feedback webhook: every submission is discarded',

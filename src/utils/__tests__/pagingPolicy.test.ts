@@ -67,6 +67,7 @@ describe('PAGING_SURFACES', () => {
         "recurring-processor",
         "quick-add-composer",
         "calendar-sync",
+        "calendar-view",
         "feedback-submit",
         "billing-ui",
         "review-demo",

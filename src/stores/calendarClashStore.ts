@@ -4,6 +4,10 @@
 // TIMES (via the field-masked events.list seam — never event content) on the
 // connected calendars over the visible planner window, excludes beanies' OWN synced
 // events, and decorates beanies activities that overlap an external commitment.
+// View-only calendars (plan 2026-11-17 A5) are further busy sources: their times
+// come from calendarViewStore's already-fetched events, never a second request.
+// Dependency direction: this store imports the sync and view stores; neither of
+// them imports this store or each other.
 // Privacy-preserving — times only, never titles/notes/location/attendees. Writes
 // NOTHING to any calendar.
 //
@@ -30,20 +34,20 @@ import {
   externalBusyIntervals,
   clashKey,
   type ActivityOccurrence,
+  type BusySource,
   type ClashInfo,
-  type ConnectionBusy,
 } from '@/utils/calendar/clashDetection';
-import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
+import { beaniesEventIds } from '@/utils/calendar/beaniesEventIds';
+import { CLASH_BUSY_TTL_MS, MAX_INFLIGHT } from '@/utils/calendar/limits';
+import { isDocLoaded } from '@/services/automerge/docService';
+import { list as projectionList } from '@/services/automerge/projection';
 import type { EventTime } from '@/services/calendar/CalendarClient';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
+import { useCalendarViewStore } from '@/stores/calendarViewStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { CalendarConnection } from '@/types/models';
 
 const FLAG = 'calendarClashNudge';
-/** Event times are re-read at most once per (connection, window) per this TTL. */
-const CLASH_BUSY_TTL_MS = 300_000; // 5 min
-/** Bounded concurrency over connections. */
-const MAX_INFLIGHT = 5;
 
 interface BusyCacheEntry {
   windowKey: string;
@@ -54,17 +58,39 @@ interface BusyCacheEntry {
   fetchedAt: number;
 }
 
+/** The window + occurrences of the latest `ensureBusyForWindow` call, kept so a
+ *  change in view events can recompute without a fetch. */
+interface LastRequest {
+  windowKey: string;
+  occurrences: ActivityOccurrence[];
+}
+
+/** The Google calendar ids a connection pushes to. `'primary'` (the default) is
+ *  the account's own calendar, whose Google id is the account email. Lowercased:
+ *  an email-shaped id compares case-insensitively. */
+function destinationIdsOf(connection: CalendarConnection): string[] {
+  const dest = connection.destinationCalendarId || 'primary';
+  const ids = [dest.toLowerCase()];
+  if (dest === 'primary' && connection.accountEmail)
+    ids.push(connection.accountEmail.toLowerCase());
+  return ids;
+}
+
 export const useCalendarClashStore = defineStore('calendarClash', () => {
   const syncStore = useCalendarSyncStore();
+  const viewStore = useCalendarViewStore();
   const settingsStore = useSettingsStore();
 
   // ── Ephemeral state (store-scoped; cleared in one place by stop()) ──────────
-  /** connectionId → busy intervals for a window. In-memory only, never persisted. */
+  /** connection id → busy intervals for a window. In-memory only, never persisted.
+   *  Viewed calendars are not cached here: their events live in calendarViewStore. */
   const busyCache = new Map<string, BusyCacheEntry>();
   /** activity-occurrence key → clash. Recomputed by REASSIGNMENT (reactivity). */
   const clashes = ref<Map<string, ClashInfo>>(new Map());
   /** The window a fetch is currently running for — short-circuits duplicate fetches. */
   let inFlightWindowKey: string | null = null;
+  /** The planner's latest window, for the view-events recompute. */
+  let lastRequest: LastRequest | null = null;
 
   /** All connected calendars. Every stored connection holds `events.owned`
    *  (#32 REQUIRED_SCOPE), so every connection is readable — no partial-grant
@@ -76,10 +102,12 @@ export const useCalendarClashStore = defineStore('calendarClash', () => {
   const hasConnectedCalendar = computed(() => syncStore.connections.length > 0);
 
   /** Feature is live only when the flag + the user toggle are on AND at least one
-   *  calendar is connected. */
+   *  calendar is connected or viewed. */
   const isAvailable = computed(
     () =>
-      isFlagEnabled(FLAG) && settingsStore.calendarClashNudgeEnabled && hasConnectedCalendar.value
+      isFlagEnabled(FLAG) &&
+      settingsStore.calendarClashNudgeEnabled &&
+      (hasConnectedCalendar.value || viewStore.isActive)
   );
 
   function windowKeyOf(timeMinIso: string, timeMaxIso: string): string {
@@ -130,34 +158,71 @@ export const useCalendarClashStore = defineStore('calendarClash', () => {
   ): void {
     // `deterministicEventId` THROWS on a blank/corrupt activity id. recompute runs
     // from a fire-and-forget `void ensureBusyForWindow(...)`, so an uncaught throw
-    // would become a silent unhandled rejection — guard each call: report once and
-    // skip that occurrence from the self-exclusion set rather than aborting the pass.
-    const beanieEventIds = new Set<string>();
-    for (const o of occurrences) {
-      try {
-        beanieEventIds.add(deterministicEventId(o.activity.id));
-      } catch (e) {
+    // would become a silent unhandled rejection. `beaniesEventIds` skips that
+    // occurrence from the self-exclusion set and hands it here to be reported,
+    // rather than aborting the pass. The links add adopted and imported events,
+    // whose Google ids are not derived from the activity id.
+    const beanieEventIds = beaniesEventIds(
+      occurrences.map((o) => o.activity.id),
+      isDocLoaded() ? projectionList('calendarEventLinks') : [],
+      (activityId, e) =>
         reportError({
           surface: 'calendar-clash',
           message:
             '[calendarClash] could not derive event id for occurrence; skipping it from the self-exclusion set',
           error: e,
           severity: 'warning',
-          context: { activity_id: o.activity.id },
-        });
-      }
-    }
+          context: { activity_id: activityId },
+        })
+    );
 
-    const busyByConnection: ConnectionBusy[] = connections.map((connection) => {
+    // Source order is fixed because computeClashes is first-source-wins:
+    // connections first (their existing order), then viewed calendars.
+    const ownSources: BusySource[] = connections.map((connection) => {
       const entry = busyCache.get(connection.id);
       const events = entry && entry.windowKey === windowKey ? entry.events : [];
       return {
-        connectionId: connection.id,
-        calendarLabel: connection.accountEmail,
+        sourceId: connection.id,
+        source: 'own',
+        sourceName: connection.accountEmail,
         intervals: externalBusyIntervals(events, beanieEventIds),
       };
     });
-    clashes.value = computeClashes(occurrences, busyByConnection);
+    clashes.value = computeClashes(occurrences, [
+      ...ownSources,
+      ...viewedSources(connections, beanieEventIds),
+    ]);
+  }
+
+  /**
+   * One busy source per viewed calendar, in `createdAt` order (the view store's
+   * `calendars` order). Times come from the view store's in-memory events, which
+   * cover the planner window (screen window widened by a period each side), so no
+   * request is made here. A viewed calendar that IS a connection's destination is
+   * skipped: it is already a source, and counting it twice would quiet it under a
+   * second acknowledgement key. Transparent ("free") and beanies-owned events are
+   * dropped exactly as for a connection.
+   */
+  function viewedSources(
+    connections: CalendarConnection[],
+    beanieEventIds: ReadonlySet<string>
+  ): BusySource[] {
+    if (!viewStore.isActive) return [];
+    const destinations = new Set(connections.flatMap(destinationIdsOf));
+    const eventsByCalendar = new Map<string, EventTime[]>();
+    for (const e of viewStore.events) {
+      const list = eventsByCalendar.get(e.viewedCalendarId);
+      if (list) list.push(e);
+      else eventsByCalendar.set(e.viewedCalendarId, [e]);
+    }
+    return viewStore.calendars
+      .filter((cal) => !destinations.has(cal.calendarId.toLowerCase()))
+      .map((cal) => ({
+        sourceId: cal.id,
+        source: 'viewed' as const,
+        sourceName: cal.name,
+        intervals: externalBusyIntervals(eventsByCalendar.get(cal.id) ?? [], beanieEventIds),
+      }));
   }
 
   /**
@@ -177,6 +242,7 @@ export const useCalendarClashStore = defineStore('calendarClash', () => {
       return;
     }
     const windowKey = windowKeyOf(timeMinIso, timeMaxIso);
+    lastRequest = { windowKey, occurrences };
     // A fetch for this exact window is already running → don't duplicate it.
     if (inFlightWindowKey === windowKey) return;
 
@@ -212,10 +278,24 @@ export const useCalendarClashStore = defineStore('calendarClash', () => {
     if (!avail && clashes.value.size > 0) clashes.value = new Map();
   });
 
+  // View events land on their own schedule (window debounce, TTL poll, return to
+  // the app). Recompute purely from the caches for the latest window. NOT through
+  // ensureBusyForWindow: it returns early while the same window is in flight and
+  // would drop this update. A connection whose fetch is still running reads as
+  // empty here; that fetch's own recompute fills it in when it lands.
+  watch(
+    () => viewStore.events,
+    () => {
+      if (!isAvailable.value || !lastRequest) return;
+      recompute(connectedCalendars(), lastRequest.windowKey, lastRequest.occurrences);
+    }
+  );
+
   /** Tear down all ephemeral state on sign-out / family-switch. */
   function stop(): void {
     busyCache.clear();
     inFlightWindowKey = null;
+    lastRequest = null;
     if (clashes.value.size > 0) clashes.value = new Map();
   }
 

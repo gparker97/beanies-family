@@ -169,11 +169,20 @@ describe('uiStrings', () => {
       'statementImport.',
       'calendarImport.',
       'calendarSync.reconnect.',
+      // The add step: a Google consent and the choice of which calendar receives
+      // the family's activities.
+      'calendarSync.connect.',
       // Connection loss, told to someone who may not be able to fix it — they need
       // the real nouns to know who to go to.
       'reconnectPrompt.',
       'calendarSync.disconnect.',
       'calendarSync.toast.',
+      // View-only calendars (plan 2026-11-17): lost sharing, a dead sign-in and failed
+      // saves. "bean" must never stand in for the calendar or the Google account.
+      'calendarView.toast.',
+      // The view-only calendar's card (lost sharing, a dead sign-in) and its disconnect confirm.
+      'calendarView.card.',
+      'calendarView.disconnect.',
       'confirm.',
       'transferOwnership.',
       'permissions.',

@@ -10,8 +10,14 @@ import {
   useTimeGrid,
   groupOverlapping,
   timedCards,
-  type TimedCard,
+  externalCards,
+  isExternalCard,
+  type PlannerCard,
 } from '@/composables/useCalendarNavigation';
+import { useExternalEvents } from '@/composables/useExternalEvents';
+import type { ExternalEvent } from '@/types/externalEvents';
+import ExternalChip from '@/components/planner/ExternalChip.vue';
+import ExternalTimedBlock from '@/components/planner/ExternalTimedBlock.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useCalendarDrag } from '@/composables/useCalendarDrag';
@@ -42,6 +48,7 @@ import HolidayChip from '@/components/planner/HolidayChip.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useDayExtras } from '@/composables/useDayExtras';
+import { externalExtras } from '@/utils/calendarDay';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import { useClashLookup } from '@/composables/useClash';
 import WeekStripNav, {
@@ -73,6 +80,8 @@ const emit = defineEmits<{
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
   'holiday-click': [holiday: HolidayOccurrence];
+  /** A view-only external event was tapped; the page opens its read-only details. */
+  'external-click': [event: ExternalEvent];
   /** Swipe navigation — the page advances the shared reference date. */
   prev: [];
   next: [];
@@ -198,6 +207,16 @@ function birthdaysForDay(dateStr: string) {
     .map((e) => e.birthday!);
 }
 
+/**
+ * All-day view-only external events on one day, from the same shared query (a
+ * multi-day one is listed on each of its days). The timed ones come straight from the
+ * read-only selector; this view never sets the fetch window (the page does).
+ */
+function externalsForDay(dateStr: string): ExternalEvent[] {
+  return externalExtras(extrasByDate.value.get(dateStr));
+}
+const { timedForDate: externalTimedFor } = useExternalEvents();
+
 // ── Data ────────────────────────────────────────────────────────────────────
 
 /** The shared occurrence shape (`calendar/occurrence.ts`). */
@@ -265,10 +284,16 @@ function getUntimedSegmentsForDay(dateStr: string): TravelSegmentOccurrence[] {
 // Keeps `useTimeGrid` agnostic to segment shape; the composable just sees a
 // list of `{ startTime, endTime }` entries and auto-extends its hour range
 // to fit (so a 22:00 flight expands the grid past the 7am-7pm default).
-/** Each day's timed cards, built once for both the time range and the grid. */
+/**
+ * Each day's timed cards, built once for both the time range and the grid: the
+ * activities AND the timed view-only events, in one list, so `groupOverlapping` puts an
+ * activity and an external event that overlap side by side.
+ */
 const cardsByDay = computed(() => {
-  const map = new Map<string, TimedCard[]>();
-  for (const [date, occs] of weekActivities.value) map.set(date, timedCards(occs));
+  const map = new Map<string, PlannerCard[]>();
+  for (const [date, occs] of weekActivities.value) {
+    map.set(date, [...timedCards(occs), ...externalCards(externalTimedFor(date), date)]);
+  }
   return map;
 });
 
@@ -444,6 +469,7 @@ function hasUntimedContent(dateStr: string): boolean {
   return (
     holidayForDay(dateStr) !== undefined ||
     birthdaysForDay(dateStr).length > 0 ||
+    externalsForDay(dateStr).length > 0 ||
     getUntimedForDay(dateStr).length > 0 ||
     (weekTodos.value.get(dateStr)?.length ?? 0) > 0 ||
     getUntimedSegmentsForDay(dateStr).length > 0 ||
@@ -862,6 +888,7 @@ function onStripDayClick(dateStr: string) {
             v-if="
               holidayForDay(day.dateStr) ||
               birthdaysForDay(day.dateStr).length > 0 ||
+              externalsForDay(day.dateStr).length > 0 ||
               getUntimedForDay(day.dateStr).length > 0 ||
               (weekTodos.get(day.dateStr)?.length ?? 0) > 0 ||
               getUntimedSegmentsForDay(day.dateStr).length > 0
@@ -883,6 +910,14 @@ function onStripDayClick(dateStr: string) {
               :is-end="true"
               class="mb-0.5 block w-full"
               @click="emit('holiday-click', holidayForDay(day.dateStr)!)"
+            />
+            <ExternalChip
+              v-for="e in externalsForDay(day.dateStr)"
+              :key="'ext-' + e.viewedCalendarId + '-' + e.id"
+              :event="e"
+              :date="day.dateStr"
+              class="mb-0.5"
+              @open="(ev) => emit('external-click', ev)"
             />
             <AllDayActivityChip
               v-for="occ in getUntimedForDay(day.dateStr)"
@@ -969,25 +1004,39 @@ function onStripDayClick(dateStr: string) {
               v-for="(group, gi) in groupOverlapping(cardsByDay.get(day.dateStr) ?? [])"
               :key="gi"
             >
-              <PlannerTimedBlock
-                v-for="({ activity, startTime, endTime, eventDate, key, isTail }, ai) in group"
-                :key="key"
-                :activity="activity"
-                :event-date="eventDate"
-                :start-time="startTime!"
-                :end-time="endTime"
-                :lane-index="ai"
-                :lane-count="group.length"
-                :identity="identityFor(activity)"
-                :get-position="getPosition"
-                :title="displayTitle(activity, eventDate)"
-                :clash="clashFor(activity.id, eventDate)"
-                surface="week"
-                show-photos
-                resizable
-                :draggable="!isTail"
-                @view-activity="(id, date) => emit('view-activity', id, date)"
-              />
+              <template v-for="(card, ai) in group" :key="card.key">
+                <!-- A view-only external event: a quiet sibling in the same lanes, no
+                     drag, no resize, and its click never reaches the slot underneath. -->
+                <ExternalTimedBlock
+                  v-if="isExternalCard(card)"
+                  :event="card.external"
+                  :start-time="card.startTime"
+                  :end-time="card.endTime"
+                  :lane-index="ai"
+                  :lane-count="group.length"
+                  :get-position="getPosition"
+                  class="z-10"
+                  @open="(e) => emit('external-click', e)"
+                />
+                <PlannerTimedBlock
+                  v-else
+                  :activity="card.activity"
+                  :event-date="card.eventDate"
+                  :start-time="card.startTime!"
+                  :end-time="card.endTime"
+                  :lane-index="ai"
+                  :lane-count="group.length"
+                  :identity="identityFor(card.activity)"
+                  :get-position="getPosition"
+                  :title="displayTitle(card.activity, card.eventDate)"
+                  :clash="clashFor(card.activity.id, card.eventDate)"
+                  surface="week"
+                  show-photos
+                  resizable
+                  :draggable="!card.isTail"
+                  @view-activity="(id, date) => emit('view-activity', id, date)"
+                />
+              </template>
             </template>
 
             <!-- Where the lifted block would land (#142). -->
@@ -1051,6 +1100,8 @@ function onStripDayClick(dateStr: string) {
         :is-today="selectedMobileDay === toDateInputValue(new Date())"
         :holiday="holidayForDay(selectedMobileDay) ?? null"
         :birthdays="birthdaysForDay(selectedMobileDay)"
+        :external-timed="externalTimedFor(selectedMobileDay)"
+        :external-all-day="externalsForDay(selectedMobileDay)"
         :drop-slot="overSlot"
         all-day-draggable
         @birthday-click="(b) => emit('birthday-click', b)"
@@ -1060,6 +1111,7 @@ function onStripDayClick(dateStr: string) {
         @view-segment="(vid: string, idx: number) => emit('view-segment', vid, idx)"
         @add-activity="(date, time) => emit('add-activity', date, time)"
         @holiday-click="(h) => emit('holiday-click', h)"
+        @external-click="(e) => emit('external-click', e)"
       />
     </template>
   </div>

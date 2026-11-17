@@ -29,6 +29,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import type { MonthDayCellData } from '@/utils/monthCells';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import type { HolidayOccurrence } from '@/types/models';
+import type { ExternalEvent } from '@/types/externalEvents';
 import MonthDayContents from '@/components/planner/MonthDayContents.vue';
 
 const props = defineProps<{
@@ -44,6 +45,7 @@ const emit = defineEmits<{
   'view-segment': [vacationId: string, segmentIndex: number];
   'holiday-click': [holiday: HolidayOccurrence];
   'birthday-click': [birthday: BirthdayOccurrence];
+  'external-click': [event: ExternalEvent];
 }>();
 
 const anchorRef = ref<HTMLElement>();
@@ -128,6 +130,7 @@ defineExpose({ openFor, close, el: popoverRef });
         @view-segment="(vid, sidx) => closeThen(() => emit('view-segment', vid, sidx))"
         @holiday-click="(h) => closeThen(() => emit('holiday-click', h))"
         @birthday-click="(b) => closeThen(() => emit('birthday-click', b))"
+        @external-click="(e) => closeThen(() => emit('external-click', e))"
       />
     </div>
   </Teleport>
