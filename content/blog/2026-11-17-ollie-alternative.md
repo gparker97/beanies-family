@@ -22,7 +22,7 @@ Ollie and Maple were two extremely well-funded family apps (Ollie at about $7.5M
 
 ![ollie closed on november 6, 2026 and maple closes on december 31, 2026. side by side: ollie read your whole inbox, while beanies.family reads only the one email you share. a table compares calendar, to-dos, meal planning and finances, and where each app keeps your data.](/blog/ollie-alternative-infographic.webp)
 
-_the whole story at a glance, for those in a hurry. laid out in beanie form._
+_the whole story at a glance, laid out in beanie form for those in a hurry_
 
 ## Why beanies.family will always be there
 
