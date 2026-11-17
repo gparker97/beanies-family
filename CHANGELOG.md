@@ -33,6 +33,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - A family that left setup early is now counted as having finished creating its pod.
+- The choreboard's celebration no longer says "What a afternoon" or "What a evening"; it now reads "What a great afternoon".
 - Travel segment titles are now built from the segment's details everywhere they appear, so imported trips no longer show a document's own headings on the calendar.
 - Disconnecting one of two calendars on the same Google account no longer cuts off the other.
 - A connected calendar's name is now shown correctly in Google Calendar settings even when Google can't be reached.

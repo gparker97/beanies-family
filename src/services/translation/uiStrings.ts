@@ -16458,8 +16458,8 @@ const STRING_DEFS = {
     beanie: '{name} did it! every {blockWord} chore, done.',
   },
   'choreboard.praise.whatA': {
-    en: 'What a {blockWord}, {name}! All done.',
-    beanie: 'what a {blockWord}, {name}! all done.',
+    en: 'What a great {blockWord}, {name}! All done.',
+    beanie: 'what a great {blockWord}, {name}! all done.',
   },
   'choreboard.praise.lookAtYou': {
     en: 'Look at you go, {name}! {block}, all done.',

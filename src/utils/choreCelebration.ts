@@ -136,7 +136,8 @@ export function isChoreSoundId(value: unknown): value is ChoreSoundId {
 /**
  * The six praise lines (the mockup's PRAISE). Placeholders: `{name}` (the bean's first name),
  * `{block}` (the block's label, "Morning") and `{blockWord}` (the block inside a sentence,
- * "morning"). "What a morning" has no Anytime reading, so it is for the timed blocks only.
+ * "morning"). "What a great morning" has no Anytime reading, so it is for the timed blocks only.
+ * The "great" is load-bearing: a bare "What a {blockWord}" reads "What a afternoon".
  */
 export const CHORE_PRAISE: readonly { key: UIStringKey; timedOnly?: boolean }[] = [
   { key: 'choreboard.praise.allDone' },
