@@ -13,7 +13,7 @@ draft: false
 
 **📢 Announcement: Another family organization app bites the dust (not that we’re gloating or anything) 📢**
 
-Ollie, a family AI assistant that allowed you to text it like a person, [shut down on November 6](https://techcrunch.com/2026/10/30/ollie-a-privacy-focused-ai-assistant-is-shutting-down/). The announcement was only released a couple weeks ago, so families literally got about four weeks’ notice to grab their data and go. Not very thoughtful, although to be fair, these situations can be chaotic.
+Ollie, a family AI assistant that allowed you to text it like a person, [shut down on November 6](https://techcrunch.com/2026/10/30/ollie-a-privacy-focused-ai-assistant-is-shutting-down/). The announcement was only released a couple weeks ago, so families literally got _one week_ of notice before their data was _gonzo_. Not very thoughtful, although to be fair, these situations can be chaotic.
 
 Maple, which [I wrote about back in August](https://beanies.family/blog/maple-alternative?utm_source=blog&utm_medium=post&utm_campaign=ollie-alternative&utm_content=maple-post), turns off the lights for good on December 31.
 
