@@ -4,6 +4,7 @@ slug: ollie-alternative
 date: 2026-11-17
 category: review
 coverEmoji: 💬
+coverImage: /blog/ollie-alternative-infographic.webp
 excerpt: "ollie shut down on november 6 and maple follows on december 31. here's a private family app that keeps your calendar and reads only the emails you share."
 subtitle: 'i used to use ollie or maple - what can i use now to organize my family?'
 featured: false
@@ -18,6 +19,10 @@ Ollie, a family AI assistant that allowed you to text it like a person, [shut do
 Maple, which [I wrote about back in August](https://beanies.family/blog/maple-alternative?utm_source=blog&utm_medium=post&utm_campaign=ollie-alternative&utm_content=maple-post), turns off the lights for good on December 31.
 
 Ollie and Maple were two extremely well-funded family apps (Ollie at about $7.5M, and Maple at $5M in seed funding), and both are gone in the blink of an eye (well - in cosmic terms). If you used either one, I'm sorry for your loss - letting go of the thing that holds your family together (in any form) is a real pain. Here’s the good news, though: it doesn’t have to happen again.
+
+![ollie closed on november 6, 2026 and maple closes on december 31, 2026. side by side: ollie read your whole inbox, while beanies.family reads only the one email you share. a table compares calendar, to-dos, meal planning and finances, and where each app keeps your data.](/blog/ollie-alternative-infographic.webp)
+
+_the whole story at a glance, for those in a hurry. laid out in beanie form._
 
 ## Why beanies.family will always be there
 
