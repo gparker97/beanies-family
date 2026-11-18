@@ -151,6 +151,8 @@ jobs:
           # "Not checked live" (the client's not_configured path), never an error.
           VITE_FLIGHT_STATUS_URL: ${{ vars.FLIGHT_STATUS_URL }}
           VITE_FLIGHT_STATUS_API_KEY: ${{ secrets.FLIGHT_STATUS_API_KEY }}
+          VITE_PLACE_SEARCH_URL: ${{ vars.PLACE_SEARCH_URL }}
+          VITE_PLACE_SEARCH_API_KEY: ${{ secrets.PLACE_SEARCH_API_KEY }}
           VITE_PLAUSIBLE_DOMAIN: jvjpzIr6FM9tDKaS1gZaK
           VITE_NEWSLETTER_SUBSCRIBE_URL: https://everybeancounts.substack.com/api/v1/free
           # Open-Meteo "API Standard" key (#134, ADR-043). Unset today, so the build uses the

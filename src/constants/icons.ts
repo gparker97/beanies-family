@@ -584,6 +584,16 @@ const DETAIL_ICONS = {
       'M16.5 8.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z',
     ],
   },
+  // #150: a video call (Join Call) and "Keep what I typed" in the location field.
+  video: {
+    paths: [
+      'M5 6h8a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Z',
+      'M16 10l6-3v10l-6-3',
+    ],
+  },
+  'type-text': {
+    paths: ['M4 7V5h16v2', 'M9 19h6', 'M12 5v14'],
+  },
 } satisfies Record<string, BeanieIconDef>;
 
 // ─── Merged Icon Registry ──────────────────────────────────────────────────

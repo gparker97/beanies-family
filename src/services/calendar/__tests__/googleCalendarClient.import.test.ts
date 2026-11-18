@@ -37,7 +37,7 @@ describe('googleCalendarClient.listEventsForImport', () => {
     vi.unstubAllGlobals();
   });
 
-  async function callOnce(body: unknown = { items: [] }) {
+  async function callOnce(body: unknown = { items: [] }, includeMeetingUrl = false) {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, body));
     vi.stubGlobal('fetch', fetchMock);
     const client = createGoogleCalendarClient(provider);
@@ -45,7 +45,8 @@ describe('googleCalendarClient.listEventsForImport', () => {
       'conn-1',
       'primary',
       '2026-09-11T00:00:00Z',
-      '2027-09-11T00:00:00Z'
+      '2027-09-11T00:00:00Z',
+      { includeMeetingUrl }
     );
     return { out, url: new URL(String(fetchMock.mock.calls[0][0]), 'https://x') };
   }
@@ -124,6 +125,74 @@ describe('googleCalendarClient.listEventsForImport', () => {
     expect(out.map((e) => e.id)).toEqual(['ok']);
     // Never a silent drop.
     expect(warn).toHaveBeenCalled();
+  });
+
+  it('requests the exact mask in both meeting-link states (#150 P4)', async () => {
+    const base =
+      'nextPageToken,items(id,summary,description,location,start,end,recurrence,status,recurringEventId,organizer(self),creator(self)';
+    expect((await callOnce()).url.searchParams.get('fields')).toBe(`${base})`);
+    expect((await callOnce({ items: [] }, true)).url.searchParams.get('fields')).toBe(
+      `${base},hangoutLink,conferenceData(entryPoints(entryPointType,uri)))`
+    );
+  });
+
+  it('with meeting links off, never derives a meetingUrl even if Google sends one', async () => {
+    const { out } = await callOnce({
+      items: [
+        {
+          id: 'call',
+          start: { date: '2026-09-15' },
+          hangoutLink: 'https://meet.google.com/abc-defg-hij',
+        },
+        { id: 'bad', start: { date: '2026-09-15' }, hangoutLink: 'javascript:alert(1)' },
+      ],
+    });
+    for (const ev of out) {
+      expect(ev).not.toHaveProperty('meetingUrl');
+      expect(ev).not.toHaveProperty('meetingUrlRejected');
+      expect(ev).not.toHaveProperty('hangoutLink');
+    }
+  });
+
+  it('requests the meeting-link fields and keeps only the derived meetingUrl (#150 P4)', async () => {
+    const { out, url } = await callOnce(
+      {
+        items: [
+          {
+            id: 'call',
+            start: { date: '2026-09-15' },
+            hangoutLink: 'https://meet.google.com/abc-defg-hij',
+            conferenceData: {
+              entryPoints: [{ entryPointType: 'video', uri: 'https://zoom.us/j/123' }],
+            },
+          },
+          { id: 'bad', start: { date: '2026-09-15' }, hangoutLink: 'javascript:alert(1)' },
+          // A tombstone is picked explicitly too: nothing raw rides along on it.
+          {
+            id: 'm_20260922',
+            status: 'cancelled',
+            recurringEventId: 'm',
+            conferenceData: { entryPoints: [{ entryPointType: 'video', uri: 'https://x.test' }] },
+          },
+        ],
+      },
+      true
+    );
+    expect(url.searchParams.get('fields')).toContain(
+      'hangoutLink,conferenceData(entryPoints(entryPointType,uri))'
+    );
+    // The video entry point wins over hangoutLink.
+    expect(out[0]!.meetingUrl).toBe('https://zoom.us/j/123');
+    expect(out[0]).not.toHaveProperty('conferenceData');
+    expect(out[0]).not.toHaveProperty('hangoutLink');
+    expect(out[1]).not.toHaveProperty('meetingUrl');
+    expect(out[1]!.meetingUrlRejected).toBe(true);
+    expect(out[2]).toEqual({
+      id: 'm_20260922',
+      status: 'cancelled',
+      recurringEventId: 'm',
+      isOrganizer: false,
+    });
   });
 
   it('KEEPS a cancelled instance, which is the signal an occurrence was removed', async () => {

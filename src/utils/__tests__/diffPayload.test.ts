@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { diffPayload } from '@/utils/diffPayload';
+import { placePatch } from '@/utils/location/placeText';
 
 describe('diffPayload', () => {
   describe('the core contract', () => {
@@ -140,5 +141,35 @@ describe('diffPayload', () => {
       const out = diffPayload({ meta: { a: 1, b: 2 } }, { meta: { b: 2, a: 1 } });
       expect('meta' in out).toBe(true);
     });
+  });
+});
+
+describe('diffPayload with a PlaceRef (#150)', () => {
+  it('an equal place in a different key order is unchanged once both go through makePlaceRef', () => {
+    const stored = {
+      location: '12 Main St, room 3',
+      locationPlace: { name: '12 Main St', placeId: 'p1' },
+    };
+    const before = placePatch('location', stored.location, stored.locationPlace);
+    const after = placePatch('location', '12 Main St, room 3', {
+      placeId: 'p1',
+      name: '12 Main St',
+    });
+    expect(diffPayload(before, after)).toEqual({});
+  });
+
+  it('editing only the detail writes the string, never the place', () => {
+    const place = { placeId: 'p1', name: '12 Main St' };
+    const before = placePatch('location', '12 Main St, room 3', place);
+    const after = placePatch('location', '12 Main St, room 4', place);
+    expect(diffPayload(before, after)).toEqual({ location: '12 Main St, room 4' });
+  });
+
+  it('removing the place writes a present-but-undefined key (a delete)', () => {
+    const before = placePatch('location', '12 Main St', { placeId: 'p1', name: '12 Main St' });
+    const after = placePatch('location', '12 Main St', null);
+    const diff = diffPayload(before, after);
+    expect('locationPlace' in diff).toBe(true);
+    expect(diff.locationPlace).toBeUndefined();
   });
 });

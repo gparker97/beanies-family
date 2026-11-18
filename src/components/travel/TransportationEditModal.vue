@@ -4,6 +4,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import LocationField from '@/components/ui/LocationField.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
@@ -21,6 +22,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { buildTransportationTitle } from '@/utils/vacation';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { safeExternalHref } from '@/utils/url';
+import { useLocationPair } from '@/composables/useLocationPair';
 import type { VacationTransportation, VacationSegmentStatus } from '@/types/models';
 
 type TransportationField =
@@ -47,7 +49,9 @@ const pickupTime = ref('');
 const returnDate = ref('');
 const returnTime = ref('');
 const agencyName = ref('');
-const agencyAddress = ref('');
+/** #150: the agency address string and its picked place, bound as one pair. */
+const agencyAddressPair = useLocationPair('agencyAddress');
+const { text: agencyAddress, value: agencyAddressValue } = agencyAddressPair;
 const operator = ref('');
 const route = ref('');
 const departureStation = ref('');
@@ -79,7 +83,7 @@ function buildPayload() {
     returnDate: returnDate.value,
     returnTime: returnTime.value,
     agencyName: agencyName.value,
-    agencyAddress: agencyAddress.value,
+    ...agencyAddressPair.patch(agencyAddress.value),
     operator: operator.value,
     route: route.value,
     departureStation: departureStation.value,
@@ -111,7 +115,7 @@ const { isSubmitting, formDiff } = useFormModal<
       returnDate.value = trans.returnDate ?? '';
       returnTime.value = trans.returnTime ?? '';
       agencyName.value = trans.agencyName ?? '';
-      agencyAddress.value = trans.agencyAddress ?? '';
+      agencyAddressPair.seed(trans);
       operator.value = trans.operator ?? '';
       route.value = trans.route ?? '';
       departureStation.value = trans.departureStation ?? '';
@@ -130,7 +134,7 @@ const { isSubmitting, formDiff } = useFormModal<
       returnDate.value = '';
       returnTime.value = '';
       agencyName.value = '';
-      agencyAddress.value = '';
+      agencyAddressPair.reset();
       operator.value = '';
       route.value = '';
       departureStation.value = '';
@@ -316,10 +320,13 @@ async function handleSave() {
           <BaseInput v-model="agencyName" :placeholder="t('vacation.field.agencyName')" />
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.field.agencyAddress')">
-          <BaseTextarea
-            v-model="agencyAddress"
-            :placeholder="t('vacation.field.agencyAddress')"
+          <LocationField
+            v-model:value="agencyAddressValue"
+            mode="address"
+            field-kind="agency"
+            multiline
             :rows="2"
+            :placeholder="t('vacation.field.agencyAddress')"
           />
         </FormFieldGroup>
         <div class="grid grid-cols-2 gap-3">

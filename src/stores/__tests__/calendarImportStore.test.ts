@@ -22,6 +22,7 @@ const {
   reportErrorMock,
   listInstancesMock,
   homeZoneMock,
+  locationLinksOn,
 } = vi.hoisted(() => ({
   listEventsForImportMock: vi.fn(),
   listCalendarsForMock: vi.fn(),
@@ -32,6 +33,8 @@ const {
   reportErrorMock: vi.fn(),
   listInstancesMock: vi.fn(),
   homeZoneMock: vi.fn(),
+  /** `locationLinksEnabled()` (#150), off by default. */
+  locationLinksOn: { value: false },
 }));
 
 /** The family's resolved home zone, as `settingsStore.resolveHomeTimeZoneNow()` returns it. */
@@ -95,6 +98,10 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
 vi.mock('@/utils/calendar/memberNames', () => ({
   makeMemberNameResolver: () => (id: string) => (id === 'me' ? 'Greg' : undefined),
 }));
+vi.mock('@/utils/location/locationLinks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/location/locationLinks')>()),
+  locationLinksEnabled: () => locationLinksOn.value,
+}));
 vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({ resolveHomeTimeZoneNow: homeZoneMock }),
 }));
@@ -129,6 +136,7 @@ beforeEach(() => {
   );
   listInstancesMock.mockResolvedValue([]);
   homeZoneMock.mockReturnValue(SG_PERSISTED);
+  locationLinksOn.value = false;
 });
 
 describe('choosing calendars', () => {
@@ -391,6 +399,83 @@ describe('the commit', () => {
       hashZone: 'Asia/Singapore',
     });
     expect(later.upserts[0].hash).toBe(later.upserts[0].existingHash);
+  });
+
+  describe('an event with a Google Meet link (#150 P4, D6)', () => {
+    const MEET = 'https://meet.google.com/abc-defg-hij';
+    beforeEach(() => {
+      listEventsForImportMock.mockResolvedValue([
+        timedEvent({ location: 'Room 3', meetingUrl: MEET }),
+      ]);
+    });
+
+    it('adopting it pushes NOTHING to Google: the hash is recorded from the composed draft', async () => {
+      locationLinksOn.value = true;
+      clientCalls.length = 0;
+      const { activity, link } = await commitOne();
+
+      // The activity holds the composed location (D6)...
+      expect(link.origin).toBe('adopted');
+      expect(activity.location).toBe(`Room 3 ${MEET}`);
+      // ...the commit itself made no calendar write...
+      expect(clientCalls).toEqual(['listEventsForImport']);
+      // ...and the NEXT reconcile finds the hashes equal, so it does not patch the
+      // family's real Google event until they edit the activity.
+      const plan = planReconcile([activity], [link], activity.date, {
+        memberName: resolver,
+        hashZone: SG_PERSISTED.hashZone,
+      });
+      expect(plan.upserts).toHaveLength(1);
+      expect(plan.upserts[0].hash).toBe(plan.upserts[0].existingHash);
+      // Non-vacuous: the hash really covers the composed location, so a hash taken
+      // from Google's own location would have pushed.
+      // (An adopted link never folds the home zone, hence `hashZone: ''`.)
+      const ctx = { memberName: resolver, hashZone: '' };
+      expect(computePushHash(activity, ctx)).toBe(link.lastPushedHash);
+      expect(computePushHash({ ...activity, location: 'Room 3' }, ctx)).not.toBe(
+        link.lastPushedHash
+      );
+    });
+
+    it('without the flag the location is exactly Google’s and still nothing is pushed', async () => {
+      const { activity, link } = await commitOne();
+      expect(activity.location).toBe('Room 3');
+      const plan = planReconcile([activity], [link], activity.date, {
+        memberName: resolver,
+        hashZone: SG_PERSISTED.hashZone,
+      });
+      expect(plan.upserts[0].hash).toBe(plan.upserts[0].existingHash);
+    });
+
+    it('logs the meeting-link count, and a rejected link by count only', async () => {
+      locationLinksOn.value = true;
+      listEventsForImportMock.mockResolvedValue([
+        timedEvent({ location: 'Room 3', meetingUrl: MEET }),
+        timedEvent({ id: 'g-2', meetingUrlRejected: true }),
+      ]);
+      const store = useCalendarImportStore();
+      await store.open('c1');
+      await store.scan();
+      const contexts = logEventMock.mock.calls
+        .map((c) => c[0])
+        .filter((p) => p.message === 'import_meeting_links')
+        .map((p) => p.context);
+      expect(contexts).toEqual([
+        { action: 'import_meeting_links', count: 1 },
+        { action: 'import_meeting_links', detail: 'meeting-url-rejected', count: 1 },
+      ]);
+      expect(JSON.stringify(logEventMock.mock.calls)).not.toContain('meet.google.com');
+      expect(listEventsForImportMock.mock.calls[0][4]).toEqual({ includeMeetingUrl: true });
+    });
+
+    it('logs no meeting-link event with the flag off, and never asks Google for the fields', async () => {
+      const store = useCalendarImportStore();
+      await store.open('c1');
+      await store.scan();
+      const messages = logEventMock.mock.calls.map((c) => c[0].message);
+      expect(messages).not.toContain('import_meeting_links');
+      expect(listEventsForImportMock.mock.calls[0][4]).toEqual({ includeMeetingUrl: false });
+    });
   });
 
   it('re-mirrors the activity array ONCE, not once per row', async () => {

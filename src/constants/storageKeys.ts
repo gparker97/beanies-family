@@ -50,6 +50,11 @@ export const STORAGE_KEYS = {
    *  (`services/flightStatus/devFetchBudget.ts`), so a dev server left open cannot drain the
    *  production provider quota. Never written by a production build. */
   FLIGHT_STATUS_DEV_BUDGET: 'beanies:flight-status-dev',
+  /** #150: until when this device leaves address suggestions quiet after the place-search
+   *  Lambda answered a cap or a rate limit (`{ until }`, epoch ms), so a reload does not ask
+   *  again straight away. Device-local, never in the pod; not read by the `index.html`
+   *  bootstrap. */
+  PLACE_SEARCH_QUIET: 'beanies:place-search-quiet',
   /** #141: the desktop month grid's density (`compact` | `comfortable`). Device-local;
    *  not read by the `index.html` bootstrap. */
   MONTH_GRID_DENSITY: 'beanies:monthGridDensity',

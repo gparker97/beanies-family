@@ -6,17 +6,19 @@ import type {
   VacationTransportation,
   VacationTransportationType,
   VacationSegmentStatus,
+  PlaceRef,
 } from '@/types/models';
 import { generateUUID } from '@/utils/id';
 import { prefillTransportationDates } from '@/utils/vacation';
+import { placePatch } from '@/utils/location/placeText';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import LocationField from '@/components/ui/LocationField.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
-import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -76,10 +78,20 @@ function addItem(type: VacationTransportationType) {
   emit('update:transportation', [...props.transportation, item]);
 }
 
-function updateItem(index: number, field: keyof VacationTransportation, value: string) {
+/** Several fields of one item in ONE array rebuild and ONE emit (a string and its place). */
+function updateItemFields(index: number, patch: Partial<VacationTransportation>) {
   const updated = [...props.transportation];
-  updated[index] = { ...updated[index]!, [field]: value };
+  updated[index] = { ...updated[index]!, ...patch };
   emit('update:transportation', updated);
+}
+
+function updateItem(index: number, field: keyof VacationTransportation, value: string) {
+  updateItemFields(index, { [field]: value });
+}
+
+/** The agency address and its picked place, written together (#150). */
+function updateAgencyAddress(index: number, value: { text: string; place?: PlaceRef }) {
+  updateItemFields(index, placePatch('agencyAddress', value.text, value.place));
 }
 
 function updateStatus(index: number, value: string) {
@@ -239,26 +251,18 @@ function isBus(type: VacationTransportationType): boolean {
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.agencyAddress')">
-              <div class="relative">
-                <BaseTextarea
-                  :model-value="item.agencyAddress ?? ''"
-                  :placeholder="t('vacation.field.agencyAddress')"
-                  class="vacation-teal-input"
-                  :rows="2"
-                  @update:model-value="updateItem(index, 'agencyAddress', String($event))"
-                />
-                <a
-                  v-if="item.agencyAddress"
-                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.agencyAddress)}`"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="absolute top-2 right-2 text-sm opacity-40 transition-opacity hover:opacity-80"
-                  :title="t('vacation.field.openInMaps')"
-                  @click.stop
-                >
-                  📍
-                </a>
-              </div>
+              <LocationField
+                :value="{ text: item.agencyAddress ?? '', place: item.agencyAddressPlace }"
+                mode="address"
+                field-kind="agency"
+                multiline
+                :rows="2"
+                map-pin
+                :map-pin-title="t('vacation.field.openInMaps')"
+                :placeholder="t('vacation.field.agencyAddress')"
+                class="vacation-teal-input"
+                @update:value="updateAgencyAddress(index, $event)"
+              />
             </FormFieldGroup>
           </div>
           <FormFieldGroup :label="t('vacation.field.bookingReference')">

@@ -1,4 +1,5 @@
 import type { HelpArticle } from './types';
+import { ADDRESS_SUGGESTIONS_HELP_LIVE } from './liveFlags';
 
 /**
  * "The Pod" — the family-life side of beanies.family: each member's profile
@@ -909,7 +910,10 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
           'Tap <strong>Add contact</strong>',
           'Pick a <strong>Category</strong> — Doctor, Dentist, Nurse, Teacher, School, or Other (you can type your own)',
           'Enter the <strong>Name</strong> and a <strong>Role or relationship</strong> (e.g. <em>“Pediatrician at Bayside Clinic”</em>)',
-          'Add whatever you have — <strong>Phone</strong>, <strong>Email</strong>, <strong>Address</strong> — and any <strong>Notes</strong>',
+          'Add whatever you have — <strong>Phone</strong>, <strong>Email</strong>, <strong>Address</strong> — and any <strong>Notes</strong>' +
+            (ADDRESS_SUGGESTIONS_HELP_LIVE
+              ? '. While you type an address, beanies.family can suggest matching places from Google Maps; see <a href="/help/features/address-suggestions-and-call-links">Address suggestions and call links</a>'
+              : ''),
           'Tap <strong>Save</strong>',
         ],
       },

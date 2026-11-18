@@ -30,6 +30,7 @@ import FlightCheckChip from '@/components/travel/FlightCheckChip.vue';
 import FlightChangeNotice from '@/components/travel/FlightChangeNotice.vue';
 import FlightTrackLink from '@/components/travel/FlightTrackLink.vue';
 import LivePill from '@/components/travel/LivePill.vue';
+import LocationLine from '@/components/common/LocationLine.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import PhotoThumbnail from '@/components/media/PhotoThumbnail.vue';
 import ExpandableText from '@/components/ui/ExpandableText.vue';
@@ -297,18 +298,7 @@ async function copy(value: string): Promise<void> {
         />
 
         <!-- Map link (entire row clickable) -->
-        <a
-          v-else-if="row.mapLink"
-          :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="flex min-w-0 items-center gap-1.5"
-        >
-          <span class="truncate text-sm text-[#00B4D8] hover:underline">
-            {{ row.value }}
-          </span>
-          <span class="shrink-0 text-xs opacity-40">📍</span>
-        </a>
+        <LocationLine v-else-if="row.mapLink" :text="row.value" :place="row.place" />
 
         <!-- Clickable link -->
         <div v-else-if="row.isLink" class="flex min-w-0 items-center gap-1.5">

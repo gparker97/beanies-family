@@ -4,6 +4,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import LocationField from '@/components/ui/LocationField.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
@@ -20,6 +21,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { buildAccommodationTitle } from '@/utils/vacation';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { safeExternalHref } from '@/utils/url';
+import { useLocationPair } from '@/composables/useLocationPair';
 import type { VacationAccommodation, VacationSegmentStatus } from '@/types/models';
 
 type AccommodationField =
@@ -41,7 +43,9 @@ const vacationStore = useVacationStore();
 // Form fields
 const status = ref<VacationSegmentStatus>('pending');
 const name = ref('');
-const address = ref('');
+/** #150: the address string and its picked place, bound as one pair. */
+const addressPair = useLocationPair('address');
+const { text: address, value: addressValue } = addressPair;
 const checkInDate = ref('');
 const checkOutDate = ref('');
 const confirmationNumber = ref('');
@@ -68,7 +72,7 @@ function buildPayload() {
     title: autoTitle.value,
     status: status.value,
     name: name.value,
-    address: address.value,
+    ...addressPair.patch(address.value),
     checkInDate: checkInDate.value,
     checkOutDate: checkOutDate.value,
     confirmationNumber: confirmationNumber.value,
@@ -95,7 +99,7 @@ const { isSubmitting, formDiff } = useFormModal<
     onEdit(acc) {
       status.value = acc.status ?? 'pending';
       name.value = acc.name ?? '';
-      address.value = acc.address ?? '';
+      addressPair.seed(acc);
       checkInDate.value = acc.checkInDate ?? '';
       checkOutDate.value = acc.checkOutDate ?? '';
       confirmationNumber.value = acc.confirmationNumber ?? '';
@@ -109,7 +113,7 @@ const { isSubmitting, formDiff } = useFormModal<
     onNew() {
       status.value = 'pending';
       name.value = '';
-      address.value = '';
+      addressPair.reset();
       checkInDate.value = '';
       checkOutDate.value = '';
       confirmationNumber.value = '';
@@ -247,7 +251,14 @@ async function handleSave() {
 
       <!-- Address -->
       <FormFieldGroup :label="t('vacation.field.address')" v-bind="validation.bind('address')">
-        <BaseTextarea v-model="address" :placeholder="t('vacation.field.address')" :rows="2" />
+        <LocationField
+          v-model:value="addressValue"
+          mode="address"
+          field-kind="stay"
+          multiline
+          :rows="2"
+          :placeholder="t('vacation.field.address')"
+        />
       </FormFieldGroup>
 
       <!-- Check-in / Check-out dates -->

@@ -113,6 +113,13 @@ function field(w: VueWrapper, label: string) {
   return w.find(`[data-form-label="${label}"]`);
 }
 
+/** The location group: "Location", or "Location or Link" while address suggestions are on (#150). */
+function locationField(w: VueWrapper) {
+  return w.find(
+    '[data-form-label="planner.field.location"], [data-form-label="planner.field.locationOrLink"]'
+  );
+}
+
 function saved(w: VueWrapper, i = 0) {
   return w.emitted('save')?.[i]?.[0] as Record<string, unknown> & {
     data?: Record<string, unknown>;
@@ -225,19 +232,19 @@ describe('ActivityModal: occasions', () => {
 
   it('⭐ an empty occasion keeps logistics behind "Add more details"', async () => {
     const { w, vm } = await openNew();
-    expect(field(w, 'planner.field.location').exists()).toBe(true);
+    expect(locationField(w).exists()).toBe(true);
     await vm.onCategoryPicked('occasion_birthday');
     await flush();
-    expect(field(w, 'planner.field.location').exists()).toBe(false);
+    expect(locationField(w).exists()).toBe(false);
     const more = w.findAll('button').find((b) => b.text().includes('planner.field.moreDetails'))!;
     await more.trigger('click');
     await flush();
-    expect(field(w, 'planner.field.location').exists()).toBe(true);
+    expect(locationField(w).exists()).toBe(true);
   });
 
   it('⭐ an occasion with a location shows it without opening "Add more details"', async () => {
     const { w } = await openNew({ activity: { ...unclesBirthday, location: 'Gran’s house' } });
-    expect(field(w, 'planner.field.location').exists()).toBe(true);
+    expect(locationField(w).exists()).toBe(true);
   });
 
   it('⭐ the AI update-existing flow keeps a saved year', async () => {

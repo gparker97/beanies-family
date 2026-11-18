@@ -130,6 +130,32 @@ describe('settingsStore weather', () => {
     });
   });
 
+  describe('address suggestions (#150)', () => {
+    it('defaults on', () => {
+      expect(useSettingsStore().addressSuggestionsEnabled).toBe(true);
+    });
+
+    it('setAddressSuggestionsEnabled writes the flat field', async () => {
+      const store = useSettingsStore();
+      await store.setAddressSuggestionsEnabled(false);
+      expect(h.saveSettings).toHaveBeenCalledWith({ addressSuggestionsEnabled: false });
+      expect(store.addressSuggestionsEnabled).toBe(false);
+    });
+
+    it('a failed write toasts with the switch label and rethrows', async () => {
+      h.saveSettings.mockRejectedValueOnce(new Error('disk full'));
+      await expect(useSettingsStore().setAddressSuggestionsEnabled(false)).rejects.toThrow(
+        'disk full'
+      );
+      expect(h.showToast).toHaveBeenCalledWith(
+        'error',
+        'settings.persistFailed',
+        'settings.addressSuggestions.title',
+        expect.objectContaining({ context: { field: 'addressSuggestionsEnabled' } })
+      );
+    });
+  });
+
   describe('patchWall', () => {
     it('changing the style keeps the sleep settings', async () => {
       const store = useSettingsStore();

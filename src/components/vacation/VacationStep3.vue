@@ -7,16 +7,19 @@ import type {
   VacationAccommodationType,
   VacationSegmentStatus,
   VacationTravelSegment,
+  PlaceRef,
 } from '@/types/models';
 import { generateUUID } from '@/utils/id';
 import { prefillAccommodationDates } from '@/utils/vacation';
+import { placePatch } from '@/utils/location/placeText';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import LocationField from '@/components/ui/LocationField.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -113,10 +116,20 @@ function addItem(type: VacationAccommodationType) {
   emit('update:accommodations', [...props.accommodations, item]);
 }
 
-function updateItem(index: number, field: keyof VacationAccommodation, value: string | boolean) {
+/** Several fields of one item in ONE array rebuild and ONE emit (a string and its place). */
+function updateItemFields(index: number, patch: Partial<VacationAccommodation>) {
   const updated = [...props.accommodations];
-  updated[index] = { ...updated[index]!, [field]: value };
+  updated[index] = { ...updated[index]!, ...patch };
   emit('update:accommodations', updated);
+}
+
+function updateItem(index: number, field: keyof VacationAccommodation, value: string | boolean) {
+  updateItemFields(index, { [field]: value });
+}
+
+/** The address and its picked place, written together (#150). */
+function updateAddress(index: number, value: { text: string; place?: PlaceRef }) {
+  updateItemFields(index, placePatch('address', value.text, value.place));
 }
 
 function updateStatus(index: number, value: string) {
@@ -217,25 +230,17 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
         </FormFieldGroup>
 
         <FormFieldGroup :label="t('vacation.field.address')">
-          <div class="relative">
-            <BaseTextarea
-              :model-value="item.address ?? ''"
-              class="vacation-teal-input"
-              :rows="2"
-              @update:model-value="updateItem(index, 'address', String($event))"
-            />
-            <a
-              v-if="item.address"
-              :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="absolute top-2 right-2 text-sm opacity-40 transition-opacity hover:opacity-80"
-              :title="t('vacation.field.openInMaps')"
-              @click.stop
-            >
-              📍
-            </a>
-          </div>
+          <LocationField
+            :value="{ text: item.address ?? '', place: item.addressPlace }"
+            mode="address"
+            field-kind="stay"
+            multiline
+            :rows="2"
+            map-pin
+            :map-pin-title="t('vacation.field.openInMaps')"
+            class="vacation-teal-input"
+            @update:value="updateAddress(index, $event)"
+          />
         </FormFieldGroup>
 
         <div class="grid grid-cols-2 gap-3">

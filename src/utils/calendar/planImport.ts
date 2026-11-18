@@ -26,6 +26,7 @@ import { parseRecurrence } from './parseRrule';
 import { googleTimesToActivityFields } from './activityToGoogleEvent';
 import { activityShadowFromRule } from '@/services/recurrence/adapters';
 import { wallClockInZone } from '@/utils/timeZone';
+import { withMeetingUrl } from '@/utils/location/locationLinks';
 
 /** What the review row tells the user will happen to this event. */
 export type ImportOutcome = 'adopt' | 'copy' | 'unsupported-recurrence';
@@ -108,6 +109,13 @@ export interface ImportDefaults {
   /** The family's resolved HOME zone: what an imported event's wall clock is read in
    *  (`settingsStore.resolveHomeTimeZoneNow().zone`, once per scan). */
   homeTimeZone: string;
+  /**
+   * Append the event's Google Calendar join link to the activity's location (#150 P4,
+   * D6). The store passes `locationLinksEnabled()`. The push hash is recorded from the
+   * composed draft, so adoption itself pushes nothing; a later edit pushes the composed
+   * text to Google as the event location (D6, accepted).
+   */
+  includeMeetingUrl?: boolean;
 }
 
 export interface ImportSource {
@@ -120,6 +128,8 @@ export interface ImportSource {
 export interface ImportPlan {
   candidates: ImportCandidate[];
   skipped: Array<{ id: string; reason: ImportSkipReason }>;
+  /** Candidates whose location carries the event's join link (0 unless `includeMeetingUrl`). */
+  withMeetingLink: number;
 }
 
 /** Fields Google cannot tell us, chosen once, here, rather than at each call site. */
@@ -198,6 +208,8 @@ export function planImport(
   defaults: ImportDefaults
 ): ImportPlan {
   const linkedGoogleIds = new Set(existingLinks.map((l) => l.googleEventId));
+  /** Event ids whose draft location carries the join link (#150 P4), for telemetry. */
+  const joinable = new Set<string>();
   const candidates: ImportCandidate[] = [];
   const skipped: ImportPlan['skipped'] = [];
 
@@ -286,6 +298,12 @@ export function planImport(
         origin = adoptable ? 'adopted' : 'external';
       }
 
+      // #150 P4: the join link joins the location text unless the text already holds it.
+      const location = defaults.includeMeetingUrl
+        ? withMeetingUrl(ev.location, ev.meetingUrl)
+        : (ev.location ?? '');
+      if (defaults.includeMeetingUrl && ev.meetingUrl) joinable.add(ev.id);
+
       candidates.push({
         googleEventId: ev.id,
         connectionId: source.connectionId,
@@ -301,7 +319,7 @@ export function planImport(
           // `description` would mean the first push WIPES the user's event body in
           // Google. This one line is what makes adoption near-lossless.
           ...(ev.description ? { notes: ev.description } : {}),
-          ...(ev.location ? { location: ev.location } : {}),
+          ...(location ? { location } : {}),
           ...times,
           ...recurrenceFields,
           ...activityDefaults(defaults.memberId),
@@ -337,5 +355,7 @@ export function planImport(
     skipped.push({ id: drop.googleEventId, reason: 'duplicate-across-calendars' });
   }
 
-  return { candidates: deduped, skipped };
+  const withMeetingLink = deduped.filter((c) => joinable.has(c.googleEventId)).length;
+
+  return { candidates: deduped, skipped, withMeetingLink };
 }

@@ -10,14 +10,22 @@
  * times only), and "Open in Google Calendar" through `openExternal`, only when the host
  * allows it (`showGoogleLink`: false on the beanie wall, a locked kiosk) and Google gave
  * the event a link.
+ *
+ * The "where" renders through `LocationLine` (#150 P4) from the location plus the event's
+ * Google Calendar join link (`withMeetingUrl`), so a Meet or Zoom link reads as Join Call.
+ * `interactive=false` (the wall) shows the same content with nothing to tap. When the view
+ * model has nothing to link (always the case while `locationLinksEnabled()` is false,
+ * since this surface passes `mapWhenOff: false`), the row stays today's plain text.
  */
 import { computed } from 'vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import ExternalSourceLabel from '@/components/planner/ExternalSourceLabel.vue';
+import LocationLine from '@/components/common/LocationLine.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { externalEventTitle, externalWhenLabel } from '@/utils/calendar/externalDisplay';
 import { openExternal } from '@/utils/openExternal';
+import { describeLocation, withMeetingUrl } from '@/utils/location/locationLinks';
 import type { ExternalEvent } from '@/types/externalEvents';
 
 const props = withDefaults(
@@ -25,8 +33,10 @@ const props = withDefaults(
     event: ExternalEvent | null;
     open: boolean;
     showGoogleLink?: boolean;
+    /** False on the wall (a locked kiosk): the location and join link are not tappable. */
+    interactive?: boolean;
   }>(),
-  { showGoogleLink: true }
+  { showGoogleLink: true, interactive: true }
 );
 const emit = defineEmits<{ close: [] }>();
 
@@ -34,7 +44,14 @@ const { t } = useTranslation();
 
 const title = computed(() => (props.event ? externalEventTitle(props.event, t) : ''));
 const when = computed(() => (props.event ? externalWhenLabel(props.event, t) : ''));
-const where = computed(() => (props.event?.busyOnly ? '' : (props.event?.location ?? '')));
+const where = computed(() =>
+  props.event?.busyOnly ? '' : withMeetingUrl(props.event?.location, props.event?.meetingUrl)
+);
+/** Whether `LocationLine` has anything beyond plain text to show (a map or a link). */
+const whereHasLinks = computed(() => {
+  const view = describeLocation(where.value, undefined, { mapWhenOff: false });
+  return view.links.length > 0 || view.mapHref !== undefined;
+});
 const linkHref = computed(() =>
   props.showGoogleLink && props.event?.htmlLink ? props.event.htmlLink : ''
 );
@@ -77,7 +94,13 @@ function openInGoogle(): void {
             class="text-secondary-500 dark:text-ink break-words"
             data-testid="external-event-where"
           >
-            {{ where }}
+            <LocationLine
+              v-if="whereHasLinks"
+              :text="where"
+              :interactive="interactive"
+              :map-when-off="false"
+            />
+            <template v-else>{{ where }}</template>
           </dd>
         </template>
       </dl>

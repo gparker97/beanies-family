@@ -22,6 +22,7 @@ import {
   isGoogleThrottleReason,
 } from '@/utils/googleApiError';
 import { eventItemToMs } from '@/utils/calendar/googleEventTime';
+import { safeHttpsUrl } from '@/utils/url';
 import {
   CalendarApiError,
   type CalendarClient,
@@ -46,6 +47,62 @@ const VIEW_EVENT_TYPES = ['default', 'outOfOffice', 'fromGmail'] as const;
 /** Safety cap on event-list paging: 20 × 250 = 5000 events >> any ≤42-day window.
  *  Structural guard against a non-terminating nextPageToken — never fires in practice. */
 const MAX_EVENT_PAGES = 20;
+
+/**
+ * The meeting-link fields both content reads request when `includeMeetingUrl` is set
+ * (#150 P4, `locationLinksEnabled()`). Ordinary event fields: no extra scope. Only the
+ * one derived `meetingUrl` string is ever kept.
+ */
+const MEETING_FIELDS = 'hangoutLink,conferenceData(entryPoints(entryPointType,uri))';
+
+/** The mask suffix for the meeting fields: present only when the caller asked for them. */
+const meetingMask = (include: boolean) => (include ? `,${MEETING_FIELDS}` : '');
+
+/** The raw meeting-link fields of an `events.list` item, as `MEETING_FIELDS` masks them. */
+export interface GoogleMeetingFields {
+  hangoutLink?: string;
+  conferenceData?: { entryPoints?: Array<{ entryPointType?: string; uri?: string }> };
+}
+
+/** The candidate join links of an item, best first: the video entry point, then `hangoutLink`. */
+function meetingCandidates(item: GoogleMeetingFields): string[] {
+  const out: string[] = [];
+  for (const entry of item.conferenceData?.entryPoints ?? []) {
+    if (entry?.entryPointType === 'video' && typeof entry.uri === 'string' && entry.uri) {
+      out.push(entry.uri);
+    }
+  }
+  if (typeof item.hangoutLink === 'string' && item.hangoutLink) out.push(item.hangoutLink);
+  return out;
+}
+
+/**
+ * The one join link of an event (#150 P4): the video entry point's `uri`, else
+ * `hangoutLink`, screened by `safeHttpsUrl` (https only, default port, 2,000 characters).
+ * A conference entry point can be written by a third-party add-on on someone else's
+ * event, so it is machine-supplied input and gets the machine-URL screen. `null` when
+ * the event has no link or every candidate fails the screen.
+ */
+export function meetingUrlOf(item: GoogleMeetingFields): string | null {
+  for (const candidate of meetingCandidates(item)) {
+    const screened = safeHttpsUrl(candidate);
+    if (screened) return screened;
+  }
+  return null;
+}
+
+/**
+ * The meeting-link part of an explicit pick: `{ meetingUrl }` when the event has a
+ * usable link, `{ meetingUrlRejected: true }` when it offered one that failed the
+ * screen (the store counts those, so a dropped link is never silent), else nothing.
+ */
+function pickMeetingUrl(
+  item: GoogleMeetingFields
+): { meetingUrl: string } | { meetingUrlRejected: true } | Record<string, never> {
+  const meetingUrl = meetingUrlOf(item);
+  if (meetingUrl) return { meetingUrl };
+  return meetingCandidates(item).length ? { meetingUrlRejected: true } : {};
+}
 
 /** Access-token expiry skew — refresh a little early so a request never races expiry. */
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
@@ -785,7 +842,8 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
       return out;
     },
 
-    async listEventsForImport(connectionId, calendarId, timeMinIso, timeMaxIso) {
+    async listEventsForImport(connectionId, calendarId, timeMinIso, timeMaxIso, options = {}) {
+      const withMeeting = options.includeMeetingUrl === true;
       const params = new URLSearchParams({
         timeMin: timeMinIso,
         timeMax: timeMaxIso,
@@ -816,14 +874,16 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
         // email addresses out of the family's .beanpod. `organizer(self)` and
         // `creator(self)` are booleans about the signed-in user, not identities.
         // `nextPageToken` MUST be included or paging stops after page 1.
-        fields:
-          'nextPageToken,items(id,summary,description,location,start,end,recurrence,status,recurringEventId,organizer(self),creator(self))',
+        // `MEETING_FIELDS` (#150 P4) are requested ONLY with `includeMeetingUrl`
+        // (`locationLinksEnabled()`), for the one derived `meetingUrl`.
+        fields: `nextPageToken,items(id,summary,description,location,start,end,recurrence,status,recurringEventId,organizer(self),creator(self)${meetingMask(withMeeting)})`,
       });
       const { items } = await pageAll<
-        Omit<CalendarEventFull, 'isOrganizer'> & {
-          organizer?: { self?: boolean };
-          creator?: { self?: boolean };
-        }
+        Omit<CalendarEventFull, 'isOrganizer' | 'meetingUrl' | 'meetingUrlRejected'> &
+          GoogleMeetingFields & {
+            organizer?: { self?: boolean };
+            creator?: { self?: boolean };
+          }
       >(connectionId, `/calendars/${enc(calendarId)}/events`, params, 'events.list (import)');
       const out: CalendarEventFull[] = [];
       for (const it of items) {
@@ -835,7 +895,14 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
         // event. It is not a data anomaly and must not be warned about or
         // dropped: the planner reads only its `recurringEventId`.
         if (it.status === 'cancelled' && it.recurringEventId) {
-          out.push({ ...it, isOrganizer: false });
+          // Picked explicitly, never spread: the mask now carries `conferenceData`,
+          // which must not ride along on the tombstone (#150 P4).
+          out.push({
+            id: it.id,
+            status: it.status,
+            recurringEventId: it.recurringEventId,
+            isOrganizer: false,
+          });
           continue;
         }
         if (!it.start) {
@@ -860,12 +927,14 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
           status: it.status,
           recurringEventId: it.recurringEventId,
           isOrganizer: it.organizer?.self === true || it.creator?.self === true,
+          ...(withMeeting ? pickMeetingUrl(it) : {}),
         });
       }
       return out;
     },
 
-    async listEventsForView(credentialId, calendarId, timeMinIso, timeMaxIso) {
+    async listEventsForView(credentialId, calendarId, timeMinIso, timeMaxIso, options = {}) {
+      const withMeeting = options.includeMeetingUrl === true;
       // The read guard (plan A3). A view grant can read EVERY calendar on the signed-in
       // account; beanies only ever reads one the family added, through the account it
       // was added from. Enforced here, at the one place the request is made, so no
@@ -889,9 +958,10 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
         // The view-only mask: what a calendar block shows and nothing more. No
         // `description` (an owner's private notes) and no `attendees` (other
         // people's addresses). `nextPageToken` MUST be included or paging stops
-        // after page 1.
-        fields:
-          'nextPageToken,items(id,recurringEventId,status,eventType,summary,location,start,end,transparency,visibility,htmlLink)',
+        // after page 1. `MEETING_FIELDS` (#150 P4) are requested ONLY with
+        // `includeMeetingUrl`, for the one derived `meetingUrl`;
+        // `normalizeViewEvents` keeps it only for a details event.
+        fields: `nextPageToken,items(id,recurringEventId,status,eventType,summary,location,start,end,transparency,visibility,htmlLink${meetingMask(withMeeting)})`,
       });
       // `eventTypes` is a repeated parameter. Out-of-office is the most useful
       // work-calendar signal; focus time and working location are left out.
@@ -899,12 +969,9 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
       // on the calendar it looks like any other event, so leaving it out reads as a
       // missing event (found in testing, 2026-11-17).
       for (const type of VIEW_EVENT_TYPES) params.append('eventTypes', type);
-      const { items, truncated } = await pageAll<CalendarViewEvent>(
-        credentialId,
-        `/calendars/${enc(calendarId)}/events`,
-        params,
-        'events.list (view)'
-      );
+      const { items, truncated } = await pageAll<
+        Omit<CalendarViewEvent, 'meetingUrl' | 'meetingUrlRejected'> & GoogleMeetingFields
+      >(credentialId, `/calendars/${enc(calendarId)}/events`, params, 'events.list (view)');
       // Pick the masked fields explicitly, so nothing Google adds to a response
       // can ride along into memory.
       const events = items.map((it): CalendarViewEvent => ({
@@ -919,6 +986,7 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
         transparency: it.transparency,
         visibility: it.visibility,
         htmlLink: it.htmlLink,
+        ...(withMeeting ? pickMeetingUrl(it) : {}),
       }));
       return { events, truncated };
     },

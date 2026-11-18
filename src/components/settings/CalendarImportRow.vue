@@ -16,6 +16,7 @@
  */
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useLocationOneLine } from '@/composables/useLocationOneLine';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import TickButton from '@/components/ui/TickButton.vue';
 import { REVIEW_CHIP_TONES } from '@/constants/reviewChipTones';
@@ -29,6 +30,7 @@ const props = defineProps<{
 const emit = defineEmits<{ toggle: [] }>();
 
 const { t } = useTranslation();
+const { locationOneLine } = useLocationOneLine();
 // The app's ONE recurrence summariser. The planner deliberately ships no string
 // of its own: a local one would be a fourth formatter and, living in a `.ts`
 // file, would have shipped hardcoded English past the template i18n lint.
@@ -123,7 +125,7 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
       <span
         v-if="candidate.draft.location && !repeats"
         class="text-secondary-400 dark:text-ink-faint hidden max-w-[8rem] min-w-0 shrink-[6] truncate text-xs sm:inline"
-        >{{ candidate.draft.location }}</span
+        >{{ locationOneLine(candidate.draft.location, undefined, { pin: false }) }}</span
       >
     </div>
 

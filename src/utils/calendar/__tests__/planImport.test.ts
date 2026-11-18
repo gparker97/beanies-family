@@ -253,6 +253,45 @@ describe('field mapping', () => {
   });
 });
 
+describe('the event’s meeting link (#150 P4, D6)', () => {
+  const MEET = 'https://meet.google.com/abc-defg-hij';
+  const withFlag = (events: CalendarEventFull[]) =>
+    planImport([source(events)], [], { ...defaults, includeMeetingUrl: true });
+
+  it('appends the join link to the location with includeMeetingUrl', () => {
+    const result = withFlag([ev({ location: 'Room 3', meetingUrl: MEET })]);
+    expect(result.candidates[0].draft.location).toBe(`Room 3 ${MEET}`);
+    expect(result.withMeetingLink).toBe(1);
+  });
+
+  it('leaves the location exactly as Google had it without the flag', () => {
+    const result = plan([ev({ location: 'Room 3', meetingUrl: MEET })]);
+    expect(result.candidates[0].draft.location).toBe('Room 3');
+    expect(result.withMeetingLink).toBe(0);
+    // No location and a link: still nothing, so the draft has no location key at all.
+    expect(plan([ev({ meetingUrl: MEET })]).candidates[0].draft).not.toHaveProperty('location');
+  });
+
+  it('does not append a link the location already contains', () => {
+    const location = `Zoom: ${MEET}`;
+    const { candidates } = withFlag([ev({ location, meetingUrl: MEET })]);
+    expect(candidates[0].draft.location).toBe(location);
+  });
+
+  it('an empty location becomes the link alone', () => {
+    expect(withFlag([ev({ meetingUrl: MEET })]).candidates[0].draft.location).toBe(MEET);
+    expect(withFlag([ev({ location: '', meetingUrl: MEET })]).candidates[0].draft.location).toBe(
+      MEET
+    );
+  });
+
+  it('an event with no link keeps its location (and none stays none)', () => {
+    const result = withFlag([ev({ location: 'Katong' }), ev({ id: 'g-2' })]);
+    expect(result.candidates.map((c) => c.draft.location)).toEqual(['Katong', undefined]);
+    expect(result.withMeetingLink).toBe(0);
+  });
+});
+
 describe('what never reaches the review list', () => {
   it('skips cancelled events', () => {
     const { candidates, skipped } = plan([ev({ status: 'cancelled' })]);

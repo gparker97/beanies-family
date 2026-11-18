@@ -1685,6 +1685,17 @@ describe('buildWidgetSnapshot: view-only external rows (plan 2026-11-17, C7)', (
     expect(JSON.stringify(snap)).not.toContain('g-evt-2');
   });
 
+  it('never puts an external event’s location or meeting link in the widget file (#150 P4)', () => {
+    const MEET = 'https://meet.google.com/abc-defg-hij';
+    const withLink: ExternalEvent = { ...EXT, location: 'Room 3', meetingUrl: MEET };
+    const snap = build({ externalEvents: [withLink] }).snapshot;
+    expect(externalRows(snap)).toHaveLength(1);
+    const text = JSON.stringify(snap);
+    expect(text).not.toContain('meet.google.com');
+    expect(text).not.toContain('meetingUrl');
+    expect(text).not.toContain('Room 3');
+  });
+
   it('sorts a timed external row among the day’s events by start time', () => {
     const rows = today(build({ externalEvents: [EXT] }).snapshot).view.rows.filter(
       (r) => r.kind === 'event' && r.startsAt !== null

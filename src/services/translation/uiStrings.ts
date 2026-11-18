@@ -10290,6 +10290,55 @@ const STRING_DEFS = {
   'planner.viewActivity': { en: 'Activity Details', beanie: 'activity details' },
   'planner.noLocation': { en: 'No location', beanie: 'no location' },
   'planner.openInMaps': { en: 'Open in Google Maps', beanie: 'open in maps' },
+  // #150 location autofill and call links (LocationField, LocationLine).
+  'planner.field.locationOrLink': { en: 'Location or Link', beanie: 'location or link' },
+  'location.suggestions': { en: 'Suggested Places', beanie: 'suggested places' },
+  'location.keepTyped': { en: 'Keep What I Typed', beanie: 'keep what i typed' },
+  'location.keepTyped.hint': {
+    en: 'No place is attached. The map link searches for your text.',
+    beanie: 'no place is attached. the map link searches for your text.',
+  },
+  'location.detailLabel': {
+    en: 'Unit, Room or Other Detail',
+    beanie: 'unit, room or other detail',
+  },
+  'location.detailHint': {
+    en: 'Unit, room or other detail. Kept from what you typed; change it if it is not right.',
+    beanie: 'unit, room or other detail. kept from what you typed; change it if it is not right.',
+  },
+  'location.detailHintEmpty': {
+    en: 'Add a unit, room or other detail if you need one.',
+    beanie: 'add a unit, room or other detail if you need one.',
+  },
+  'location.removePlace': { en: 'Remove Place', beanie: 'remove place' },
+  'location.joinCall': { en: 'Join {service} Call', beanie: 'join {service} call' },
+  'location.callOf': { en: '{service} call', beanie: '{service} call' },
+  'location.mapLink': { en: 'Map Link', beanie: 'map link' },
+  'location.joinFromPhone': { en: 'Join from your phone', beanie: 'join from your phone' },
+  'location.understood.call': {
+    en: '{service} call. Shows as Join Call on the activity.',
+    beanie: '{service} call. shows as join call on the activity.',
+  },
+  'location.understood.link': {
+    en: 'Web link. Shows as a link on the activity.',
+    beanie: 'web link. shows as a link on the activity.',
+  },
+  'location.understood.map': {
+    en: 'Map link. Shows as a map link on the activity.',
+    beanie: 'map link. shows as a map link on the activity.',
+  },
+  'location.understood.placeAndCall': {
+    en: 'Place and {service} call. Both show on the activity.',
+    beanie: 'place and {service} call. both show on the activity.',
+  },
+  'location.understood.placeAndLink': {
+    en: 'Place and web link. Both show on the activity.',
+    beanie: 'place and web link. both show on the activity.',
+  },
+  'location.pickFailed': {
+    en: "Couldn't load that place. Your text is kept as typed, and the map link still works.",
+    beanie: "couldn't load that place. your text is kept as typed, and the map link still works.",
+  },
   'planner.noNotes': { en: 'No notes', beanie: 'no notes' },
   'planner.cost': { en: 'Cost', beanie: 'cost' },
   'planner.transport': { en: 'Transport', beanie: 'transport' },
@@ -15792,6 +15841,17 @@ const STRING_DEFS = {
     en: "Your home town is only used to look up the weather for the wall, the Nook and your widgets. beanies.family never reads your device's location.",
     beanie:
       "your home town is only used to look up the weather for the wall, the nook and your widgets. beanies.family never reads your device's location.",
+  },
+  'settings.weather.homeTownHintPlaces': {
+    en: "Your home town is used to look up the weather for the wall, the Nook and your widgets, and as a rough hint for address suggestions. beanies.family never reads your device's location.",
+    beanie:
+      "your home town is used to look up the weather for the wall, the nook and your widgets, and as a rough hint for address suggestions. beanies.family never reads your device's location.",
+  },
+  'settings.addressSuggestions.title': { en: 'Address Suggestions', beanie: 'address suggestions' },
+  'settings.addressSuggestions.hint': {
+    en: 'Suggest places from Google Maps as you type a location. What you type in a location field is sent to Google to find matches.',
+    beanie:
+      'suggest places from google maps as you type a location. what you type in a location field is sent to google to find matches.',
   },
   'settings.weather.notFound': {
     en: 'No town called "{query}". Check the spelling, or try a ZIP code or a bigger town nearby.',

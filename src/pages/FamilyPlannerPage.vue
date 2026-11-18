@@ -49,6 +49,7 @@ import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useLocationOneLine } from '@/composables/useLocationOneLine';
 import { usePermissions } from '@/composables/usePermissions';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
@@ -95,6 +96,7 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
+const { locationOneLine } = useLocationOneLine();
 // Month view has sibling surfaces; `monthSurface` (below) picks which one mounts.
 const { isMobile, isTablet } = useBreakpoint();
 const { categoryLabel } = useActivityCategoryLabel();
@@ -1156,7 +1158,10 @@ function showActivityCreatedConfirmation(data: CreateFamilyActivityInput, activi
     });
   }
   if (data.location) {
-    details.push({ label: t('planner.field.location'), value: data.location });
+    details.push({
+      label: t('planner.field.location'),
+      value: locationOneLine(data.location, data.locationPlace, { pin: false }),
+    });
   }
   createdConfirm.value = {
     open: true,

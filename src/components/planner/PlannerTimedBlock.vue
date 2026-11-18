@@ -29,6 +29,7 @@ import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import PlannerResizeHandle from '@/components/planner/PlannerResizeHandle.vue';
 import { useActivityDragAttrs } from '@/composables/drag/useActivityDragAttrs';
 import { formatTime12 } from '@/utils/date';
+import { useLocationOneLine } from '@/composables/useLocationOneLine';
 import type { ActivityIdentity } from '@/composables/useActivityIdentity';
 import type { ResolvedClash } from '@/composables/useClash';
 import type { FamilyActivity } from '@/types/models';
@@ -67,6 +68,7 @@ const props = withDefaults(
     draggable: true,
   }
 );
+const { locationOneLine } = useLocationOneLine();
 
 const emit = defineEmits<{
   'view-activity': [id: string, date: string];
@@ -137,7 +139,7 @@ const blockStyle = computed(() => ({
         v-if="activity.location"
         class="min-w-0 flex-1 truncate text-xs leading-tight text-[var(--muted-text)]"
       >
-        · 📍 {{ activity.location }}
+        · {{ locationOneLine(activity.location, activity.locationPlace) }}
       </span>
       <!--
         Faces are ALWAYS right-anchored (`ml-auto`), which keeps a title's left edge

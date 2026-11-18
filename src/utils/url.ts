@@ -53,32 +53,69 @@ function isBareUrl(candidate: string): boolean {
   return true;
 }
 
-/** Extract all URLs found in a string. Returns fully-qualified https:// URLs. */
-export function extractUrls(text: string): string[] {
-  const results: string[] = [];
+/** One URL found in a text, with where it sits (for callers that need to cut it out). */
+export interface UrlSpan {
+  /** The fully-qualified URL (`https://` prepended to a bare host). */
+  url: string;
+  /** The matched text exactly as it appears in the input. */
+  raw: string;
+  /** `text.slice(start, end) === raw`. */
+  start: number;
+  end: number;
+  /** True when the text carried an explicit `http(s)://`. */
+  hadScheme: boolean;
+}
+
+/**
+ * Every URL in a string with its position, using exactly the matching `extractUrls` has always
+ * used, in the same order (explicit-scheme URLs first, then bare hosts) and NOT deduplicated.
+ * `extractUrls` is this list's unique `url`s, so the two can never disagree.
+ */
+export function extractUrlSpans(text: string): UrlSpan[] {
+  const spans: UrlSpan[] = [];
 
   // First pass: explicit protocol URLs
-  const protocolMatches = text.match(PROTOCOL_URL_REGEX) ?? [];
-  for (const m of protocolMatches) {
-    results.push(m);
+  const protocolMatches: string[] = [];
+  for (const m of text.matchAll(PROTOCOL_URL_REGEX)) {
+    protocolMatches.push(m[0]);
+    spans.push({
+      url: m[0],
+      raw: m[0],
+      start: m.index,
+      end: m.index + m[0].length,
+      hadScheme: true,
+    });
   }
 
-  // Second pass: find bare domains by splitting on whitespace
-  for (const word of text.split(/\s+/)) {
+  // Second pass: find bare domains word by word (a word is a run of non-whitespace)
+  for (const w of text.matchAll(/\S+/g)) {
+    const word = w[0];
     // Strip leading/trailing punctuation that isn't part of a URL
+    const lead = word.match(/^[(<"']+/)?.[0].length ?? 0;
     const cleaned = word.replace(/^[(<"']+|[)>"',;.!?]+$/g, '');
     if (!cleaned || cleaned.includes('://')) continue;
     // Must contain a dot and look like a domain (word.tld)
     if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,6}/i.test(cleaned)) continue;
     if (!isBareUrl(cleaned)) continue;
     // Skip if already covered by a protocol match
-    const full = `https://${cleaned}`;
     if (protocolMatches.some((p) => p.includes(cleaned))) continue;
-    results.push(full);
+    const start = w.index + lead;
+    spans.push({
+      url: `https://${cleaned}`,
+      raw: cleaned,
+      start,
+      end: start + cleaned.length,
+      hadScheme: false,
+    });
   }
 
+  return spans;
+}
+
+/** Extract all URLs found in a string. Returns fully-qualified https:// URLs. */
+export function extractUrls(text: string): string[] {
   // Deduplicate while preserving order
-  return [...new Set(results)];
+  return [...new Set(extractUrlSpans(text).map((s) => s.url))];
 }
 
 /** Get display-friendly domain from a URL (e.g. "docs.google.com"). */

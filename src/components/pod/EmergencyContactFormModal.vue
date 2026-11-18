@@ -11,6 +11,9 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import LocationField from '@/components/ui/LocationField.vue';
+import { orUndefined } from '@/utils/diffPayload';
+import { useLocationPair } from '@/composables/useLocationPair';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
@@ -33,7 +36,9 @@ const name = ref('');
 const role = ref('');
 const phone = ref('');
 const email = ref('');
-const address = ref('');
+/** #150: the address string and its picked place, bound as one pair. */
+const addressPair = useLocationPair('address');
+const { text: address, value: addressValue } = addressPair;
 const notes = ref('');
 
 const categoryOptions = computed(() => [
@@ -56,7 +61,7 @@ const { isEditing, isSubmitting } = useFormModal(
       role.value = c.role ?? '';
       phone.value = c.phone ?? '';
       email.value = c.email ?? '';
-      address.value = c.address ?? '';
+      addressPair.seed(c);
       notes.value = c.notes ?? '';
     },
     onNew: () => {
@@ -66,7 +71,7 @@ const { isEditing, isSubmitting } = useFormModal(
       role.value = '';
       phone.value = '';
       email.value = '';
-      address.value = '';
+      addressPair.reset();
       notes.value = '';
     },
   }
@@ -91,7 +96,8 @@ async function handleSave(): Promise<void> {
       ...(role.value.trim() ? { role: role.value.trim() } : {}),
       ...(phone.value.trim() ? { phone: phone.value.trim() } : {}),
       ...(email.value.trim() ? { email: email.value.trim() } : {}),
-      ...(address.value.trim() ? { address: address.value.trim() } : {}),
+      // Present-as-undefined when cleared, so the address and its place are really removed.
+      ...addressPair.patch(orUndefined(address.value)),
       ...(notes.value.trim() ? { notes: notes.value.trim() } : {}),
     };
     if (isEditing.value && props.contact) {
@@ -167,7 +173,7 @@ async function handleDelete(): Promise<void> {
     </div>
 
     <FormFieldGroup :label="t('contacts.field.address')" optional>
-      <BaseInput v-model="address" />
+      <LocationField v-model:value="addressValue" mode="address" field-kind="contact" />
     </FormFieldGroup>
 
     <FormFieldGroup :label="t('contacts.field.notes')" optional>

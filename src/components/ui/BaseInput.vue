@@ -36,10 +36,13 @@ const emit = defineEmits<{
 
 /**
  * Optional `leading` slot: a decorative icon inside the field's left edge (the home-town
- * field's map pin). Additive: the extra left padding applies only when the slot is filled.
+ * field's map pin, `LocationField`'s call / link icon). Additive: the extra left padding
+ * applies only when the slot is filled. Read at render time, never through `computed`:
+ * `useSlots()` is not reactive, so a computed would cache the first answer and a slot a
+ * parent adds later behind `v-if` (LocationField, #150) would never show.
  */
 const slots = useSlots();
-const hasLeading = computed(() => !!slots.leading);
+const hasLeading = () => !!slots.leading;
 
 const inputId = computed(() => props.id || `input-${Math.random().toString(36).slice(2, 9)}`);
 
@@ -60,7 +63,7 @@ const inputClasses = computed(() => {
     ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-surface-ground'
     : '';
 
-  return [base, hasLeading.value ? 'pl-10' : 'pl-3', states, disabled];
+  return [base, states, disabled];
 });
 
 function handleInput(event: Event) {
@@ -83,7 +86,7 @@ function handleInput(event: Event) {
 
     <div class="relative">
       <span
-        v-if="hasLeading"
+        v-if="hasLeading()"
         class="text-secondary-400 dark:text-ink-soft pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
         aria-hidden="true"
       >
@@ -96,7 +99,7 @@ function handleInput(event: Event) {
         :placeholder="placeholder"
         :disabled="disabled"
         :required="required"
-        :class="inputClasses"
+        :class="[inputClasses, hasLeading() ? 'pl-10' : 'pl-3']"
         v-bind="$attrs"
         @input="handleInput"
         @blur="emit('blur', $event)"

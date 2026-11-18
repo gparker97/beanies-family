@@ -4,6 +4,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import LocationField from '@/components/ui/LocationField.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
@@ -30,6 +31,7 @@ import {
   buildTravelSegmentTitle,
 } from '@/utils/vacation';
 import { orUndefined } from '@/utils/diffPayload';
+import { useLocationPair } from '@/composables/useLocationPair';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { CHORE_TITLE_MAX } from '@/constants/choreBlocks';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
@@ -122,7 +124,9 @@ const carLabel = ref('');
 const leavingTime = ref('');
 const activityCategory = ref('');
 const description = ref('');
-const location = ref('');
+/** #150: the location string and its picked place, bound as one pair. */
+const locationPair = useLocationPair('location');
+const { text: location, value: locationValue } = locationPair;
 const link = ref('');
 // SECURITY: authorises the href. The old `link.startsWith('http')` test blocked
 // `javascript:` only by accident, and segment.link is MODEL OUTPUT (see the travel
@@ -181,7 +185,7 @@ function buildPayload() {
       ? (activityCategory.value as import('@/types/models').VacationActivityCategory)
       : undefined,
     description: description.value || undefined,
-    location: location.value || undefined,
+    ...locationPair.patch(location.value || undefined),
     link: link.value || undefined,
     startTime: startTime.value || undefined,
     duration: activityDuration.value || undefined,
@@ -236,7 +240,7 @@ const { isSubmitting, formDiff } = useFormModal<VacationTravelSegment, SegmentPa
       leavingTime.value = seg.leavingTime ?? '';
       activityCategory.value = seg.activityCategory ?? '';
       description.value = seg.description ?? '';
-      location.value = seg.location ?? '';
+      locationPair.seed(seg);
       link.value = seg.link ?? '';
       startTime.value = seg.startTime ?? '';
       activityDuration.value = seg.duration ?? '';
@@ -273,7 +277,7 @@ const { isSubmitting, formDiff } = useFormModal<VacationTravelSegment, SegmentPa
       leavingTime.value = '';
       activityCategory.value = '';
       description.value = '';
-      location.value = '';
+      locationPair.reset();
       link.value = '';
       startTime.value = '';
       activityDuration.value = '';
@@ -944,20 +948,13 @@ async function handleSave() {
 
         <!-- Location (own row, with maps link) -->
         <FormFieldGroup :label="t('vacation.field.location')">
-          <div class="relative">
-            <BaseInput v-model="location" />
-            <a
-              v-if="location"
-              :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="absolute top-1/2 right-2 -translate-y-1/2 text-sm opacity-40 transition-opacity hover:opacity-80"
-              :title="t('planner.openInMaps')"
-              @click.stop
-            >
-              📍
-            </a>
-          </div>
+          <LocationField
+            v-model:value="locationValue"
+            mode="address"
+            field-kind="segment"
+            map-pin
+            :map-pin-title="t('planner.openInMaps')"
+          />
         </FormFieldGroup>
 
         <!-- Booking reference -->

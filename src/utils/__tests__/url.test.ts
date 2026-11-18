@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractUrls,
+  extractUrlSpans,
   getUrlDomain,
   getUrlLabel,
   getFaviconUrl,
@@ -57,6 +58,48 @@ describe('extractUrls', () => {
 
   it('ignores version numbers', () => {
     expect(extractUrls('upgrade to 3.14')).toEqual([]);
+  });
+  it('two URLs separated by a comma are still two', () => {
+    expect(extractUrls('https://a.com,https://b.org/x')).toEqual([
+      'https://a.com',
+      'https://b.org/x',
+    ]);
+    expect(extractUrls('see https://a.com, https://b.org')).toEqual([
+      'https://a.com',
+      'https://b.org',
+    ]);
+  });
+});
+
+describe('extractUrlSpans', () => {
+  it('locates each URL, scheme ones first, bare hosts after, undeduplicated', () => {
+    const text = '(zoom.us/j/1) and https://a.com/x, then https://a.com/x';
+    const spans = extractUrlSpans(text);
+    expect(spans.map((s) => [s.url, s.raw, s.hadScheme])).toEqual([
+      ['https://a.com/x', 'https://a.com/x', true],
+      ['https://a.com/x', 'https://a.com/x', true],
+      ['https://zoom.us/j/1', 'zoom.us/j/1', false],
+    ]);
+    for (const s of spans) expect(text.slice(s.start, s.end)).toBe(s.raw);
+    expect(spans[1]!.start).toBeGreaterThan(spans[0]!.start);
+  });
+
+  it('a scheme URL stops at a comma, as extractUrls always has', () => {
+    const [span] = extractUrlSpans('https://www.google.com/maps/@1.29,103.85,17z');
+    expect(span!.raw).toBe('https://www.google.com/maps/@1.29');
+  });
+
+  it('extractUrls is the unique urls of the spans', () => {
+    const corpus = [
+      'Check https://example.com and https://foo.bar/path for details',
+      'see https://example.com and example.com',
+      'edit file.vue and config.ts, upgrade to 3.14',
+      'St.Regis Hotel, Mt.Pleasant Rd, www.example.com/a?b=1.',
+      'https://a.com,https://b.org http://c.net/(x)',
+    ];
+    for (const text of corpus) {
+      expect(extractUrls(text)).toEqual([...new Set(extractUrlSpans(text).map((s) => s.url))]);
+    }
   });
 });
 

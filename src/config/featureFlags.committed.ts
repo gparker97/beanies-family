@@ -16,6 +16,7 @@ export const COMMITTED_FLAGS: Record<DevFlag, boolean> = {
   googleCalendarSync: true,
   helpfulHints: true,
   mealPlanner: true,
+  placeSuggestions: false,
   podCompaction: true,
   pricing: true,
   systemBrowserPicker: true,

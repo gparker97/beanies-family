@@ -14,6 +14,7 @@ import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ActivityCategoryPicker from '@/components/ui/ActivityCategoryPicker.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import LocationField from '@/components/ui/LocationField.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
@@ -26,6 +27,8 @@ import { calculateMonthlyFee } from '@/utils/finance';
 import { resolveActivityRule, activityShadowFromRule } from '@/services/recurrence/adapters';
 import { monthlyFactor, occurrenceCount } from '@/services/recurrence/recurrenceEngine';
 import { diffPayload } from '@/utils/diffPayload';
+import { locationLinksEnabled } from '@/utils/location/locationLinks';
+import { useLocationPair } from '@/composables/useLocationPair';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useActivityStore } from '@/stores/activityStore';
@@ -182,7 +185,13 @@ const category = ref<ActivityCategory>('' as ActivityCategory);
 const assigneeIds = ref<string[]>([]);
 const dropoffMemberId = ref<string>('');
 const pickupMemberId = ref<string>('');
-const location = ref('');
+/** #150: the location string and its picked place, bound as one pair. */
+const locationPair = useLocationPair('location');
+const { text: location, value: locationValue } = locationPair;
+/** "Location or Link" once suggestions are live, today's "Location" otherwise. */
+const locationLabel = computed(() =>
+  t(locationLinksEnabled() ? 'planner.field.locationOrLink' : 'planner.field.location')
+);
 const feeSchedule = ref<FeeSchedule>('none');
 const feeAmount = ref<number | undefined>(undefined);
 const feeCurrency = ref('');
@@ -270,7 +279,9 @@ function applyPrefill(): void {
   }
   if (p.title !== undefined) title.value = p.title;
   if (p.date) date.value = p.date;
-  if (p.location !== undefined) location.value = p.location;
+  if (p.location !== undefined) {
+    locationPair.seed({ location: p.location });
+  }
   if (p.description !== undefined) description.value = p.description;
   // AI-extracted prep notes route to the VISIBLE `notes` field, which lives inside the
   // collapsed "Add more details" section — reveal it so the prefilled notes aren't hidden
@@ -424,7 +435,7 @@ const { isEditing, isSubmitting } = useFormModal(
       assigneeIds.value = normalizeAssignees(activity);
       dropoffMemberId.value = activity.dropoffMemberId ?? '';
       pickupMemberId.value = activity.pickupMemberId ?? '';
-      location.value = activity.location ?? '';
+      locationPair.seed(activity);
       feeSchedule.value = activity.feeSchedule === 'none' ? 'per_session' : activity.feeSchedule;
       feeAmount.value = activity.feeAmount ?? 0;
       feeCurrency.value = activity.feeCurrency ?? settingsStore.displayCurrency;
@@ -470,7 +481,7 @@ const { isEditing, isSubmitting } = useFormModal(
       assigneeIds.value = props.defaultAssigneeIds ?? [];
       dropoffMemberId.value = '';
       pickupMemberId.value = '';
-      location.value = '';
+      locationPair.reset();
       feeSchedule.value = 'per_session';
       feeAmount.value = 0;
       feeCurrency.value = settingsStore.displayCurrency;
@@ -891,7 +902,7 @@ function buildPayload(): CreateFamilyActivityInput {
     ...assigneePayload,
     dropoffMemberId: dropoffMemberId.value || undefined,
     pickupMemberId: pickupMemberId.value || undefined,
-    location: location.value.trim() || undefined,
+    ...locationPair.patch(location.value.trim() || undefined),
     feeSchedule: hasCost.value ? feeSchedule.value : ('none' as FeeSchedule),
     feeAmount: hasCost.value ? feeAmount.value : undefined,
     feeCurrency: hasCost.value ? feeCurrency.value : undefined,
@@ -1391,8 +1402,13 @@ function handleSave() {
            record or prefill that already carries any of them always shows them. -->
       <template v-if="showLogistics">
         <!-- 8. Location -->
-        <FormFieldGroup ref="locationGroupRef" :label="t('planner.field.location')" optional>
-          <BaseInput v-model="location" :placeholder="t('planner.field.location')" />
+        <FormFieldGroup ref="locationGroupRef" :label="locationLabel" optional>
+          <LocationField
+            v-model:value="locationValue"
+            mode="location-or-link"
+            field-kind="activity"
+            :placeholder="locationLabel"
+          />
         </FormFieldGroup>
 
         <!-- 8. Drop Off Duty / Pick Up Duty -->

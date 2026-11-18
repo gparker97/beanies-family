@@ -29,6 +29,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { locationLinksEnabled } from '@/utils/location/locationLinks';
 import type { CountryCode, TemperatureUnit } from '@/types/models';
 
 const props = defineProps<{ open: boolean }>();
@@ -114,6 +115,25 @@ async function onToggleWeather(on: boolean) {
   }
 }
 
+// ── Address suggestions (#150) ──────────────────────────────────────────────
+// Visible only while the feature is live. Family-wide, so only a pod manager flips it; off
+// returns every location field to plain typing on every device after sync.
+const suggestionsLive = locationLinksEnabled();
+
+async function onToggleAddressSuggestions(on: boolean) {
+  try {
+    await settingsStore.setAddressSuggestionsEnabled(on);
+    logEvent({
+      level: 'info',
+      surface: 'place-search',
+      message: 'place_suggestions_settings',
+      context: { action: 'settings', detail: on ? 'on' : 'off' },
+    });
+  } catch {
+    // Already toasted by persistAiSetting; the switch reads the store value, so it reverts.
+  }
+}
+
 async function onPickUnit(value: string) {
   // The pills have no disabled state of their own; the fieldset disables them, and this
   // guard keeps a non-manager from writing even if a click gets through.
@@ -184,7 +204,13 @@ async function onPickUnit(value: string) {
           :placeholder="t('settings.weather.homeTownPlaceholder')"
         />
         <p class="dark:text-ink-soft text-secondary-400 mt-1.5 text-xs">
-          {{ t('settings.weather.homeTownHint') }}
+          {{
+            t(
+              suggestionsLive
+                ? 'settings.weather.homeTownHintPlaces'
+                : 'settings.weather.homeTownHint'
+            )
+          }}
         </p>
       </FormFieldGroup>
       <FormFieldGroup :label="t('settings.weather.unit')">
@@ -200,6 +226,17 @@ async function onPickUnit(value: string) {
         </p>
       </FormFieldGroup>
     </template>
+
+    <!-- Address suggestions: outside the weather block so it is reachable with weather off. -->
+    <SettingToggleRow
+      v-if="suggestionsLive"
+      :model-value="settingsStore.addressSuggestionsEnabled"
+      :title="t('settings.addressSuggestions.title')"
+      :hint="t('settings.addressSuggestions.hint')"
+      :disabled="!canManagePod"
+      testid="address-suggestions-toggle"
+      @update:model-value="onToggleAddressSuggestions"
+    />
 
     <p v-if="showHolidayRetryHint" class="dark:text-ink-soft text-secondary-500 text-xs">
       {{ t('holiday.loadFailedRetryHint') }}

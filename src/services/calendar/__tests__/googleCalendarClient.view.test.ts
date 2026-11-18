@@ -108,7 +108,7 @@ describe('googleCalendarClient.listEventsForView', () => {
     });
   });
 
-  async function callOnce(body: unknown = { items: [] }) {
+  async function callOnce(body: unknown = { items: [] }, includeMeetingUrl = false) {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, body));
     vi.stubGlobal('fetch', fetchMock);
     const client = createGoogleCalendarClient(makeTokenProvider().provider);
@@ -116,12 +116,13 @@ describe('googleCalendarClient.listEventsForView', () => {
       'view-1',
       SHARED_CALENDAR_ID,
       '2026-11-17T00:00:00Z',
-      '2026-12-01T00:00:00Z'
+      '2026-12-01T00:00:00Z',
+      { includeMeetingUrl }
     );
     return { result, url: new URL(String(fetchMock.mock.calls[0][0])) };
   }
 
-  it('requests exactly the view mask: no description, no attendees', async () => {
+  it('requests exactly the view mask: no description, no attendees, no meeting fields when off', async () => {
     const { url } = await callOnce();
     const fields = url.searchParams.get('fields')!;
     expect(fields).toBe(
@@ -129,6 +130,54 @@ describe('googleCalendarClient.listEventsForView', () => {
     );
     expect(fields).not.toContain('description');
     expect(fields).not.toContain('attendees');
+  });
+
+  it('adds the meeting-link fields to the mask only when meeting links are on (#150 P4)', async () => {
+    const { url } = await callOnce({ items: [] }, true);
+    expect(url.searchParams.get('fields')).toBe(
+      'nextPageToken,items(id,recurringEventId,status,eventType,summary,location,start,end,transparency,visibility,htmlLink,hangoutLink,conferenceData(entryPoints(entryPointType,uri)))'
+    );
+  });
+
+  it('with meeting links off, never derives a meetingUrl even if Google sends one', async () => {
+    const { result } = await callOnce({
+      items: [timed('e1', { hangoutLink: 'https://meet.google.com/abc-defg-hij' })],
+    });
+    expect(result.events[0]).not.toHaveProperty('meetingUrl');
+    expect(result.events[0]).not.toHaveProperty('meetingUrlRejected');
+  });
+
+  it('keeps ONE derived meetingUrl and never conferenceData or hangoutLink (#150 P4)', async () => {
+    const { result } = await callOnce(
+      {
+        items: [
+          timed('e1', {
+            summary: 'Standup',
+            hangoutLink: 'https://meet.google.com/abc-defg-hij',
+            conferenceData: {
+              entryPoints: [
+                { entryPointType: 'phone', uri: 'tel:+1-555-0100' },
+                { entryPointType: 'video', uri: 'https://meet.google.com/abc-defg-hij' },
+              ],
+            },
+          }),
+          // eslint-disable-next-line @microsoft/sdl/no-insecure-url -- the insecure scheme IS the case under test
+          timed('e2', { hangoutLink: 'http://meet.google.com/insecure' }),
+          timed('e3'),
+        ],
+      },
+      true
+    );
+    const [withLink, rejected, none] = result.events;
+    expect(withLink!.meetingUrl).toBe('https://meet.google.com/abc-defg-hij');
+    expect(withLink).not.toHaveProperty('conferenceData');
+    expect(withLink).not.toHaveProperty('hangoutLink');
+    expect(withLink).not.toHaveProperty('meetingUrlRejected');
+    // A link that fails the screen is dropped and marked, so the store can count it.
+    expect(rejected).not.toHaveProperty('meetingUrl');
+    expect(rejected!.meetingUrlRejected).toBe(true);
+    expect(none).not.toHaveProperty('meetingUrl');
+    expect(none).not.toHaveProperty('meetingUrlRejected');
   });
 
   it('expands recurring events, hides deleted ones, and passes the window through', async () => {

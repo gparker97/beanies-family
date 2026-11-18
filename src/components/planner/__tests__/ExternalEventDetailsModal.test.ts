@@ -17,6 +17,12 @@ vi.mock('@/composables/useTranslation', () => ({
 const openExternal = vi.hoisted(() => vi.fn());
 vi.mock('@/utils/openExternal', () => ({ openExternal }));
 
+/** The #150 location-links flag, off by default (today's behaviour). */
+const flags = vi.hoisted(() => ({ on: false }));
+vi.mock('@/config/flags', () => ({
+  isFlagEnabled: (id: string) => (id === 'placeSuggestions' ? flags.on : false),
+}));
+
 const BaseModal = {
   props: ['open', 'title', 'size'],
   emits: ['close'],
@@ -26,16 +32,24 @@ const BaseModal = {
 
 const LINK = 'https://www.google.com/calendar/event?eid=abc';
 
-function open(event: ExternalEvent | null, showGoogleLink?: boolean) {
+function open(event: ExternalEvent | null, showGoogleLink?: boolean, interactive?: boolean) {
   return mount(ExternalEventDetailsModal, {
-    props: { event, open: true, ...(showGoogleLink === undefined ? {} : { showGoogleLink }) },
+    props: {
+      event,
+      open: true,
+      ...(showGoogleLink === undefined ? {} : { showGoogleLink }),
+      ...(interactive === undefined ? {} : { interactive }),
+    },
     global: { stubs: { BaseModal } },
   });
 }
 
 const find = (w: ReturnType<typeof open>, id: string) => w.find(`[data-testid="${id}"]`);
 
-beforeEach(() => openExternal.mockReset());
+beforeEach(() => {
+  openExternal.mockReset();
+  flags.on = false;
+});
 
 describe('ExternalEventDetailsModal', () => {
   it('shows the title, the source, when, where and the view-only note', () => {
@@ -114,5 +128,49 @@ describe('ExternalEventDetailsModal', () => {
   it('renders nothing for a null event', () => {
     const w = open(null);
     expect(find(w, 'external-event-details').exists()).toBe(false);
+  });
+
+  describe('the meeting link (#150 P4)', () => {
+    const MEET = 'https://meet.google.com/abc-defg-hij';
+    const meeting = () =>
+      externalEvent('Standup', { location: 'Room 3', meetingUrl: MEET, htmlLink: LINK });
+
+    it('flag off: the where row is today’s plain text, with no link or button', () => {
+      // With the flag off the store never sets `meetingUrl`, so the event is as today.
+      const w = open(externalEvent('Babysitting', { location: 'Our house https://x.test/a' }));
+      const where = find(w, 'external-event-where');
+      expect(where.text()).toBe('Our house https://x.test/a');
+      expect(where.find('a').exists()).toBe(false);
+      expect(where.find('button').exists()).toBe(false);
+      expect(where.find('[data-testid="location-line"]').exists()).toBe(false);
+    });
+
+    it('flag on: renders Join Call that opens the screened link', async () => {
+      flags.on = true;
+      const w = open(meeting());
+      const join = find(w, 'location-line-join');
+      expect(join.exists()).toBe(true);
+      expect(join.text()).toBe('Join Google Meet Call');
+      await join.trigger('click');
+      expect(openExternal).toHaveBeenCalledWith(MEET);
+      expect(find(w, 'external-event-where').text()).toContain('Room 3');
+    });
+
+    it('flag on, not interactive (the wall): the call shows by name with nothing to tap', () => {
+      flags.on = true;
+      const w = open(meeting(), false, false);
+      const where = find(w, 'external-event-where');
+      expect(where.text()).toContain('Google Meet call');
+      expect(where.text()).toContain('Join from your phone');
+      expect(where.find('a').exists()).toBe(false);
+      expect(where.find('button').exists()).toBe(false);
+    });
+
+    it('a busy-only event shows no where row even if a link slipped through', () => {
+      flags.on = true;
+      const w = open(externalEvent('x', { busyOnly: true, title: undefined, meetingUrl: MEET }));
+      expect(find(w, 'external-event-where').exists()).toBe(false);
+      expect(find(w, 'location-line-join').exists()).toBe(false);
+    });
   });
 });

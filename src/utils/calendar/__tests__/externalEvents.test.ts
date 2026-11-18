@@ -115,6 +115,67 @@ describe('normalizeViewEvents', () => {
     expect(events[0]).not.toHaveProperty('location');
   });
 
+  describe('meeting links (#150 P4)', () => {
+    const MEET = 'https://meet.google.com/abc-defg-hij';
+    const ON = { includeMeetingUrl: true };
+
+    it('keeps the client-screened meetingUrl on a details event when asked to', () => {
+      const { events } = normalizeViewEvents([timed({ meetingUrl: MEET })], CAL, NO_IDS, ON);
+      expect(events[0]!.meetingUrl).toBe(MEET);
+      // Only the derived string: the client's rejection marker never reaches the event.
+      const marked = normalizeViewEvents([timed({ meetingUrlRejected: true })], CAL, NO_IDS, ON)
+        .events[0]!;
+      expect(marked).not.toHaveProperty('meetingUrlRejected');
+      expect(marked).not.toHaveProperty('meetingUrl');
+    });
+
+    it('sets no meetingUrl with includeMeetingUrl false, or with no option at all', () => {
+      const off = normalizeViewEvents([timed({ meetingUrl: MEET })], CAL, NO_IDS, {
+        includeMeetingUrl: false,
+      });
+      expect(off.events[0]).not.toHaveProperty('meetingUrl');
+      const absent = normalizeViewEvents([timed({ meetingUrl: MEET })], CAL, NO_IDS);
+      expect(absent.events[0]).not.toHaveProperty('meetingUrl');
+    });
+
+    it.each([
+      ['the calendar is set to busy only', { ...CAL, detailLevel: 'busy' as const }, {}],
+      ['the account is a freeBusyReader', { ...CAL, accessRole: 'freeBusyReader' as const }, {}],
+      ['the event is private', CAL, { visibility: 'private' }],
+      ['the event has no summary', CAL, { summary: undefined }],
+    ])('a busy-only event never carries one (%s)', (_why, calendar, overrides) => {
+      const { events } = normalizeViewEvents(
+        [timed({ meetingUrl: MEET, ...overrides })],
+        calendar,
+        NO_IDS,
+        ON
+      );
+      expect(events[0]!.busyOnly).toBe(true);
+      expect(events[0]).not.toHaveProperty('meetingUrl');
+    });
+
+    it('restripForCalendar strips a busy-only event that still carries a meeting URL', () => {
+      // A shape no normalize produces today, which is the point: the early return must
+      // not let a stray meeting URL through on an event already marked busy-only.
+      const stray: ExternalEvent = {
+        ...normalizeViewEvents([timed({ summary: undefined })], CAL, NO_IDS).events[0]!,
+        meetingUrl: MEET,
+      };
+      expect(stray.busyOnly).toBe(true);
+      const out = restripForCalendar(stray, { detailLevel: 'busy', accessRole: 'reader' });
+      expect(out).not.toBe(stray);
+      expect(out).not.toHaveProperty('meetingUrl');
+    });
+
+    it('restripForCalendar drops the meeting URL with the title when the calendar turns busy only', () => {
+      const [event] = normalizeViewEvents([timed({ meetingUrl: MEET })], CAL, NO_IDS, ON).events;
+      const out = restripForCalendar(event!, { detailLevel: 'busy', accessRole: 'reader' });
+      expect(out.busyOnly).toBe(true);
+      expect(out).not.toHaveProperty('title');
+      expect(out).not.toHaveProperty('meetingUrl');
+    });
+  });
+
   it('an event Google made from an email keeps its details on a calendar the account OWNS', () => {
     // Google's default for these, not the owner's choice (greg, 2026-11-17).
     for (const visibility of ['private', 'confidential']) {

@@ -55,6 +55,8 @@ import OverlapMark from '@/components/planner/OverlapMark.vue';
 import ActivityLists from '@/components/lists/ActivityLists.vue';
 import ActivityTodos from '@/components/todo/ActivityTodos.vue';
 import { openExternal } from '@/utils/openExternal';
+import LocationLine from '@/components/common/LocationLine.vue';
+import { describeLocation, locationLabelKey } from '@/utils/location/locationLinks';
 import { safeExternalHref } from '@/utils/url';
 import { isRepeatingActivity, shiftSpan, spanOffsetDays } from '@/utils/calendar/activityDays';
 // SECURITY: authorises the href. ensureHttpUrl preserves `javascript://…` (see url.ts).
@@ -1353,35 +1355,11 @@ async function confirmReschedule() {
         <!-- Location — whole field opens Google Maps. Editing lives on the
              footer ✏️ Edit button (full form) to keep the common tap path
              (viewing where the activity is) a single frictionless action. -->
-        <FormFieldGroup v-if="activity.location" :label="t('planner.field.location')">
-          <a
-            :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="group/loc -mx-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors hover:bg-orange-50 focus:bg-orange-50 focus:outline-none dark:hover:bg-orange-900/20 dark:focus:bg-orange-900/20"
-            :title="t('planner.openInMaps')"
-          >
-            <span
-              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[#F15D22] transition-colors group-hover/loc:bg-orange-100 dark:group-hover/loc:bg-orange-900/30"
-              aria-hidden="true"
-            >
-              <svg
-                class="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-            </span>
-            <span
-              class="dark:text-ink-soft text-sm text-[var(--color-text)] group-hover/loc:underline"
-            >
-              {{ activity.location }}
-            </span>
-          </a>
+        <FormFieldGroup
+          v-if="activity.location"
+          :label="t(locationLabelKey(describeLocation(activity.location, activity.locationPlace)))"
+        >
+          <LocationLine :text="activity.location" :place="activity.locationPlace" />
         </FormFieldGroup>
 
         <!-- Drop-off / Pick-up — inline editable -->

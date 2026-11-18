@@ -1279,6 +1279,7 @@ watch(
         :event="selectedExternal"
         :open="selectedExternal !== null"
         :show-google-link="false"
+        :interactive="false"
         @close="selectedExternal = null"
       />
 

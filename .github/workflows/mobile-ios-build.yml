@@ -117,6 +117,8 @@ jobs:
           # "Not checked live" (the client's not_configured path), never an error.
           VITE_FLIGHT_STATUS_URL: ${{ vars.FLIGHT_STATUS_URL }}
           VITE_FLIGHT_STATUS_API_KEY: ${{ secrets.FLIGHT_STATUS_API_KEY }}
+          VITE_PLACE_SEARCH_URL: ${{ vars.PLACE_SEARCH_URL }}
+          VITE_PLACE_SEARCH_API_KEY: ${{ secrets.PLACE_SEARCH_API_KEY }}
 
       # A .swift file in ios/App/App/ is NOT compiled just because it is committed — the
       # App group lists its children explicitly and nothing here regenerates the project.

@@ -155,6 +155,8 @@ export default [
             'iCloud',
             'Google Drive',
             'Google',
+            // #150: Google's required attribution under address suggestions (not localized).
+            'Google Maps',
             // Decorative glyphs / emoji — render identically in every language, so
             // they carry no translatable content. Adding a NEW decorative glyph
             // triggers a lint error → add it here intentionally (keeps the set

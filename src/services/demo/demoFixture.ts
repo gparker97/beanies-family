@@ -378,7 +378,22 @@ export function materializeFixture(args: { today: Date; ownerMemberId: UUID }): 
     act(1, 0, 'Piano Lesson', '🎹', 'music', '16:30', '17:15', [ID.kidA], 'Bramble Music School'),
     act(2, 1, 'Football Training', '⚽', 'football', '17:00', '18:30', [ID.kidB], 'Meadow Park'),
     act(3, 2, 'Ballet Class', '🩰', 'dance', '15:45', '16:45', [ID.kidC], 'Corner Studio'),
-    act(4, 3, 'Swimming', '🏊', 'swimming', '09:00', '10:00', [ID.kidA, ID.kidB], 'Lido Pool'),
+    // #150: one activity with a picked place and a kept detail (the string starts with the
+    // place's name, so validPlace honours it). The place ID is invented, like every value here.
+    {
+      ...act(
+        4,
+        3,
+        'Swimming',
+        '🏊',
+        'swimming',
+        '09:00',
+        '10:00',
+        [ID.kidA, ID.kidB],
+        'Lido Pool, side gate'
+      ),
+      locationPlace: { placeId: 'demo-place-lido-pool', name: 'Lido Pool' },
+    },
     act(
       5,
       4,

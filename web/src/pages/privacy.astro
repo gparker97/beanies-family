@@ -145,11 +145,36 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <h2>weather</h2>
     <p>
       the weather is the one place the app uses a location, and only with your consent: it is collected only when a
-      pod manager in your family explicitly types a home town for the weather. what is sent is the typed town (to
-      find it) and its rounded coordinates (about a kilometre), from your device to
+      pod manager in your family explicitly types a home town for the weather. what is sent for the weather is the
+      typed town (to find it) and its rounded coordinates (about a kilometre), from your device to
       <a href="https://open-meteo.com" rel="noopener noreferrer">Open-Meteo</a> only, never through our servers. your
       device's location services and GPS are never used. turning <strong>Show Weather</strong> off stops every lookup,
-      and weather readings are cached on your device only.
+      and weather readings are cached on your device only. when address suggestions are turned on (see the next
+      section), the same rounded home town and its country are also sent, as a rough hint, with the address lookups
+      described there.
+    </p>
+  </section>
+
+  <section id="address-suggestions">
+    <h2>address suggestions</h2>
+    <p>
+      address suggestions help fill in a location or address while you type it (on an activity, a travel plan or an
+      emergency contact). this is rolling out and may not be in your app yet. when it is turned on, and only while you
+      type in one of those fields, the app sends a small beanies.family service the <strong>text you typed</strong>
+      (three or more characters, and never text that contains a link), the <strong>app language</strong>, and your
+      family's saved home town <strong>rounded to about a kilometre, plus its country</strong>, as a rough hint for
+      nearby places. the service asks
+      <a href="https://developers.google.com/maps" rel="noopener noreferrer">Google Maps Platform</a> (Places and
+      Geocoding) for matches. no family id, name, member, address you have saved, internet address or device location
+      is sent, and the app never reads your device's location. google may keep the search terms under
+      <a href="https://policies.google.com/privacy" rel="noopener noreferrer">its own privacy policy</a>, and
+      beanies.family does not log what you typed or which place you picked.
+    </p>
+    <p>
+      when you pick a suggestion, the app asks once more for that place's address, and the address google returns is
+      saved only in your family's own data (your encrypted <code>.beanpod</code>), next to the unit or room detail you
+      typed. a pod manager can turn address suggestions off in <strong>Settings</strong> (<strong>Address
+      Suggestions</strong>), which stops every lookup on every device in the family.
     </p>
   </section>
 
@@ -267,9 +292,9 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>OAuth scopes:</strong> we request <code>calendar.events.owned</code> (read and write the events you own), <code>calendar.calendarlist.readonly</code> (the <em>names</em> of the calendars in your account, so you can pick which one to use and which to import from), and <code>userinfo.email</code> (to label the connection). the calendar list includes calendars shared with you, and we read their names so you can see them. the one-time import covers calendars you own: a calendar someone else owns shows in the list but cannot be ticked for the import</li>
       <li><strong>what we write:</strong> beanies creates and updates events for your beanies activities, and it only ever deletes an event it created itself. an event that existed before beanies is never deleted by us</li>
       <li><strong>what we read, normally:</strong> when the clash nudge is on, we ask only whether you are busy at a given time on your connected calendar. we request times, not content. we read the content of events only when you ask us to, by running the one-time import or by adding a calendar as view only</li>
-      <li><strong>what we read during a one-time import:</strong> if you choose to import your existing events, we read the <strong>title, description, place, times and repeat pattern</strong> of events on the calendars you tick, for the next 12 months. this happens only when you ask for it, and you review every event before anything is imported</li>
+      <li><strong>what we read during a one-time import:</strong> if you choose to import your existing events, we read the <strong>title, description, place, times and repeat pattern</strong> of events on the calendars you tick, for the next 12 months (and, when address suggestions are turned on, the video call link the event carries). this happens only when you ask for it, and you review every event before anything is imported</li>
       <li><strong>view only calendars:</strong> a member can choose to add a calendar that is shared with them as view only (this option is rolling out and may not be in your app yet). for that, we request the additional scope <code>calendar.events.readonly</code> (read events on calendars you can see), which is what allows a calendar owned by someone else to be read at all</li>
-      <li><strong>what we read for a view only calendar:</strong> the <strong>title, time, location, visibility and link</strong> of its events, so your family can see them next to your own plans. we never read descriptions, and we never read guest lists. if the calendar was shared with you as busy times only, or the member chose "show as busy only", the title and location are dropped before anything is shown</li>
+      <li><strong>what we read for a view only calendar:</strong> the <strong>title, time, location, visibility and link</strong> of its events (and, when address suggestions are turned on, the video call link the event carries), so your family can see them next to your own plans. we never read descriptions, and we never read guest lists. if the calendar was shared with you as busy times only, or the member chose "show as busy only", the title and location are dropped before anything is shown</li>
       <li><strong>who sees them:</strong> everyone in the family. adding a calendar tells the member who adds it to check with the calendar's owner first. beanies.family never changes, writes to or deletes anything on a view only calendar, and never sends its events to any other calendar</li>
       <li><strong>where they are kept:</strong> view only events are held only on each device while the app is in use. they are never saved in your <code>.beanpod</code> and never sent to or stored on any server of ours. the single exception: if you turn on "Include in Home-Screen Widgets" for a calendar, that calendar's events are saved on that device so the widget can show them. that file never leaves the device</li>
       <li><strong>signing in is broader than what we fetch:</strong> signing in for view only lets your family's devices read that Google account's calendars, and the sign-in is kept in your encrypted family file like the one for syncing. beanies.family only fetches the calendars that were added, and refuses to fetch any other</li>
@@ -330,6 +355,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>Google OAuth:</strong> only when you choose to sign in</li>
       <li><strong>Amazon Web Services:</strong> hosts the family registry, our diagnostic logs and the first-party event record, and sends our occasional owner emails (Amazon SES)</li>
       <li><strong>AeroDataBox:</strong> only when live flight checks are on — receives a flight number and date (never a family) to look up the flight's live schedule, and sends us change notices that name no one</li>
+      <li><strong>Google Maps Platform (Places and Geocoding):</strong> only when address suggestions are turned on; receives the text typed in a location field, the app language and a rounded home town with its country, through a small beanies.family service, to suggest places and fetch the address of the one you pick (never a family)</li>
       <li><strong>Substack:</strong> receives the owner's email address if they opt in to our newsletter at sign-up</li>
       <li><strong>Google Play's install referrer:</strong> Android only; Google passes our own utm tags from the Play link to the app on first launch</li>
       <li>

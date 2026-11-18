@@ -36,6 +36,7 @@ import type {
   VacationTravelSegment,
   VacationAccommodation,
   VacationTransportation,
+  PlaceRef,
 } from '@/types/models';
 
 /** Translator threaded into the detail-row builders so labels + enum values
@@ -57,6 +58,8 @@ export interface DetailRow {
   copyable?: boolean;
   /** Show map link icon */
   mapLink?: boolean;
+  /** The picked place for a `mapLink` row, read only through `describeLocation` (#150). */
+  place?: PlaceRef;
   /** Render as a clickable external link */
   isLink?: boolean;
   /** A value this device's check reads (gate, belt, estimate), or a plan value it confirms
@@ -467,7 +470,12 @@ export function travelDetailRows(
     if (seg.duration)
       rows.push({ label: t('segmentRow.duration'), value: seg.duration, field: 'duration' });
     if (seg.location)
-      rows.push({ label: t('segmentRow.location'), value: seg.location, mapLink: true });
+      rows.push({
+        label: t('segmentRow.location'),
+        value: seg.location,
+        mapLink: true,
+        place: seg.locationPlace,
+      });
   } else {
     // Train / Ferry
     if (seg.operator) rows.push({ label: t('segmentRow.operator'), value: seg.operator });
@@ -508,7 +516,13 @@ export function travelDetailRows(
  *  when-band promotes (and the `withTiming` filter then drops) them. */
 export function accommodationDetailRows(acc: VacationAccommodation, t: T): DetailRow[] {
   const rows: DetailRow[] = [];
-  if (acc.address) rows.push({ label: t('segmentRow.address'), value: acc.address, mapLink: true });
+  if (acc.address)
+    rows.push({
+      label: t('segmentRow.address'),
+      value: acc.address,
+      mapLink: true,
+      place: acc.addressPlace,
+    });
   if (acc.checkInDate)
     rows.push({
       label: t('segmentRow.checkIn'),
@@ -545,7 +559,12 @@ export function accommodationDetailRows(acc: VacationAccommodation, t: T): Detai
 export function transportationDetailRows(trans: VacationTransportation, t: T): DetailRow[] {
   const rows: DetailRow[] = [];
   if (trans.agencyAddress)
-    rows.push({ label: t('segmentRow.address'), value: trans.agencyAddress, mapLink: true });
+    rows.push({
+      label: t('segmentRow.address'),
+      value: trans.agencyAddress,
+      mapLink: true,
+      place: trans.agencyAddressPlace,
+    });
   if (trans.operator) rows.push({ label: t('segmentRow.operator'), value: trans.operator });
   if (trans.route) rows.push({ label: t('segmentRow.route'), value: trans.route });
   if (trans.departureStation)

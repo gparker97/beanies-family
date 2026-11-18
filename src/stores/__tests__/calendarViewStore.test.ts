@@ -55,6 +55,8 @@ const h = vi.hoisted(() => ({
   poll: null as null | { cb: () => unknown; ms: number; opts: unknown },
   pollStop: vi.fn(),
   failCreateCalendar: { value: false },
+  /** `locationLinksEnabled()` (#150 P4). */
+  locationLinks: { value: false },
 }));
 
 vi.mock('@/services/calendar/calendarAuth', () => ({
@@ -92,6 +94,10 @@ vi.mock('@/utils/calendar/beaniesEventIds', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/utils/calendar/beaniesEventIds')>();
   return { ...real, beaniesEventIds: vi.fn(real.beaniesEventIds) };
 });
+vi.mock('@/utils/location/locationLinks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/location/locationLinks')>()),
+  locationLinksEnabled: () => h.locationLinks.value,
+}));
 vi.mock('@/composables/usePollWhileVisible', () => ({
   usePollWhileVisible: (cb: () => unknown, ms: number, opts: unknown) => {
     h.poll = { cb, ms, opts };
@@ -248,6 +254,7 @@ beforeEach(async () => {
   h.driveEmail.value = 'drive@example.com';
   h.redirect.value = false;
   h.failCreateCalendar.value = false;
+  h.locationLinks.value = false;
   h.poll = null;
   latched = new Set();
   listedWith = [];
@@ -417,6 +424,69 @@ describe('calendarViewStore: windows and cache', () => {
     expect(store.events.map((e) => e.id)).toEqual(['theirs']);
     const dedupe = h.logEvent.mock.calls.find(([e]) => e.context?.action === 'dedupe');
     expect(dedupe?.[0].context).toMatchObject({ count: 1 });
+  });
+});
+
+describe('calendarViewStore: meeting links (#150 P4)', () => {
+  const MEET = 'https://meet.google.com/abc-defg-hij';
+  const withLinks = (): CalendarViewEvent[] => [
+    { ...eventToday('a'), meetingUrl: MEET },
+    { ...eventToday('b'), meetingUrlRejected: true },
+  ];
+  const meetingLogs = () =>
+    h.logEvent.mock.calls
+      .map(([e]) => e)
+      .filter((e) => e.context?.action === 'meeting-links')
+      .map((e) => e.context);
+
+  it('with the location-links flag on: keeps the link and logs counts, never the URL', async () => {
+    h.locationLinks.value = true;
+    reader.mockResolvedValue({ events: withLinks(), truncated: false });
+    const account = await seedAccount();
+    await seedCalendar(account.id);
+    const store = useCalendarViewStore();
+    await store.refresh();
+    expect(store.events.find((e) => e.id === 'a')?.meetingUrl).toBe(MEET);
+    expect(store.events.find((e) => e.id === 'b')).not.toHaveProperty('meetingUrl');
+    expect(meetingLogs()).toContainEqual({ action: 'meeting-links', count: 1 });
+    expect(meetingLogs()).toContainEqual({
+      action: 'meeting-links',
+      detail: 'meeting-url-rejected',
+      count: 1,
+    });
+    expect(telemetryText()).not.toContain('meet.google.com');
+    // The read asked Google for the meeting fields.
+    expect(reader.mock.calls[0]![4]).toEqual({ includeMeetingUrl: true });
+  });
+
+  it('with the flag off the read does not ask Google for meeting fields', async () => {
+    reader.mockResolvedValue({ events: [], truncated: false });
+    const account = await seedAccount();
+    await seedCalendar(account.id);
+    await useCalendarViewStore().refresh();
+    expect(reader).toHaveBeenCalled();
+    for (const call of reader.mock.calls) expect(call[4]).toEqual({ includeMeetingUrl: false });
+  });
+
+  it('with the flag off: no meeting link on any event and no meeting-link log', async () => {
+    reader.mockResolvedValue({ events: withLinks(), truncated: false });
+    const account = await seedAccount();
+    await seedCalendar(account.id);
+    const store = useCalendarViewStore();
+    await store.refresh();
+    expect(store.events.length).toBeGreaterThan(0);
+    expect(store.events.every((e) => e.meetingUrl === undefined)).toBe(true);
+    expect(meetingLogs()).toEqual([]);
+  });
+
+  it('a busy-only calendar never carries a meeting link, flag on', async () => {
+    h.locationLinks.value = true;
+    reader.mockResolvedValue({ events: withLinks(), truncated: false });
+    const account = await seedAccount();
+    await seedCalendar(account.id, { detailLevel: 'busy' });
+    const store = useCalendarViewStore();
+    await store.refresh();
+    expect(store.events.every((e) => e.meetingUrl === undefined)).toBe(true);
   });
 });
 

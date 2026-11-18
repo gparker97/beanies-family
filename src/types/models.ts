@@ -1565,6 +1565,14 @@ export interface DutyCompletion {
   completedAt: ISODateString; // timestamp of completion
 }
 
+/** A place picked for a location string (#150). Honoured only while the sibling string is
+ *  `name` or starts with `name + ', '` (see validPlace); otherwise inert. A VALUE object:
+ *  always written whole, never per key. Older builds ignore it. */
+export interface PlaceRef {
+  placeId: string; // provider place ID (storable indefinitely)
+  name: string; // the place line exactly as it begins the sibling string
+}
+
 export interface FamilyActivity {
   id: UUID;
   title: string;
@@ -1614,6 +1622,8 @@ export interface FamilyActivity {
 
   // Location
   location?: string;
+  /** #150: the picked place for `location`, read only through `validPlace`. Older builds ignore it. */
+  locationPlace?: PlaceRef;
 
   // Link — optional URL (booking page, class info, event page, etc.)
   link?: string;
@@ -2049,6 +2059,8 @@ export interface VacationTravelSegment {
   activityCategory?: VacationActivityCategory;
   description?: string;
   location?: string;
+  /** #150: the picked place for `location`, read only through `validPlace`. Older builds ignore it. */
+  locationPlace?: PlaceRef;
   startTime?: string;
   duration?: string;
 
@@ -2096,6 +2108,8 @@ export interface VacationAccommodation {
   status: VacationSegmentStatus;
   name?: string;
   address?: string;
+  /** #150: the picked place for `address`, read only through `validPlace`. Older builds ignore it. */
+  addressPlace?: PlaceRef;
   checkInDate?: ISODateString;
   checkOutDate?: ISODateString;
   confirmationNumber?: string;
@@ -2124,6 +2138,8 @@ export interface VacationTransportation {
   returnTime?: string;
   agencyName?: string;
   agencyAddress?: string;
+  /** #150: the picked place for `agencyAddress`, read only through `validPlace`. Older builds ignore it. */
+  agencyAddressPlace?: PlaceRef;
   // Train/Bus fields
   operator?: string;
   route?: string;
@@ -2152,6 +2168,8 @@ export interface VacationIdea {
   description?: string;
   category?: VacationIdeaCategory;
   location?: string;
+  /** #150: the picked place for `location`, read only through `validPlace`. Older builds ignore it. */
+  locationPlace?: PlaceRef;
   suggestedDate?: ISODateString;
   estimatedCost?: number;
   estimatedCostCurrency?: CurrencyCode;
@@ -2599,6 +2617,8 @@ export interface EmergencyContact {
   phone?: string;
   email?: string;
   address?: string;
+  /** #150: the picked place for `address`, read only through `validPlace`. Older builds ignore it. */
+  addressPlace?: PlaceRef;
   notes?: string;
   createdBy?: UUID;
   createdAt: ISODateString;
@@ -2727,6 +2747,9 @@ export interface Settings {
   /** #134: the family's home town for the weather, typed and picked by a pod manager (never
    *  from device location). Coordinates are rounded to 2 decimals before storage. */
   weatherPlace?: WeatherPlace | null;
+  /** #150: the family's "Address Suggestions" switch. Absent = true. Off means no place
+   *  lookups from any location field; picked places already saved keep their map links. */
+  addressSuggestionsEnabled?: boolean;
   /** #134: °F or °C. Absent = `defaultUnitFor(family country)` (US = F, everywhere else C). */
   temperatureUnit?: TemperatureUnit;
   skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.

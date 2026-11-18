@@ -12,6 +12,7 @@ import type { FamilyActivity, FamilyMember, ReminderMinutes } from '@/types/mode
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { normalizeAssignees } from '@/utils/assignees';
+import { describeLocation } from '@/utils/location/locationLinks';
 import { classifyAudience, type BriefingAudience } from '@/utils/audience';
 
 /**
@@ -84,7 +85,12 @@ export function activityReminderContext(
     .map(resolveMember)
     .filter((m): m is FamilyMember => m !== undefined)
     .map((m) => m.name);
-  if (activity.location) who.push(activity.location);
+  // The place and a call's service name only (#150): a URL never lands in an OS notification.
+  if (activity.location) {
+    for (const part of describeLocation(activity.location, activity.locationPlace).oneLine) {
+      if ((part.kind === 'place' || part.kind === 'call') && part.text) who.push(part.text);
+    }
+  }
   const dutyRoles: ('dropoff' | 'pickup')[] = [];
   if (isDropoff) dutyRoles.push('dropoff');
   if (isPickup) dutyRoles.push('pickup');

@@ -59,3 +59,9 @@ For a viewed calendar the client requests a fixed field mask: id, status, title,
 
 - Google classifies the scope as restricted, or changes what `events.list` returns for busy-only shares.
 - A second provider (Outlook, iCloud) is requested; the view grant kind and the two collections are Google-specific today.
+
+## Addendum 2026-11-18: meeting links (#150 P4)
+
+- The view read now also requests `hangoutLink` and `conferenceData(entryPoints(entryPointType,uri))` and derives ONE string from them, `meetingUrl` (the video entry point, else `hangoutLink`), screened by `safeHttpsUrl`. `conferenceData` itself is never kept. These are ordinary event fields: no new scope, no change to the consent screen.
+- The link is kept only when both `viewOnlyCalendars` and `placeSuggestions` are on (the store passes `locationLinksEnabled()` to `normalizeViewEvents`), and never on a busy-only event: `normalizeViewEvents` does not set it and `restripForCalendar` drops it with the title and location. It is held in memory like the rest of the event, shown as Join Call in the event details (not tappable on the wall), and never reaches the widget file or telemetry (counts only).
+- If this ADR's feature is removed at its review, the meeting-link read goes with it: its touch points are `listEventsForView`, `normalizeViewEvents`, `restripForCalendar` and `ExternalEventDetailsModal`. Decision record: `~/projects/beanies-ops/docs/plans/2026-11-18-location-autofill-and-link-150.md`.

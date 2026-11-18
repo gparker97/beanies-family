@@ -46,6 +46,7 @@ import { reportError } from '@/utils/errorReporter';
 import { trackFeature } from '@/services/analytics/plausible';
 import { useTranslationStore } from '@/stores/translationStore';
 import { toISODateString } from '@/utils/date';
+import { locationLinksEnabled } from '@/utils/location/locationLinks';
 
 const SURFACE = 'calendar-import';
 
@@ -276,10 +277,14 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
 
       const client = getCalendarClient();
       const sources: ImportSource[] = [];
+      // #150 P4: one reading for the whole scan, so the fetch and the plan agree.
+      const includeMeetingUrl = locationLinksEnabled();
 
       for (const cal of chosen) {
         try {
-          const events = await client.listEventsForImport(id, cal.id, timeMin, timeMax);
+          const events = await client.listEventsForImport(id, cal.id, timeMin, timeMax, {
+            includeMeetingUrl,
+          });
           sources.push({
             connectionId: id,
             calendarId: cal.id,
@@ -329,7 +334,35 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
         memberId,
         destinationCalendarId: connection?.destinationCalendarId ?? 'primary',
         homeTimeZone: home.zone,
+        includeMeetingUrl,
       });
+
+      if (includeMeetingUrl) {
+        // #150 P4. Counts only, never a URL: how many rows carry a join link, and how
+        // many offered links failed the client's screen (dropped, so never silent).
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'import_meeting_links',
+          context: { action: 'import_meeting_links', count: plan.withMeetingLink },
+        });
+        const rejected = sources.reduce(
+          (n, src) => n + src.events.filter((e) => e.meetingUrlRejected === true).length,
+          0
+        );
+        if (rejected > 0) {
+          logEvent({
+            level: 'warn',
+            surface: SURFACE,
+            message: 'import_meeting_links',
+            context: {
+              action: 'import_meeting_links',
+              detail: 'meeting-url-rejected',
+              count: rejected,
+            },
+          });
+        }
+      }
 
       // ⚠️ The cap counts only what the user can ACT on. Slicing the raw list first
       // meant a family that had already imported 300 events got 200 rows every one

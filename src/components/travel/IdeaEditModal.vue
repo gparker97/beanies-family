@@ -5,6 +5,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import LocationField from '@/components/ui/LocationField.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
@@ -12,6 +13,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useLocationPair } from '@/composables/useLocationPair';
 import { fetchLinkPreview, extractDomain, type LinkPreview } from '@/utils/linkPreview';
 import type { VacationIdea, VacationIdeaCategory, CurrencyCode } from '@/types/models';
 
@@ -35,7 +37,9 @@ const settingsStore = useSettingsStore();
 const title = ref('');
 const description = ref('');
 const category = ref<VacationIdeaCategory | undefined>(undefined);
-const location = ref('');
+/** #150: the location string and its picked place, bound as one pair. */
+const locationPair = useLocationPair('location');
+const { text: location, value: locationValue } = locationPair;
 const suggestedDate = ref('');
 const costType = ref<'free' | 'paid' | undefined>(undefined);
 const estimatedCost = ref<number | undefined>(0);
@@ -67,7 +71,7 @@ const { isEditing } = useFormModal(
       title.value = idea.title ?? '';
       description.value = idea.description ?? '';
       category.value = idea.category;
-      location.value = idea.location ?? '';
+      locationPair.seed(idea);
       suggestedDate.value = idea.suggestedDate ?? '';
       costType.value = idea.costType;
       estimatedCost.value = idea.estimatedCost ?? 0;
@@ -87,7 +91,7 @@ const { isEditing } = useFormModal(
       title.value = '';
       description.value = '';
       category.value = undefined;
-      location.value = '';
+      locationPair.reset();
       suggestedDate.value = '';
       costType.value = undefined;
       estimatedCost.value = 0;
@@ -185,6 +189,7 @@ function currentFormJson(): string {
     description.value,
     category.value,
     location.value,
+    locationPair.patch(),
     suggestedDate.value,
     costType.value,
     estimatedCost.value,
@@ -225,7 +230,7 @@ function handleSave() {
     title: title.value,
     description: description.value || undefined,
     category: category.value,
-    location: location.value || undefined,
+    ...locationPair.patch(location.value || undefined),
     suggestedDate: suggestedDate.value || undefined,
     costType: costType.value,
     estimatedCost: costType.value === 'paid' ? estimatedCost.value || undefined : undefined,
@@ -296,7 +301,12 @@ function handleSave() {
           <BeanieDatePicker v-model="suggestedDate" />
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.field.location')">
-          <BaseInput v-model="location" :placeholder="t('vacation.field.locationPlaceholder')" />
+          <LocationField
+            v-model:value="locationValue"
+            mode="address"
+            field-kind="idea"
+            :placeholder="t('vacation.field.locationPlaceholder')"
+          />
         </FormFieldGroup>
       </div>
 

@@ -1,4 +1,5 @@
 import type { HelpArticle } from './types';
+import { ADDRESS_SUGGESTIONS_HELP_LIVE } from './liveFlags';
 
 // View-only external calendars (#145). Built and ready, but NOT published: the feature
 // ships behind the `viewOnlyCalendars` flag, which stays off until Google approves the
@@ -129,6 +130,108 @@ const VIEW_ANOTHER_CALENDAR_ARTICLE: HelpArticle = {
       items: [
         '<a href="/help/features/import-your-google-calendar">Import your Google Calendar</a>: bring your own events across, once',
         '<a href="/help/security/google-calendar-sync">How beanies Syncs Your Activities to Google Calendar</a>: how your activities get to your calendar',
+      ],
+    },
+  ],
+};
+
+// Address suggestions and call links (#150). Hidden until its feature flag ships
+// (see ADDRESS_SUGGESTIONS_HELP_LIVE in ./liveFlags.ts); the spread at the end of
+// FEATURES_ARTICLES keeps it out of the index, search, sitemap and llms-full until then.
+const ADDRESS_SUGGESTIONS_ARTICLE: HelpArticle = {
+  slug: 'address-suggestions-and-call-links',
+  category: 'features',
+  title: 'Address Suggestions and Call Links',
+  excerpt:
+    'Pick a suggested place while you type an address, keep your own unit or room detail, and paste a video call link that shows up as Join Call.',
+  icon: '\u{1F4CD}',
+  readTime: 4,
+  updatedDate: '2026-11-18',
+  sections: [
+    {
+      type: 'paragraph',
+      content:
+        'Typing a full address on a phone is fiddly, and the unit number or room is the part people forget. When you type in a location or address field, beanies.family can suggest matching places from <strong>Google Maps</strong>. Pick one and the address fills in, the map link opens that exact place, and any detail you typed, like a block, unit or room, stays visible right under it.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'By the end of this guide you will know how to pick a place, keep your own words, take a picked place back off, and add a video call link to an activity.',
+    },
+    { type: 'heading', content: 'Where it works', level: 2, id: 'where' },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        'The <strong>Location or Link</strong> field on an activity',
+        'Locations, accommodation and transport addresses, and trip ideas in <a href="/help/features/travel-plans-and-vacations">travel plans</a>',
+        'The <strong>Address</strong> on an <a href="/help/features/emergency-contacts">emergency contact</a>',
+      ],
+    },
+    { type: 'heading', content: 'Picking a suggested place', level: 2, id: 'picking' },
+    {
+      type: 'steps',
+      content: '',
+      items: [
+        'Start typing in the field. After three characters, suggestions appear in a list under it',
+        'Type the unit, block or room too if you like, for example <em>127 south bridge road block 48 unit 04-19 function room</em>',
+        'Tap a suggestion. The field shows the full address, and the part the suggestion did not include, <em>block 48 unit 04-19 function room</em>, appears on its own line below it',
+        'Edit that line if you want to change it, then save as usual',
+      ],
+    },
+    {
+      type: 'paragraph',
+      content:
+        'The map link now opens that exact place in Google Maps, and your unit or room detail shows beside the address everywhere the location is shown. Nothing you typed is thrown away.',
+    },
+    { type: 'heading', content: 'Keeping exactly what you typed', level: 2, id: 'keep-typed' },
+    {
+      type: 'paragraph',
+      content:
+        'You never have to accept a suggestion. Tap <strong>Keep what I typed</strong> at the bottom of the list, or just carry on and save. The text is kept exactly as you typed it, and the map link searches for it, as it always has.',
+    },
+    { type: 'heading', content: 'Removing a picked place', level: 2, id: 'removing' },
+    {
+      type: 'paragraph',
+      content:
+        'Tap the <strong>Remove</strong> button on the picked place to go back to plain typing. If you are still in the same edit, your original text comes back. If you come back to it later, the saved address and detail are put back in the box as ordinary text. Either way, no characters are lost.',
+    },
+    { type: 'heading', content: 'Adding a video call link', level: 2, id: 'call-links' },
+    {
+      type: 'paragraph',
+      content:
+        'The activity field is called <strong>Location or Link</strong> because it takes either, or both. Paste a Zoom, Google Meet, Microsoft Teams, Webex, VooV (Tencent Meeting), FaceTime, Whereby or similar link and the activity shows a <strong>Join Call</strong> button. Any other web link shows as a link you can tap. A pasted Google Maps link shows as a map link. A line under the field tells you what beanies.family understood.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'If the field holds an address and a link, both show. A link is never sent off to a map search. On the beanie wall a call shows by its service name, with no link to tap.',
+    },
+    { type: 'heading', content: 'What is sent, and how to turn it off', level: 2, id: 'privacy' },
+    {
+      type: 'callout',
+      content:
+        'To find matches, <strong>what you type in a location field is sent to Google Maps</strong>, along with your app language and your family’s home town as a rough hint (rounded to about a kilometre, plus its country). Nothing else about you or your family is sent: no names, no family id, and never your device’s location. Text that contains a link is never sent. The address you pick is saved in your family’s own data.',
+      title: 'Sent to Google Maps',
+      icon: '\u{1F512}',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'A pod manager can turn this off. Go to <strong>Settings</strong>, open the <strong>Region and Holidays</strong> drawer and switch off <strong>Address Suggestions</strong>. Nothing is sent after that, on any device in the family, and the fields go back to plain typing. Addresses you already picked keep working. Members who are not pod managers can see the switch but not change it.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'The same goes when you are offline: the field works as a plain box, and nothing is sent. Read more in the <a href="/privacy">privacy policy</a>.',
+    },
+    { type: 'heading', content: 'What’s next?', level: 2, id: 'whats-next' },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        '<a href="/help/features/family-planner-and-activities">Family planner and activities</a>: where the location and link live',
+        '<a href="/help/features/weather-on-the-wall-and-nook">Weather on the wall and Nook</a>: where the home town is set',
       ],
     },
   ],
@@ -1475,7 +1578,10 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Add your accommodation \u2014 hotels, Airbnbs, campgrounds, or staying with family and friends. Check-in and check-out dates are pre-filled from your travel dates when possible. You can add the address, room type, confirmation number, and whether breakfast is included.',
+          'Add your accommodation \u2014 hotels, Airbnbs, campgrounds, or staying with family and friends. Check-in and check-out dates are pre-filled from your travel dates when possible. You can add the address, room type, confirmation number, and whether breakfast is included.' +
+          (ADDRESS_SUGGESTIONS_HELP_LIVE
+            ? ' As you type an address, beanies.family can suggest matching places from Google Maps; pick one to keep your room or unit detail on its own line. See <a href="/help/features/address-suggestions-and-call-links">Address suggestions and call links</a>.'
+            : ''),
       },
       {
         type: 'heading',
@@ -1949,7 +2055,9 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>Location</strong> \u2014 Where the activity takes place.',
+          ADDRESS_SUGGESTIONS_HELP_LIVE
+            ? '<strong>Location or Link</strong> \u2014 Where the activity takes place, or a video call link. Suggested places from Google Maps appear as you type, and a pasted call link shows as <strong>Join Call</strong>. See <a href="/help/features/address-suggestions-and-call-links">Address suggestions and call links</a>.'
+            : '<strong>Location</strong> \u2014 Where the activity takes place.',
           '<strong>Transport</strong> \u2014 Assign family members for dropoff and pickup.',
           '<strong>Instructor / Coach</strong> \u2014 Name and contact information.',
           '<strong>Notes</strong> \u2014 Any additional information.',
@@ -4287,7 +4395,10 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Your location is only used with your consent, when a pod manager types a home town. beanies.family <strong>never reads your device\u2019s location</strong>, and no GPS is involved. The weather comes from Open-Meteo, and the only things sent are the town you type (to find it) and its rough location, about a kilometre. Nothing else about your family is shared. The readings are kept on your device only.',
+          'Your location is only used with your consent, when a pod manager types a home town. beanies.family <strong>never reads your device\u2019s location</strong>, and no GPS is involved. The weather comes from Open-Meteo, and the only things sent are the town you type (to find it) and its rough location, about a kilometre. Nothing else about your family is shared. The readings are kept on your device only.' +
+          (ADDRESS_SUGGESTIONS_HELP_LIVE
+            ? ' The home town is also used, rounded to about a kilometre with its country, as a rough hint when beanies.family suggests addresses from Google Maps. A pod manager can turn address suggestions off in the same drawer.'
+            : ''),
       },
       {
         type: 'heading',
@@ -4449,4 +4560,5 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     ],
   },
   ...(VIEW_ANOTHER_CALENDAR_HELP_LIVE ? [VIEW_ANOTHER_CALENDAR_ARTICLE] : []),
+  ...(ADDRESS_SUGGESTIONS_HELP_LIVE ? [ADDRESS_SUGGESTIONS_ARTICLE] : []),
 ];

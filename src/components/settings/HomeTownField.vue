@@ -5,7 +5,8 @@
  *
  * A live text field whose options come from a request, so it is not `BaseCombobox` (that
  * filters a static list behind a trigger button). The keyboard half of the APG combobox is
- * `useListboxNav`; this component owns the query, the debounce and the request.
+ * `useListboxNav`; the debounce, abort and stale-answer drop are `useDebouncedSearch`; this
+ * component owns the query and what each answer means.
  *
  * MVO: it reads `weatherStore.atom` (the preview line is the same atom every surface draws, so
  * there is no second fetch path) and calls `weatherStore.searchPlaces`, which returns every
@@ -16,11 +17,12 @@
  * The device's location API is never called: the only location is the town a pod manager
  * types here.
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import WeatherGlyph from '@/components/weather/WeatherGlyph.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { useListboxNav } from '@/composables/useListboxNav';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -52,19 +54,40 @@ const weatherStore = useWeatherStore();
 const query = ref('');
 const places = ref<WeatherPlace[]>([]);
 const status = ref<SearchStatus>('idle');
-/**
- * A newer query is waiting on the debounce or the request. The previous suggestions stay
- * listed (with the spinner) until its answer replaces them, so typing never collapses the list.
- */
-const searching = ref(false);
 /** The query the shown results (or the not-found line) answer. */
 const answeredQuery = ref('');
 /** True while a stored place is being replaced ("Change"). */
 const editing = ref(false);
 const fieldWrap = ref<HTMLElement | null>(null);
 
-let timer: ReturnType<typeof setTimeout> | null = null;
-let controller: AbortController | null = null;
+/**
+ * A newer query is waiting on the debounce or the request. The previous suggestions stay
+ * listed (with the spinner) until its answer replaces them, so typing never collapses the list.
+ */
+const { searching } = useDebouncedSearch({
+  query,
+  // The service's floor (a 1-letter query is never sent), read through the store.
+  minChars: () => weatherStore.searchMinChars,
+  delayMs: SEARCH_DEBOUNCE_MS,
+  run: (q, signal) => weatherStore.searchPlaces(q, signal),
+  onAnswer: (q, result) => {
+    if (!result.ok) {
+      if (result.code === 'aborted') return;
+      // The store already logged it and printed the `[weather]` devHint.
+      answeredQuery.value = q;
+      places.value = [];
+      status.value = 'failed';
+      return;
+    }
+    answeredQuery.value = q;
+    places.value = result.places;
+    status.value = result.places.length ? 'results' : 'not-found';
+  },
+  onIdle: () => {
+    places.value = [];
+    status.value = 'idle';
+  },
+});
 
 const storedPlace = computed(() => settingsStore.weatherPlace);
 const showPlaceCard = computed(() => !!storedPlace.value && !editing.value);
@@ -94,53 +117,6 @@ const rows = computed(() =>
     rest: place.admin1 ? `, ${place.admin1}` : '',
   }))
 );
-
-function cancelPending(): void {
-  if (timer) clearTimeout(timer);
-  timer = null;
-  controller?.abort();
-  controller = null;
-}
-
-async function runSearch(q: string): Promise<void> {
-  const mine = new AbortController();
-  controller = mine;
-  const result = await weatherStore.searchPlaces(q, mine.signal);
-  // A newer keystroke (or unmount) superseded this request: its answer is not wanted.
-  if (controller !== mine) return;
-  controller = null;
-  searching.value = false;
-  if (!result.ok) {
-    if (result.code === 'aborted') return;
-    // The store already logged it and printed the `[weather]` devHint.
-    answeredQuery.value = q;
-    places.value = [];
-    status.value = 'failed';
-    return;
-  }
-  answeredQuery.value = q;
-  places.value = result.places;
-  status.value = result.places.length ? 'results' : 'not-found';
-}
-
-watch(query, (raw) => {
-  cancelPending();
-  const q = raw.trim();
-  // The service's floor (a 1-letter query is never sent), read through the store.
-  if (q.length < weatherStore.searchMinChars) {
-    places.value = [];
-    status.value = 'idle';
-    searching.value = false;
-    return;
-  }
-  searching.value = true;
-  timer = setTimeout(() => {
-    timer = null;
-    void runSearch(q);
-  }, SEARCH_DEBOUNCE_MS);
-});
-
-onBeforeUnmount(cancelPending);
 
 async function pick(place: WeatherPlace): Promise<void> {
   if (props.disabled) return;

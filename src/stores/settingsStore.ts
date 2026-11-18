@@ -204,6 +204,11 @@ export const useSettingsStore = defineStore('settings', () => {
   // on; nothing is fetched until a home town is set.
   const weatherEnabled = computed<boolean>(() => settings.value.weatherEnabled ?? true);
   const weatherPlace = computed<WeatherPlace | null>(() => settings.value.weatherPlace ?? null);
+  // #150: the family's "Address Suggestions" switch, a flat family field like Show Weather.
+  // Absent = on. Off stops every place lookup; picked places already saved keep working.
+  const addressSuggestionsEnabled = computed<boolean>(
+    () => settings.value.addressSuggestionsEnabled ?? true
+  );
   // Absent = the family country's default (US = F, every other or unset country = C).
   const temperatureUnit = computed<TemperatureUnit>(
     () => settings.value.temperatureUnit ?? defaultUnitFor(familyCountry.value)
@@ -1163,6 +1168,12 @@ export const useSettingsStore = defineStore('settings', () => {
     persistAiSetting('settings.weather.unit', 'temperatureUnit', () =>
       settingsRepo.saveSettings({ temperatureUnit: unit })
     );
+  // #150: the `setWeatherEnabled` shape (toast + rethrow, so the switch reverts on a failed
+  // write). `placeSearchStore.available` reads the getter; nothing here calls the provider.
+  const setAddressSuggestionsEnabled = (enabled: boolean) =>
+    persistAiSetting('settings.addressSuggestions.title', 'addressSuggestionsEnabled', () =>
+      settingsRepo.saveSettings({ addressSuggestionsEnabled: enabled })
+    );
 
   // #133: family-scoped consent skip for the photo→activity AI flow. Throws on failure
   // so the caller (the consent flow) can log it without leaving the wedge stranded.
@@ -1515,6 +1526,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setWeatherEnabled,
     setWeatherPlace,
     setTemperatureUnit,
+    addressSuggestionsEnabled,
+    setAddressSuggestionsEnabled,
     resolveHomeTimeZoneNow,
     setHomeTimeZone,
     ensureHomeTimeZone,

@@ -41,6 +41,7 @@ import {
   type TimedCard,
 } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
+import { useLocationOneLine } from '@/composables/useLocationOneLine';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import PlannerResizeHandle from '@/components/planner/PlannerResizeHandle.vue';
@@ -132,6 +133,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const { locationOneLine } = useLocationOneLine();
 
 // External-calendar clash lookup (#34) — called inline per positioned event (a
 // composable can't run inside a v-for). All store coupling stays in useClash.ts.
@@ -342,7 +344,7 @@ const isAllDaySource = (activity: FamilyActivity) =>
             v-if="occ.activity.location"
             class="opacity-70"
           >
-            · 📍 {{ occ.activity.location }}</span
+            · {{ locationOneLine(occ.activity.location, occ.activity.locationPlace) }}</span
           >
         </span>
         <ActivityOwnerStack :members="identityFor(occ.activity).stackMembers" size="xs" />
@@ -462,7 +464,10 @@ const isAllDaySource = (activity: FamilyActivity) =>
               <div class="text-secondary-500/60 dark:text-ink-soft truncate text-[0.625rem]">
                 {{ eventTimeLabel(ev.card.activity)
                 }}<template v-if="ev.card.activity.location">
-                  · 📍 {{ ev.card.activity.location }}</template
+                  ·
+                  {{
+                    locationOneLine(ev.card.activity.location, ev.card.activity.locationPlace)
+                  }}</template
                 >
               </div>
             </div>

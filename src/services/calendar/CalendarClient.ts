@@ -106,6 +106,14 @@ export interface CalendarEventFull {
    * adopt the master (adopting would put the removed occurrence back).
    */
   recurringEventId?: string;
+  /**
+   * The event's one join link (#150 P4): the video conference entry point, else
+   * `hangoutLink`, screened by `safeHttpsUrl`. Only this derived string is kept;
+   * `conferenceData` itself never reaches the object.
+   */
+  meetingUrl?: string;
+  /** The event offered a join link that failed the screen (counted, never shown). */
+  meetingUrlRejected?: true;
 }
 
 /**
@@ -153,6 +161,13 @@ export interface CalendarViewEvent {
   /** `'default' | 'public' | 'private' | 'confidential'`. */
   visibility?: string;
   htmlLink?: string;
+  /**
+   * The event's one join link (#150 P4), as on {@link CalendarEventFull.meetingUrl}.
+   * `normalizeViewEvents` keeps it only for a details event when asked to.
+   */
+  meetingUrl?: string;
+  /** The event offered a join link that failed the screen (counted, never shown). */
+  meetingUrlRejected?: true;
 }
 
 /**
@@ -180,6 +195,16 @@ export interface TokenProvider {
  * as `CalendarApiError` (classified); `deleteEvent` and `eventExists` treat a
  * missing remote event idempotently rather than throwing.
  */
+/** Options for the two content reads (`listEventsForImport`, `listEventsForView`). */
+export interface ContentReadOptions {
+  /**
+   * Request the meeting-link fields (`hangoutLink`, `conferenceData`) and derive
+   * `meetingUrl` (#150 P4). Only when the caller's `locationLinksEnabled()` is true:
+   * with it off, no join link is fetched from Google at all. Defaults to false.
+   */
+  includeMeetingUrl?: boolean;
+}
+
 export interface CalendarClient {
   /**
    * Drop every cached token decision for a connection: the access token, any
@@ -287,7 +312,8 @@ export interface CalendarClient {
     connectionId: string,
     calendarId: string,
     timeMinIso: string,
-    timeMaxIso: string
+    timeMaxIso: string,
+    options?: ContentReadOptions
   ): Promise<CalendarEventFull[]>;
   /**
    * List events on a VIEW-ONLY calendar over `[timeMinIso, timeMaxIso)` (plan
@@ -310,6 +336,7 @@ export interface CalendarClient {
     credentialId: string,
     calendarId: string,
     timeMinIso: string,
-    timeMaxIso: string
+    timeMaxIso: string,
+    options?: ContentReadOptions
   ): Promise<{ events: CalendarViewEvent[]; truncated: boolean }>;
 }

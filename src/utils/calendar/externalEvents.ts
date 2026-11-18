@@ -60,7 +60,8 @@ function ownsCalendar(calendar: Pick<ViewedCalendar, 'accessRole'>): boolean {
  * the calendar is now busy only, the title and location go at once, without waiting
  * for a refetch that might fail (or for a concurrent merge to be noticed). An event
  * shown only by the email-created exception (`detailsNeedOwner`) is stripped too
- * once the calendar is no longer one the account owns. The same object comes back
+ * once the calendar is no longer one the account owns. The meeting link (#150 P4) goes
+ * with the title and location. The same object comes back
  * when there is nothing to strip, so identity stays stable.
  */
 export function restripForCalendar(
@@ -70,8 +71,21 @@ export function restripForCalendar(
   const strip =
     isBusyOnlyCalendar(calendar) || (event.detailsNeedOwner === true && !ownsCalendar(calendar));
   if (!strip) return event;
-  if (event.busyOnly && event.title === undefined && event.location === undefined) return event;
-  const { title: _title, location: _location, detailsNeedOwner: _owner, ...rest } = event;
+  if (
+    event.busyOnly &&
+    event.title === undefined &&
+    event.location === undefined &&
+    event.meetingUrl === undefined
+  ) {
+    return event;
+  }
+  const {
+    title: _title,
+    location: _location,
+    meetingUrl: _meetingUrl,
+    detailsNeedOwner: _owner,
+    ...rest
+  } = event;
   return { ...rest, busyOnly: true };
 }
 
@@ -133,7 +147,9 @@ function ymdOfMs(ms: number): string {
  *  3. convert times: timed events to device-local instants, all-day events to their
  *     calendar dates (Google's exclusive end resolved, so a multi-day all-day event
  *     keeps its real first and last day);
- *  4. strip `title` and `location` for a busy-only event (see `isBusyOnly`).
+ *  4. strip `title` and `location` for a busy-only event (see `isBusyOnly`);
+ *  5. keep the client's screened `meetingUrl` (#150 P4) only when `includeMeetingUrl`
+ *     is true (the caller passes `locationLinksEnabled()`) and the event is not busy-only.
  *
  * `transparent` is true only for `transparency: 'transparent'`; a missing value is
  * busy (a free/busy calendar returns no `transparency` at all).
@@ -154,10 +170,16 @@ export function isBeaniesOrigin(
   );
 }
 
+export interface NormalizeOptions {
+  /** Keep the event's join link (#150 P4). The store passes `locationLinksEnabled()`. */
+  includeMeetingUrl?: boolean;
+}
+
 export function normalizeViewEvents(
   raw: readonly CalendarViewEvent[],
   calendar: NormalizeCalendar,
-  beaniesIds: ReadonlySet<string>
+  beaniesIds: ReadonlySet<string>,
+  { includeMeetingUrl = false }: NormalizeOptions = {}
 ): NormalizeResult {
   const events: ExternalEvent[] = [];
   let droppedAsBeanies = 0;
@@ -202,6 +224,7 @@ export function normalizeViewEvents(
     if (!busyOnly) {
       event.title = item.summary;
       if (item.location) event.location = item.location;
+      if (includeMeetingUrl && item.meetingUrl) event.meetingUrl = item.meetingUrl;
       // Shown only by the owner exception: `restripForCalendar` drops the details if
       // the calendar ever stops being one the account owns.
       if (isMarkedPrivate(item)) event.detailsNeedOwner = true;

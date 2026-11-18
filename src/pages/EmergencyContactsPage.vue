@@ -7,6 +7,7 @@
  */
 import { computed, ref } from 'vue';
 import BackLink from '@/components/common/BackLink.vue';
+import LocationLine from '@/components/common/LocationLine.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import EmergencyContactFormModal from '@/components/pod/EmergencyContactFormModal.vue';
@@ -234,7 +235,14 @@ function emailFor(c: EmergencyContact, e: Event): void {
               >
                 <span v-if="c.phone">📞 {{ c.phone }}</span>
                 <span v-if="c.email">✉️ {{ c.email }}</span>
-                <span v-if="c.address">📍 {{ c.address }}</span>
+                <LocationLine
+                  v-if="c.address"
+                  variant="compact"
+                  :text="c.address"
+                  :place="c.addressPlace"
+                  :map-when-off="false"
+                  class="text-secondary-500 dark:text-ink-soft"
+                />
               </div>
               <p
                 v-if="c.notes"

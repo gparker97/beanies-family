@@ -169,6 +169,8 @@ describe('BeanieWallPage: a view-only event opens read-only details', () => {
     expect(details.props('open')).toBe(true);
     expect(details.props('event')).toEqual(event);
     expect(details.props('showGoogleLink')).toBe(false);
+    // #150 P4: a location or join link on the wall is shown, never tappable.
+    expect(details.props('interactive')).toBe(false);
     expect(w.findComponent({ name: 'WallSheet' }).exists()).toBe(false);
     expect(lockSpies.requestUnlock).not.toHaveBeenCalled();
     expect(lockSpies.noteActivity).not.toHaveBeenCalled();

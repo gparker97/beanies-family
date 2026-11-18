@@ -31,6 +31,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { wallLocation } from '@/utils/location/wallLocation';
 
 import { isRecurring, listProgress } from '@/utils/listLifecycle';
 import { useListPeople } from '@/composables/useListPeople';
@@ -176,6 +177,11 @@ const activity = computed(() => {
   if (value.kind !== 'activity') return null;
   return activityStore.activities.find((a) => a.id === value.activityId) ?? null;
 });
+
+/** The hero's location cell (#150): place + detail, a call by service name, no links. */
+const heroLocation = computed(() =>
+  activity.value ? wallLocation(activity.value.location, activity.value.locationPlace, t) : null
+);
 
 /**
  * Wall-safe only: the sheet is a bigger surface than the card, not a laxer one.
@@ -518,9 +524,14 @@ const { identityFor } = useActivityIdentity();
                 <p class="wall-hero-cap font-outfit flex items-center gap-1.5">
                   <BeanieIcon name="map-pin" size="sm" />{{ t('planner.field.location') }}
                 </p>
-                <p v-if="activity.location" class="font-outfit wall-hero-value font-extrabold">
-                  {{ activity.location }}
-                </p>
+                <template v-if="heroLocation">
+                  <p class="font-outfit wall-hero-value font-extrabold">
+                    {{ heroLocation.main }}
+                  </p>
+                  <p v-for="sub in heroLocation.subs" :key="sub" class="font-inter wall-hero-sub">
+                    {{ sub }}
+                  </p>
+                </template>
                 <p v-else class="font-outfit wall-hero-value wall-hero-empty font-extrabold">
                   {{ t('planner.noLocation') }}
                 </p>

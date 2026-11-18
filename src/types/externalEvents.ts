@@ -4,7 +4,7 @@
 /**
  * One event from a view-only calendar, normalized once at the store boundary.
  *
- * A busy-only event (`busyOnly`) has had `title` and `location` dropped before it
+ * A busy-only event (`busyOnly`) has had `title`, `location` and `meetingUrl` dropped before it
  * reached any reactive state, so no surface, search index, widget snapshot or log
  * can leak them.
  */
@@ -32,6 +32,11 @@ export interface ExternalEvent {
   endYmd: string;
   title?: string;
   location?: string;
+  /**
+   * The event's join link (#150 P4), screened by `safeHttpsUrl` in the client. Never on
+   * a busy-only event: dropped with `title` and `location`.
+   */
+  meetingUrl?: string;
   /** "Open in Google Calendar". Present on busy-only events too. */
   htmlLink?: string;
   /** Times only: the title and location were not shown or not available. */

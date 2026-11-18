@@ -175,6 +175,8 @@ jobs:
           # "Not checked live" (the client's not_configured path), never an error.
           VITE_FLIGHT_STATUS_URL: ${{ vars.FLIGHT_STATUS_URL }}
           VITE_FLIGHT_STATUS_API_KEY: ${{ secrets.FLIGHT_STATUS_API_KEY }}
+          VITE_PLACE_SEARCH_URL: ${{ vars.PLACE_SEARCH_URL }}
+          VITE_PLACE_SEARCH_API_KEY: ${{ secrets.PLACE_SEARCH_API_KEY }}
           # Stripe publishable key (#95): public by design, but a per-mode value (pk_test_ now,
           # pk_live_ at launch) so it lives beside the other per-environment keys as a secret.
           # WEB ONLY: native never mounts checkout (workflowEnvParity.test.ts records the exemption).

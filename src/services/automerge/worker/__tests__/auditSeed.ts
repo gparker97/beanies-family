@@ -71,6 +71,9 @@ const SUPPLEMENT: Record<string, Json[]> = {
       instructorName: 'Coach Sam',
       link: 'https://swim.example',
       linkedRecurringItemId: 'rec-1',
+      // #150: a picked place (a value object, written whole) beside its string.
+      location: '127 South Bridge Rd, block 48',
+      locationPlace: { placeId: 'ChIJsupp-activity', name: '127 South Bridge Rd' },
       notes: 'Bring goggles',
       originalOccurrenceDate: D,
       parentActivityId: 'act-1',
@@ -220,12 +223,15 @@ const SUPPLEMENT: Record<string, Json[]> = {
           activityCategory: 'sightseeing',
           duration: '2 hours',
           location: 'Old town',
+          locationPlace: { placeId: 'ChIJsupp-segment', name: 'Old town' },
           startTime: '10:00',
         },
       ],
       accommodations: [
         {
           id: 'acc-supp',
+          address: '18 Mosque St, loft room 12',
+          addressPlace: { placeId: 'ChIJsupp-stay', name: '18 Mosque St' },
           contactPhone: '+44 20 0000 0000',
           link: 'https://hotel.example',
           photoIds: ['photo-1'],
@@ -236,6 +242,7 @@ const SUPPLEMENT: Record<string, Json[]> = {
         {
           id: 'transport-supp',
           agencyAddress: '1 High St',
+          agencyAddressPlace: { placeId: 'ChIJsupp-agency', name: '1 High St' },
           agencyName: 'Example Cars',
           arrivalStation: 'Central',
           bookingReference: 'CAR42',
@@ -259,6 +266,7 @@ const SUPPLEMENT: Record<string, Json[]> = {
           duration: 'half_day',
           linkPreview: { image: 'https://img.example/a.png', siteName: 'Example' },
           location: 'Harbour',
+          locationPlace: { placeId: 'ChIJsupp-idea', name: 'Harbour' },
           suggestedDate: D,
           votes: [{ memberId: 'm1', votedAt: T }],
         },
@@ -382,6 +390,7 @@ const SUPPLEMENT: Record<string, Json[]> = {
     {
       id: 'contact-1',
       address: '2 Elm St',
+      addressPlace: { placeId: 'ChIJsupp-contact', name: '2 Elm St' },
       customCategory: 'Neighbour',
       email: 'may@example.com',
       phone: '+1 555 0100',
@@ -632,6 +641,7 @@ const SETTINGS_SAMPLE = {
   recoveryKitConfirmedVia: 'saved',
   syncFilePath: 'beanies/family.beanpod',
   temperatureUnit: 'celsius',
+  addressSuggestionsEnabled: true,
   textSize: 'normal',
   theme: 'system',
   weatherPlace: {

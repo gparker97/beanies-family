@@ -129,6 +129,22 @@ export const FLAG_REGISTRY = [
     description:
       'Show shared Google calendars read-only on the family calendar and the wall; must stay off in production until Google approves calendar.events.readonly (review by 2027-02-15).',
   },
+  {
+    // #150 (plan 2026-11-18-location-autofill-and-link-150). Gates address suggestions from
+    // Google Maps in every location and address field, the picked-place display and the
+    // call/link reading of the activity location. Read in exactly ONE place,
+    // `locationLinksEnabled()` in `src/utils/location/locationLinks.ts` (a unit test pins it);
+    // every other caller goes through that function.
+    // ⚠️ MUST STAY OFF IN PRODUCTION until the flag-day list in the plan is done: the privacy
+    // and terms pages live, the App Store and Play data declarations approved (native builds
+    // carry the committed flag, so flipping earlier ships the lookup undeclared), and the
+    // `place-search` Lambda deployed with its alarms in OK. Flipping this file is then the
+    // only edit. RETIRE 30 days after flag day with no rollback (the plan lists what goes).
+    id: 'placeSuggestions',
+    label: 'Address suggestions',
+    description:
+      'Google Maps address suggestions in location fields, the picked-place map link, and Join Call / Open Link for links in an activity location; must stay off in production until the privacy pages and store declarations are live.',
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */

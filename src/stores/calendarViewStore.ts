@@ -145,6 +145,7 @@ import {
   worseState,
 } from '@/utils/calendar/externalEvents';
 import { localToday } from '@/utils/date';
+import { locationLinksEnabled } from '@/utils/location/locationLinks';
 import type { CalendarViewAccount, ViewedCalendar, ViewedCalendarAccessRole } from '@/types/models';
 import type { ExternalEvent, ViewCalendarState, YmdRange } from '@/types/externalEvents';
 import type { CalendarHealth, MsSpan } from '@/utils/calendar/externalEvents';
@@ -586,11 +587,15 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     beaniesIds: () => ReadonlySet<string>
   ): Promise<void> {
     const startedAt = performance.now();
+    // #150 P4: one reading per read, so the fetch's mask and the normalizer agree.
+    const includeMeetingUrl = locationLinksEnabled();
     let raw: Awaited<ReturnType<typeof client.listEventsForView>>;
     let failure: unknown = null;
     try {
       const { timeMinIso, timeMaxIso } = rangeToIsoWindow(range);
-      raw = await client.listEventsForView(account.id, started.calendarId, timeMinIso, timeMaxIso);
+      raw = await client.listEventsForView(account.id, started.calendarId, timeMinIso, timeMaxIso, {
+        includeMeetingUrl,
+      });
       perfTiming.record('calendar-view-fetch', performance.now() - startedAt);
     } catch (e) {
       failure = e;
@@ -613,7 +618,7 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     }
 
     try {
-      commitSuccess(cal, win, read, key, range, raw, beaniesIds);
+      commitSuccess(cal, win, read, key, range, raw, beaniesIds, includeMeetingUrl);
     } catch (e) {
       // Normalizing should never throw; if it does, it is a failed read like any other.
       commitFailure(client, live.account, cal, win, read, key, range, e);
@@ -628,13 +633,15 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
     key: string,
     range: YmdRange,
     raw: { events: CalendarViewEvent[]; truncated: boolean },
-    beaniesIds: () => ReadonlySet<string>
+    beaniesIds: () => ReadonlySet<string>,
+    includeMeetingUrl: boolean
   ): void {
     // R4: stripped by the calendar's setting NOW, not when the read began.
     const { events, droppedAsBeanies, malformed } = normalizeViewEvents(
       raw.events,
       cal,
-      beaniesIds()
+      beaniesIds(),
+      { includeMeetingUrl }
     );
     // Health first: a recovery marks the calendar's entries due, and this window's own
     // entry is then replaced by the fresh one below rather than read twice.
@@ -675,6 +682,38 @@ export const useCalendarViewStore = defineStore('calendarView', () => {
         message: 'view calendar events without a usable start/end were skipped',
         context: { action: 'malformed-event', count: malformed },
       });
+    }
+    if (includeMeetingUrl) logMeetingLinks(key, raw.events, events);
+  }
+
+  /**
+   * Meeting links on a committed read (#150 P4): how many shown events carry one (the
+   * success-path rate), and how many offered links failed the client's screen, so a
+   * dropped link is never silent. Counts only; never a URL. Once per change per window,
+   * so a wall open for days reports transitions.
+   */
+  function logMeetingLinks(
+    key: string,
+    raw: readonly CalendarViewEvent[],
+    events: readonly ExternalEvent[]
+  ): void {
+    const joinable = events.filter((e) => e.meetingUrl !== undefined).length;
+    const rejected = raw.filter((e) => e.meetingUrlRejected === true).length;
+    if (gate(outcomeGates, `${key}|meeting-links`, ONCE_PER_CHANGE)(`${joinable}|${rejected}`)) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'view calendar meeting links',
+        context: { action: 'meeting-links', count: joinable },
+      });
+      if (rejected > 0) {
+        logEvent({
+          level: 'warn',
+          surface: SURFACE,
+          message: 'view calendar meeting links failed the URL screen and were dropped',
+          context: { action: 'meeting-links', detail: 'meeting-url-rejected', count: rejected },
+        });
+      }
     }
   }
 

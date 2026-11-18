@@ -10,10 +10,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-11-18
 
+### Added
+
+- Address suggestions have been built behind a switch that is off, so nothing changes in the app yet. Once turned on, location and address fields will suggest places from Google Maps while typing, keep the unit or room detail typed, and open the exact place on the map. The activity field will become "Location or Link" and show a video call link as Join Call. A pod manager will be able to turn it off in Settings.
+
+### Fixed
+
+- Clearing an emergency contact's address now really removes it.
+
 ### Changed
 
 - Coupon codes can now be entered at checkout on every plan, beanies basic or magic beans, monthly or yearly (previously monthly magic beans only).
 - The v1 launch offer is now 20% off your first year on any plan, instead of 20% off the first three months of monthly magic beans.
+- The map row on an activity and on a travel segment has a refreshed look.
 - The beanstalk newsletter now lives at `everybeancounts.beanies.family`, and the website's links to it point there.
 
 ## 2026-11-17
