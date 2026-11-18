@@ -135,15 +135,17 @@ export const FLAG_REGISTRY = [
     // call/link reading of the activity location. Read in exactly ONE place,
     // `locationLinksEnabled()` in `src/utils/location/locationLinks.ts` (a unit test pins it);
     // every other caller goes through that function.
-    // ⚠️ MUST STAY OFF IN PRODUCTION until the flag-day list in the plan is done: the privacy
-    // and terms pages live, the App Store and Play data declarations approved (native builds
-    // carry the committed flag, so flipping earlier ships the lookup undeclared), and the
-    // `place-search` Lambda deployed with its alarms in OK. Flipping this file is then the
-    // only edit. RETIRE 30 days after flag day with no rollback (the plan lists what goes).
+    // ON for everyone since flag day, 2026-11-19 (release 1.6): the privacy and terms pages
+    // went live with the same deploy and the `place-search` Lambda was deployed with its
+    // alarms in OK. The App Store and Play data declarations are the owner's to file while
+    // the 1.6 native builds are in review. It stays as the display kill switch: flipping it
+    // off hides the suggestions, the lookups and the call/link reading.
+    // RETIRE on 2026-12-19 (flag day + 30) if there has been no rollback (the plan lists
+    // what goes).
     id: 'placeSuggestions',
     label: 'Address suggestions',
     description:
-      'Google Maps address suggestions in location fields, the picked-place map link, and Join Call / Open Link for links in an activity location; must stay off in production until the privacy pages and store declarations are live.',
+      'Google Maps address suggestions in location fields, the picked-place map link, and Join Call / Open Link for links in an activity location. ON for everyone since 2026-11-19; the kill switch until it is retired on 2026-12-19.',
   },
 ] as const;
 

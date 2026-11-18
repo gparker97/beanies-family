@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setProdFlag } from '../devFlagWriter';
+import { fetchProdFlags, setProdFlag } from '../devFlagWriter';
 
 describe('services/featureFlags/devFlagWriter', () => {
   beforeEach(() => {
@@ -68,5 +68,24 @@ describe('services/featureFlags/devFlagWriter', () => {
 
     await expect(setProdFlag('aiPhotoExtract', true)).resolves.toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('reads the saved state from the dev server', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, state: { aiPhotoExtract: false } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchProdFlags()).resolves.toEqual({ aiPhotoExtract: false });
+    expect(fetchMock).toHaveBeenCalledWith('/__feature-flags');
+  });
+
+  it('throws when the saved state cannot be read', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    await expect(fetchProdFlags()).rejects.toThrow('HTTP 500');
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await expect(fetchProdFlags()).rejects.toThrow('Could not reach the dev flag writer');
   });
 });

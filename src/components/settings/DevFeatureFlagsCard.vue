@@ -8,12 +8,12 @@
 // `import.meta.env.DEV` dynamic import in SettingsPage, so it is tree-shaken out
 // of production. It is a dev tool never seen by users → inline literal copy, no
 // i18n keys (keeps dev strings out of the prod translation payload).
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 import { listFlags } from '@/config/flags';
-import { setProdFlag } from '@/services/featureFlags/devFlagWriter';
+import { fetchProdFlags, setProdFlag } from '@/services/featureFlags/devFlagWriter';
 import { useToast } from '@/composables/useToast';
 import type { DevFlag } from '@/config/flagRegistry';
 
@@ -22,6 +22,20 @@ const { showToast } = useToast();
 // Local, mutable copy of committed (prod) state for optimistic UI.
 const rows = ref(listFlags());
 const showReload = ref(false);
+
+// The imported committed file is the copy from the last full page load, so a toggle made since
+// then is missing from it. The dev server holds the saved state; show that.
+onMounted(async () => {
+  try {
+    const saved = await fetchProdFlags();
+    for (const row of rows.value) {
+      const value = saved[row.id];
+      if (typeof value === 'boolean') row.committed = value;
+    }
+  } catch (err) {
+    console.warn('[flags] could not read the saved flag state; showing the loaded copy.', err);
+  }
+});
 
 // Collapsed by default (greg, 2026-10-01): the list outgrew the page. Same disclosure shape
 // as the Beanie Lab row above it, so Settings has one way of folding a section away.

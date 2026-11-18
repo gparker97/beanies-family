@@ -45,3 +45,24 @@ export async function setProdFlag(flag: DevFlag, enabled: boolean): Promise<void
     throw new Error(message);
   }
 }
+
+/**
+ * The committed PROD state as the dev server holds it now. The card reads this on mount: the
+ * committed file imported into the page is the copy from the last full load, so after a toggle
+ * it is out of date until the next reload. Throws with guidance on any failure.
+ */
+export async function fetchProdFlags(): Promise<Partial<Record<DevFlag, boolean>>> {
+  if (!import.meta.env.DEV) return {};
+  let res: Response;
+  try {
+    res = await fetch(ENDPOINT);
+  } catch (err) {
+    throw new Error('Could not reach the dev flag writer. Ensure `npm run dev` is running.', {
+      cause: err,
+    });
+  }
+  if (!res.ok) throw new Error(`Flag read failed (HTTP ${res.status}).`);
+  const body = (await res.json()) as { state?: Partial<Record<DevFlag, boolean>> };
+  if (!body?.state) throw new Error('Flag read returned no state.');
+  return body.state;
+}

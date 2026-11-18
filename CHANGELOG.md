@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-19
+
+### Added
+
+- Address suggestions are now on for everyone: location and address fields suggest places from Google Maps, and a video call link in an activity's location shows as Join Call.
+
+### Fixed
+
+- The dev-only feature flags card now shows the saved state after a reload.
+
 ## 2026-11-18
 
 ### Added

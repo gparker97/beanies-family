@@ -74,6 +74,10 @@ function featureFlagWriterDev() {
     configureServer(server: {
       middlewares: { use: (path: string, fn: unknown) => void };
       watcher: { unwatch: (paths: string) => void };
+      moduleGraph: {
+        getModulesByFile: (file: string) => Set<unknown> | undefined;
+        invalidateModule: (mod: never) => void;
+      };
     }) {
       server.middlewares.use(
         '/__feature-flags',
@@ -90,8 +94,15 @@ function featureFlagWriterDev() {
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify(body));
           };
+          // GET answers with the session's authoritative state. The card reads it on mount,
+          // because the copy of the committed file already loaded in the browser is the one
+          // from before the toggle.
+          if (req.method === 'GET') {
+            json(200, { ok: true, state: current });
+            return;
+          }
           if (req.method !== 'POST') {
-            json(405, { ok: false, error: 'Method not allowed (use POST).' });
+            json(405, { ok: false, error: 'Method not allowed (use GET or POST).' });
             return;
           }
           let raw = '';
@@ -123,6 +134,13 @@ function featureFlagWriterDev() {
                 server.watcher.unwatch(filePath);
                 await writeFile(filePath, result.source, 'utf8');
                 current = result.nextState;
+                // The watcher no longer sees this file, so nothing else drops Vite's cached
+                // transform of it: without this a reload is served the pre-toggle module and
+                // every toggle looks reverted until the dev server restarts. Invalidating
+                // sends no reload to the browser.
+                for (const mod of server.moduleGraph.getModulesByFile(filePath) ?? []) {
+                  server.moduleGraph.invalidateModule(mod as never);
+                }
                 json(200, { ok: true });
               } catch (err) {
                 console.error(

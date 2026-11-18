@@ -75,14 +75,19 @@ export class TransactionsPage {
 
     // Category — two-level CategoryChipPicker
     if (data.category) {
-      const group = CATEGORY_GROUP_MAP[data.category];
-      if (group) {
-        await dialog.getByRole('button', { name: group }).click();
-      }
       const categoryName = data.category
         .replace(/_/g, ' ')
         .replace(/\b\w/g, (c) => c.toUpperCase());
-      await dialog.getByRole('button', { name: categoryName }).click();
+      // The category is guessed from the description (#152): the guess shows as a chip under
+      // the description and opens its group in the picker, whose chip comes later in the form.
+      // Open the group only when that chip is not already showing: clicking an open group
+      // closes it.
+      const chip = dialog.getByRole('button', { name: categoryName }).last();
+      const group = CATEGORY_GROUP_MAP[data.category];
+      if (group && !(await chip.isVisible())) {
+        await dialog.getByRole('button', { name: group }).click();
+      }
+      await chip.click();
     }
 
     // Switch schedule to "One-time" (default is "Recurring")
