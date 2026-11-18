@@ -252,6 +252,10 @@ describe('addressCarriesTitle', () => {
     ['The Hungarian Touch', '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769', false],
     ['Marina Bay Sands Singapore', '10 Bayfront Ave, Singapore 018956', false],
     ['Raffles Place 1', '1 Raffles Pl, Singapore 048616', false],
+    // A real name whose words merely appear in the address stays a title.
+    ['Somerset', '1 Somerset Rd, Singapore 238162', false],
+    ['Raffles Place', '5 Raffles Pl, Singapore 048618', false],
+    ['Bridge Singapore', '127 S Bridge Rd, Singapore 058285', false],
     ['東京タワー', '日本、〒105-0011 東京都港区芝公園４丁目２−８ 東京タワー', true],
     ['東京タワー', '日本、〒105-0011 東京都港区芝公園４丁目２−８', false],
   ])('"%s" in "%s" is %s', (title, address, carried) => {

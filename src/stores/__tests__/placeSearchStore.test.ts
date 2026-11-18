@@ -251,7 +251,7 @@ describe('requestSuggestions', () => {
     expect(await ask()).toEqual({ ok: false, code: 'dev_capped' });
     expect(h.suggestPlaces).not.toHaveBeenCalled();
     expect(h.consumeAttempt).toHaveBeenCalledWith('place-search-dev', {
-      max: 30,
+      max: 200,
       windowMs: 86_400_000,
     });
     const devCap = h.logEvent.mock.calls.filter(

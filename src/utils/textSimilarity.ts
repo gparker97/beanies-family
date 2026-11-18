@@ -36,8 +36,10 @@ function wordTokens(text: string): Set<string> {
   return new Set(wordTokenList(text));
 }
 
-/** Latin-ish scripts, where word boundaries exist and matter. */
-const WORD_BOUNDED_SCRIPT = /^[ -ɏ\s]+$/;
+/** Latin-ish scripts, where word boundaries exist and matter. General Punctuation
+ *  (U+2000 to U+206F) is included: a phone types a curly apostrophe and long dashes, and
+ *  "mum’s" is still Latin text. */
+const WORD_BOUNDED_SCRIPT = /^[ -\u024F\u2000-\u206F\s]+$/;
 
 /** True when `text` is written in a script with word boundaries (Latin-ish). CJK is not. */
 export function isWordBoundedScript(text: string): boolean {

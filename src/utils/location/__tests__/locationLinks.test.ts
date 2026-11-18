@@ -232,6 +232,17 @@ describe('describeLocation (flag on)', () => {
     expect(describeLocation(`${PLACE.name}, back room`, TITLED).placeTitle).toBeUndefined();
   });
 
+  it('a title that reads as a link is still the place; only what follows the lead is read for links', () => {
+    const CAFE = { ...PLACE, title: 'Zoom.us Cafe' };
+    const lead = `Zoom.us Cafe, ${PLACE.name}`;
+    const view = describeLocation(`${lead}, back room https://meet.google.com/abc-defg-hij`, CAFE);
+    expect(view.placeTitle).toBe('Zoom.us Cafe');
+    expect(view.placeName).toBe(PLACE.name);
+    expect(view.detail).toBe('back room');
+    expect(view.mapHref).toBe(mapsHref(lead, CAFE));
+    expect(view.links.map((l) => l.service)).toEqual(['Google Meet']);
+  });
+
   it('a link after the place is never part of the detail', () => {
     const view = describeLocation(`${PLACE.name}, hall https://zoom.us/j/1`, PLACE);
     expect(view.detail).toBe('hall');

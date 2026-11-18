@@ -39,6 +39,11 @@ describe('wordTokenList', () => {
 });
 
 describe('containsPhrase', () => {
+  it('a curly apostrophe (phone typing) is still whole-word matched', () => {
+    expect(containsPhrase('Mum\u2019s Birthday', 'mum\u2019s birthday')).toBe(true);
+    expect(containsPhrase('Mummy\u2019s day', 'mum\u2019s')).toBe(false);
+  });
+
   it('matches whole words and phrases, case-insensitively, on raw text', () => {
     expect(containsPhrase("Uncle Bob's BIRTHDAY", 'birthday')).toBe(true);
     expect(containsPhrase('In Memory of Grandma', 'in memory')).toBe(true);

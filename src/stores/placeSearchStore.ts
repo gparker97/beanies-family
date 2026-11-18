@@ -42,8 +42,9 @@ import { readStoredJson, removeStoredJson, writeStoredJson } from '@/utils/store
 
 const SURFACE = 'place-search';
 
-/** Dev builds share the production cap, so a dev device stops at 30 provider requests a day. */
-export const DEV_PLACE_SEARCH_BUDGET = Object.freeze({ max: 30, windowMs: 86_400_000 });
+/** Dev builds share the production cap (650 a day), so a dev device stops at 200 provider
+ * requests a day: room for a long testing session, still under a third of the cap. */
+export const DEV_PLACE_SEARCH_BUDGET = Object.freeze({ max: 200, windowMs: 86_400_000 });
 const DEV_BUDGET_KEY = 'place-search-dev';
 
 /** The Lambda answers that mean "stop asking for a while". */
@@ -197,7 +198,7 @@ export const usePlaceSearchStore = defineStore('placeSearch', () => {
   }
 
   /**
-   * Dev builds only: spend one of the day's 30 provider requests, or refuse (logged once per
+   * Dev builds only: spend one of the day's provider requests, or refuse (logged once per
    * UTC day, on the console too). Production builds always pass.
    */
   function devBudgetAllows(): boolean {

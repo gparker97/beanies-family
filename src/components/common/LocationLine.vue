@@ -3,7 +3,7 @@
  * The one read row for a location (#150, ADR-049): renders `describeLocation(...)`. The map
  * row has the place as the link and the kept detail on its own line (a named place: its title
  * is the link, the address the line under it, then the detail); each video call is a
- * Join Call button (`openExternal`) with its host and path as a caption; a pasted map URL is a
+ * Join Call button (`openExternal`) with its host and path as a caption and a copy button; a pasted map URL is a
  * Map Link row; every other web link is an Open Link row from `LinkList` (favicons off, so a
  * location is never sent to a favicon service).
  *
@@ -16,9 +16,10 @@
  *
  * The label is the parent's ("Location" or "Location or Link"): `locationLabelKey` picks it.
  */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import LinkList from '@/components/ui/LinkList.vue';
+import { useClipboard } from '@/composables/useClipboard';
 import { useTranslation } from '@/composables/useTranslation';
 import type { PlaceRef } from '@/types/models';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -65,6 +66,22 @@ const callLabel = (service: string | undefined) =>
 
 function join(href: string): void {
   openExternal(href);
+}
+
+// Copy a call link (the WHOLE link: the caption drops the query, which carries a meeting's
+// passcode). A refused copy shows the full link as selectable text with the hand-copy line.
+const {
+  copied,
+  error: copyError,
+  copy,
+} = useClipboard({
+  surface: 'location-line',
+  action: 'call_link_copy_failed',
+});
+const copyHref = ref<string | null>(null);
+function copyLink(href: string): void {
+  copyHref.value = href;
+  void copy(href);
 }
 </script>
 
@@ -183,7 +200,7 @@ function join(href: string): void {
       </div>
     </template>
 
-    <div v-for="link in calls" :key="link.href" class="grid justify-items-start gap-0.5">
+    <div v-for="link in calls" :key="link.href" class="grid justify-items-start gap-1.5">
       <template v-if="interactive">
         <button
           type="button"
@@ -194,10 +211,38 @@ function join(href: string): void {
           <BeanieIcon name="video" size="sm" />
           {{ joinLabel(link.service) }}
         </button>
+        <span class="flex max-w-full items-center gap-1">
+          <span
+            class="text-secondary-400 dark:text-ink-faint min-w-0 text-xs break-all select-all"
+            data-testid="location-line-caption"
+            >{{ copyError && copyHref === link.href ? link.href : joinCaption(link.href) }}</span
+          >
+          <button
+            type="button"
+            class="text-secondary-500 dark:text-ink-soft hover:text-primary-700 dark:hover:text-accent-lift focus-visible:ring-primary-500 -my-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-orange-50 focus:outline-none focus-visible:ring-2 dark:hover:bg-orange-900/20"
+            :class="{
+              'text-primary-700 dark:text-accent-lift': copied && copyHref === link.href,
+            }"
+            :title="t('share.copyLink')"
+            :aria-label="t('share.copyLink')"
+            data-testid="location-line-copy"
+            @click.stop="copyLink(link.href)"
+          >
+            <BeanieIcon
+              :name="copied && copyHref === link.href ? 'check' : 'copy'"
+              size="sm"
+              aria-hidden="true"
+            />
+          </button>
+          <span class="sr-only" aria-live="polite">{{
+            copied && copyHref === link.href ? t('login.copied') : ''
+          }}</span>
+        </span>
         <span
-          class="text-secondary-400 dark:text-ink-faint text-xs break-all"
-          data-testid="location-line-caption"
-          >{{ joinCaption(link.href) }}</span
+          v-if="copyError && copyHref === link.href"
+          class="text-secondary-500 dark:text-ink-soft text-xs"
+          data-testid="location-line-copy-error"
+          >{{ t('share.copyFailedHelp') }}</span
         >
       </template>
       <template v-else>

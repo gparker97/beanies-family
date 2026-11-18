@@ -17,7 +17,7 @@ import { isFlagEnabled } from '@/config/flags';
 import { CALL_SERVICES, MAPS_HOSTS, hostMatches } from '@/constants/callServices';
 import type { PlaceRef } from '@/types/models';
 import { extractUrlSpans, safeExternalHref, type UrlSpan } from '@/utils/url';
-import { detailOf, mapsHref, validPlace } from './placeText';
+import { composePlaceText, detailOf, mapsHref, placeLead, validPlace } from './placeText';
 
 /**
  * Whether #150's location behaviour is on. The ONLY reader of the `placeSuggestions` flag (a
@@ -286,7 +286,16 @@ export function describeLocation(
     };
   }
 
-  const parsed = parseLocation(source);
+  // A valid place's lead (its title and address) is place text by definition, so only what
+  // follows it is read for links: a business called "Zoom.us Cafe" is a place, not a call, and
+  // the read row agrees with the form (which validates the raw text too).
+  const lead = validPlace(source, place);
+  let parsed = parseLocation(source);
+  if (lead) {
+    const rest = parseLocation(source.trim().slice(placeLead(lead).length));
+    const text = composePlaceText(lead, rest.place);
+    parsed = { place: text, links: rest.links, mapQuery: text };
+  }
   const valid = validPlace(parsed.place, place);
   const detail = valid ? detailOf(parsed.place, valid) : '';
   const mapHref = valid

@@ -312,6 +312,19 @@ describe('usePlaceSearch', () => {
       expect(result.ok && 'title' in result.place).toBe(false);
     });
 
+    it('drops the lookup still waiting, so no late answer swaps the list under the pick', async () => {
+      const f = mountField();
+      await type(f, '127 sou');
+      store.requestSuggestions.mockClear();
+      f.onInput('127 sout');
+      await nextTick();
+      const picking = f.pick(ROW, '127 sout', () => false);
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_DEBOUNCE_MS * 2);
+      await picking;
+      expect(store.requestSuggestions).not.toHaveBeenCalled();
+      expect(f.suggestions.value).toEqual([ROW]);
+    });
+
     it('picking mid-word keeps no half-typed fragment as the detail', async () => {
       const f = mountField();
       for (const typed of ['127 s brid', '127 south bri']) {

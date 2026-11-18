@@ -3,6 +3,7 @@ import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { usePlaceSearchStore } from '@/stores/placeSearchStore';
 import type { PlaceRef } from '@/types/models';
 import type { PlaceFieldKind, PlaceSearchErrorCode, PlaceSuggestion } from '@/types/placeSearch';
+import { boundText } from '@/utils/boundText';
 import { parseLocation } from '@/utils/location/locationLinks';
 import {
   SUB_PREMISE_KEYWORDS,
@@ -79,16 +80,9 @@ export const PLACE_TITLE_MAX_CHARS = 200;
  */
 export function pickTitle(suggestion: PlaceSuggestion, address: string): string | undefined {
   if (suggestion.kind !== 'place') return undefined;
-  const title = clipTitle(suggestion.main.trim());
+  const title = boundText(suggestion.main.trim(), PLACE_TITLE_MAX_CHARS).trim();
   if (!title || addressCarriesTitle(title, address)) return undefined;
   return title;
-}
-
-/** Cap at `PLACE_TITLE_MAX_CHARS` without leaving half a surrogate pair (the Lambda's `clip`). */
-function clipTitle(text: string): string {
-  if (text.length <= PLACE_TITLE_MAX_CHARS) return text;
-  const cut = text.slice(0, PLACE_TITLE_MAX_CHARS);
-  return (/[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut).trim();
 }
 
 /**
@@ -295,6 +289,8 @@ export function usePlaceSearch(options: { fieldKind: PlaceFieldKind }) {
     typed: string,
     stillCurrent: () => boolean = () => true
   ): Promise<PlacePickResult> {
+    // A lookup still waiting or in flight would swap the list under the tapped row.
+    cancel();
     pickController?.abort();
     const mine = new AbortController();
     pickController = mine;

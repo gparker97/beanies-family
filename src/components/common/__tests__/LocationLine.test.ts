@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 
 const flags = vi.hoisted(() => ({ on: true }));
 const opened = vi.hoisted(() => vi.fn());
@@ -82,6 +82,37 @@ describe('LocationLine (row)', () => {
     expect(w.text()).not.toContain('secret');
     await join.trigger('click');
     expect(opened).toHaveBeenCalledWith(href);
+  });
+
+  it('the copy button copies the whole call link, passcode included', async () => {
+    const href = 'https://us02web.zoom.us/j/84512207719?pwd=secret';
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    const w = render({ text: href });
+    await w.get('[data-testid="location-line-copy"]').trigger('click');
+    await flushPromises();
+    expect(writeText).toHaveBeenCalledWith(href);
+    expect(w.find('[data-testid="location-line-copy-error"]').exists()).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('a refused copy shows the whole link to select, with the hand-copy line', async () => {
+    const href = 'https://us02web.zoom.us/j/84512207719?pwd=secret';
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    const w = render({ text: href });
+    await w.get('[data-testid="location-line-copy"]').trigger('click');
+    await flushPromises();
+    expect(w.get('[data-testid="location-line-caption"]').text()).toBe(href);
+    expect(w.get('[data-testid="location-line-copy-error"]').text()).toContain(
+      'share.copyFailedHelp'
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it('the wall shows no copy button', () => {
+    const w = render({ text: 'https://meet.google.com/abc-defg-hij', interactive: false });
+    expect(w.find('[data-testid="location-line-copy"]').exists()).toBe(false);
   });
 
   it('a place and a call show both', () => {

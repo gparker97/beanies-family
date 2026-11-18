@@ -411,7 +411,7 @@ const announcement = computed(() => {
           :href="pinHref"
           target="_blank"
           rel="noopener noreferrer"
-          class="group/place focus-visible:ring-primary-500 min-w-0 flex-1 rounded-lg focus-visible:ring-2 focus-visible:outline-none"
+          class="group/place focus-visible:ring-primary-500 min-w-0 rounded-lg focus-visible:ring-2 focus-visible:outline-none"
           :title="t('planner.openInMaps')"
           data-testid="location-place-link"
           @click.stop
@@ -435,17 +435,9 @@ const announcement = computed(() => {
             {{ placeLines.secondary }}
           </span>
         </a>
-        <a
-          v-if="mapPin"
-          :href="pinHref"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="shrink-0 text-sm opacity-40 transition-opacity hover:opacity-80"
-          :title="pinTitle"
-          @click.stop
-        >
-          📍
-        </a>
+        <!-- Only the name and address are the link (not the chip's empty width), and it is the
+             one map link here: a `mapPin` field shows no second 📍 beside it. -->
+        <span class="flex-1" />
         <button
           v-if="!disabled"
           type="button"

@@ -327,17 +327,35 @@ export interface KeptDetailSources {
 }
 
 /**
- * Whether `address` already carries every word of `title`, in order (abbreviations folded on its
- * street line, as `splitKeptDetail` compares): a "named place" whose name is just its address
- * ("1 Raffles Place" against "1 Raffles Pl, Singapore 048616"), which must not be stored as a
- * title or the saved string would repeat itself. A title with no word breaks (CJK) is carried
- * when the address contains it; a title with no word at all counts as carried.
+ * Whether `address` BEGINS with the words of `title`, one for one (abbreviations folded on its
+ * street line, as `splitKeptDetail` compares), or one of its comma parts is the title (after a
+ * leading `#unit`): a "named place" whose name is just its address ("1 Raffles Place" against
+ * "1 Raffles Pl, Singapore 048616"; "Roxy Square" against "50 E Coast Rd, #01-138 Roxy Square,
+ * ..."), which must not be stored as a title or the saved string would repeat itself. Words
+ * merely found somewhere in the address do
+ * not count: "Raffles Place" (the station) against "5 Raffles Pl, Singapore 048618" is a real
+ * name and stays a title. When unsure the title is kept (a repeated word, never a lost name).
+ * A title with no word breaks (CJK) is carried when the address contains it; a title with no
+ * word at all counts as carried.
  */
 export function addressCarriesTitle(title: string, address: string): boolean {
   const t = (title ?? '').trim();
   if (!isWordBoundedScript(t)) return (address ?? '').includes(t);
   const words = wordTokenList(t);
-  return align(words, addressWords((address ?? '').trim()), () => true).typed.size === words.length;
+  const whole = (address ?? '').trim();
+  const stored = addressWords(whole);
+  if (words.length <= stored.length && words.every((w, i) => sameWord(w, stored[i]!))) return true;
+  // Or one comma part of the address IS the title, a leading unit aside ("#01-138 Roxy Square").
+  return whole.split(',').some((part) => {
+    const named = wordTokenList(
+      part
+        .trim()
+        .split(/\s+/)
+        .filter((chunk, i) => i > 0 || !chunk.startsWith('#'))
+        .join(' ')
+    );
+    return named.length === words.length && named.every((w, i) => fold(w) === fold(words[i]!));
+  });
 }
 
 /**
@@ -373,8 +391,9 @@ export function addressCarriesTitle(title: string, address: string): boolean {
  * same way) are dropped, a wordless chunk only between two of them. The rest of the typed text
  * then runs steps 1 to 5 against `carried`, with the title's words after the last one matched
  * standing in for the main text in the fragment rule: "hungarian touch back room" against "The
- * Hungarian Touch" is "back room", and "hungarian tou" is ''. When no head chunk aligns, the
- * title changes nothing. Text with no word breaks is dropped whole when the title contains it.
+ * Hungarian Touch" is "back room", and "hungarian tou" is ''. The dropped title words count as
+ * step 1's earlier chunk, so "starbucks level 2" keeps "level 2" even when the address holds a
+ * 2. When no head chunk aligns, the title changes nothing. Text with no word breaks is dropped whole when the title contains it.
  *
  * Text with no word breaks (CJK, see `isWordBoundedScript`) is not tokenized: when it sits
  * inside `carried` nothing is left over, when `carried` sits inside it that part is removed,
@@ -424,18 +443,27 @@ export function splitKeptDetail(typed: string, sources: KeptDetailSources): stri
     return '';
   }
   if (dropped === 0) return splitAgainstAddress(source, sources.carried, sources.main);
+  // The dropped title words stood before what is left, so a unit keyword that now comes first
+  // ("starbucks level 2" leaves "level 2") still starts a tail: `ledByTitle`.
   return splitAgainstAddress(
     chunks.slice(dropped).join(' '),
     sources.carried,
     titleWords
       .slice(lastTitleWord + 1)
       .map((w) => w.word)
-      .join(' ')
+      .join(' '),
+    true
   );
 }
 
 /** Steps 1 to 5 of `splitKeptDetail` (and its no-word-break rule), against the address. */
-function splitAgainstAddress(typed: string, carriedRaw: string, main: string | undefined): string {
+function splitAgainstAddress(
+  typed: string,
+  carriedRaw: string,
+  main: string | undefined,
+  /** Title words were dropped ahead of `typed`: they count as the tail rule's earlier chunk. */
+  ledByTitle = false
+): string {
   const carried = (carriedRaw ?? '').trim();
   const source = (typed ?? '').trim();
   if (!source) return '';
@@ -459,7 +487,7 @@ function splitAgainstAddress(typed: string, carriedRaw: string, main: string | u
   let tail = chunks.findIndex(
     (c, i) =>
       (isKeywordChunk(c) || c.raw.startsWith('#')) &&
-      chunks.slice(0, i).some((p) => !isKeywordChunk(p))
+      (ledByTitle || chunks.slice(0, i).some((p) => !isKeywordChunk(p)))
   );
   if (tail < 0) tail = chunks.length;
 
