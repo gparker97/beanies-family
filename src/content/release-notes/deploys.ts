@@ -17,6 +17,67 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.19',
+    date: '2026-11-19',
+    month: '19 november 2026',
+    spotlight: true,
+    summary: {
+      en: 'Address suggestions and Join Call links are here.',
+      beanie: 'address suggestions and join call links are here.',
+    },
+    features: [
+      {
+        icon: '📍',
+        title: { en: 'Address suggestions', beanie: 'address suggestions' },
+        description: {
+          en: 'Location and address fields now suggest places from Google Maps as you type, keep the unit or room you typed, and open the exact place on the map. A pod manager can turn it off in Settings.',
+          beanie:
+            'location and address fields now suggest places from google maps as you type, keep the unit or room you typed, and open the exact place on the map. a pod manager can turn it off in settings.',
+        },
+      },
+      {
+        icon: '📹',
+        title: { en: 'Join Call from the calendar', beanie: 'join call from the calendar' },
+        description: {
+          en: "A video call link in an activity's location now shows as Join Call, in the planner, on the Beanie Wall and in reminders. A link read from an invitation by magic beans is placed there too.",
+          beanie:
+            "a video call link in an activity's location now shows as join call, in the planner, on the beanie wall and in reminders. a link read from an invitation by magic beans is placed there too.",
+        },
+      },
+      {
+        icon: '🏷️',
+        title: { en: 'Categories picked for you', beanie: 'categories picked for you' },
+        description: {
+          en: 'The category is now picked from what is typed on a new activity or transaction, with Change one tap away. Category pickers can also be searched.',
+          beanie:
+            'the category is now picked from what is typed on a new activity or transaction, with change one tap away. category pickers can also be searched.',
+        },
+      },
+      {
+        icon: '⭐',
+        title: { en: 'Stars on the Beanie Wall', beanie: 'stars on the beanie wall' },
+        description: {
+          en: "Tapping a child's face on the wall Choreboard now shows their stars and rewards, and reaching the weekly reward is celebrated. Scrapbook photos can be tapped to see them bigger.",
+          beanie:
+            "tapping a child's face on the wall choreboard now shows their stars and rewards, and reaching the weekly reward is celebrated. scrapbook photos can be tapped to see them bigger.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.17',
     date: '2026-11-17',
     month: '17 november 2026',
