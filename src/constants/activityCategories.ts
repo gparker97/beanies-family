@@ -220,6 +220,7 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
   { id: 'multi_sport', name: 'Multi Sport', emoji: '🏅', color: '#065F46', group: 'Sports' },
   { id: 'rugby', name: 'Rugby', emoji: '🏉', color: '#34D399', group: 'Sports' },
   { id: 'soccer', name: 'Soccer', emoji: '⚽', color: '#4ADE80', group: 'Sports' },
+  { id: 'softball', name: 'Softball', emoji: '🥎', color: '#3F9142', group: 'Sports' },
   { id: 'taekwondo', name: 'Taekwondo', emoji: '🥋', color: '#0F766E', group: 'Sports' },
   { id: 'tennis', name: 'Tennis', emoji: '🎾', color: '#22C55E', group: 'Sports' },
   { id: 'gym_activity', name: 'Training', emoji: '🏋️', color: '#059669', group: 'Sports' },

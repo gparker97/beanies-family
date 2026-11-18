@@ -786,6 +786,7 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     badminton: 'sports_team',
     golf_activity: 'golf',
     baseball: 'sports_team',
+    softball: 'sports_team',
     gym_activity: 'gym',
     yoga_activity: 'yoga',
     soccer: 'sports_team',

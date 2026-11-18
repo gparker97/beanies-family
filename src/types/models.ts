@@ -1425,6 +1425,7 @@ export type ActivityCategory =
   | 'badminton'
   | 'golf_activity'
   | 'baseball'
+  | 'softball'
   | 'gym_activity'
   | 'yoga_activity'
   | 'soccer'

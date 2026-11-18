@@ -9991,6 +9991,7 @@ const STRING_DEFS = {
   'planner.category.other_social': { en: 'Other Social', beanie: 'other social' },
   'planner.category.badminton': { en: 'Badminton', beanie: 'badminton' },
   'planner.category.baseball': { en: 'Baseball', beanie: 'baseball' },
+  'planner.category.softball': { en: 'Softball', beanie: 'softball' },
   'planner.category.basketball': { en: 'Basketball', beanie: 'basketball' },
   'planner.category.football': { en: 'Football', beanie: 'football' },
   'planner.category.golf_activity': { en: 'Golf', beanie: 'golf' },

@@ -4344,6 +4344,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'planner.category.other_social': '其他社交',
   'planner.category.badminton': '羽毛球',
   'planner.category.baseball': '棒球',
+  'planner.category.softball': '垒球',
   'planner.category.basketball': '篮球',
   'planner.category.football': '美式橄榄球',
   'planner.category.golf_activity': '高尔夫',

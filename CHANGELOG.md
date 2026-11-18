@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - Address suggestions have been built behind a switch that is off, so nothing changes in the app yet. Once turned on, location and address fields will suggest places from Google Maps while typing, keep the unit or room detail typed, and open the exact place on the map. The activity field will become "Location or Link" and show a video call link as Join Call, with a button to copy the link. A pod manager will be able to turn it off in Settings.
+- Softball is now an activity category, under Sports.
 
 ### Fixed
 

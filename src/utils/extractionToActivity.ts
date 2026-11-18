@@ -43,6 +43,7 @@ export const CATEGORY_KEYWORDS: ReadonlyArray<readonly [RegExp, ActivityCategory
   [/\b(theme|amusement) park\b/i, 'theme_park'],
   [/\b(game|match|tournament)\b/i, 'sporting_event'],
   [/\b(soccer|football)\b/i, 'soccer'],
+  [/\bsoftball\b/i, 'softball'],
   [/\btennis\b/i, 'tennis'],
   [/\bswim\w*\b/i, 'swimming'],
   [/\bgymnastics\b/i, 'gymnastics'],

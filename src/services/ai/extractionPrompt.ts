@@ -38,7 +38,7 @@ import type {
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-11-01.1';
+export const PROMPT_VERSION = '2026-11-18.1';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -64,7 +64,7 @@ export const CATEGORY_OPTIONS_TEXT = [
   'Religious: religious_class (Religious Class), worship (Worship / Service), other_religious (Other Religious)',
   'School: after_school (After School Activity), field_trip (Field Trip), school_recital (School Recital / Presentation), other_school (Other School Activity)',
   'Social: date_night (Date Night), family_visit (Family Visit), playdate (Playdate), other_social (Other Social)',
-  'Sports: badminton (Badminton), baseball (Baseball), basketball (Basketball), football (Football), golf_activity (Golf), gymnastics (Gymnastics), mma (MMA), multi_sport (Multi Sport), rugby (Rugby), soccer (Soccer), taekwondo (Taekwondo), tennis (Tennis), gym_activity (Training), yoga_activity (Yoga / Pilates), other_sports_activity (Other Sports)',
+  'Sports: badminton (Badminton), baseball (Baseball), basketball (Basketball), football (Football), golf_activity (Golf), gymnastics (Gymnastics), mma (MMA), multi_sport (Multi Sport), rugby (Rugby), soccer (Soccer), softball (Softball), taekwondo (Taekwondo), tennis (Tennis), gym_activity (Training), yoga_activity (Yoga / Pilates), other_sports_activity (Other Sports)',
   'Work: conference (Conference), networking (Networking), work_party (Office Party), team_building (Team Building / Outing), work_dinner (Work Dinner), work_drinks (Work Drinks), other_work (Other Work)',
   'Other: other_activity (Other Activity)',
 ].join('\n');
