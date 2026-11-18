@@ -205,7 +205,7 @@ const ADDRESS_SUGGESTIONS_ARTICLE: HelpArticle = {
     {
       type: 'paragraph',
       content:
-        'If the field holds an address and a link, both show. A link is never sent off to a map search. On the beanie wall a call shows by its service name, with no link to tap.',
+        'If the field holds an address and a link, both show. A link is never sent off to a map search. On the beanie wall a call shows by its service name, with no link to tap. When magic beans reads an invitation that has a video call link, beanies.family puts the link with the location, so the new activity shows <strong>Join Call</strong>.',
     },
     { type: 'heading', content: 'What is sent, and how to turn it off', level: 2, id: 'privacy' },
     {

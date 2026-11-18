@@ -8,12 +8,13 @@ vi.mock('@/config/flags', () => ({
 }));
 
 import { CALL_SERVICES, MAPS_HOSTS } from '@/constants/callServices';
-import { safeExternalHref } from '@/utils/url';
+import { safeExternalHref, safeHttpsUrl } from '@/utils/url';
 import {
   describeLocation,
   linkKindOf,
   locationLinksEnabled,
   parseLocation,
+  placeCapturedLink,
   withMeetingUrl,
 } from '../locationLinks';
 import { mapsHref } from '../placeText';
@@ -333,6 +334,175 @@ describe('withMeetingUrl', () => {
       'Join https://meet.google.com/abc'
     );
     expect(withMeetingUrl('Room 3', undefined)).toBe('Room 3');
+  });
+});
+
+describe('placeCapturedLink (#153)', () => {
+  const CALLS = [
+    ['Zoom', 'https://us02web.zoom.us/j/123456789?pwd=abc'],
+    ['Google Meet', 'https://meet.google.com/abc-defg-hij'],
+    ['Microsoft Teams', 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0'],
+    ['VooV Meeting', 'https://voovmeeting.com/dm/abc123'],
+  ] as const;
+
+  it('no link: nothing to place', () => {
+    expect(placeCapturedLink('Room 3', undefined)).toEqual({
+      location: 'Room 3',
+      link: undefined,
+      outcome: 'none',
+    });
+    expect(placeCapturedLink(undefined, '')).toEqual({
+      location: undefined,
+      link: '',
+      outcome: 'none',
+    });
+  });
+
+  it('flag off: both fields exactly as given', () => {
+    flags.on = false;
+    expect(placeCapturedLink('Room 3', 'https://zoom.us/j/123')).toEqual({
+      location: 'Room 3',
+      link: 'https://zoom.us/j/123',
+      outcome: 'none',
+    });
+  });
+
+  for (const [service, url] of CALLS) {
+    it(`${service}, no venue: the link becomes the location and reads as Join Call`, () => {
+      const placed = placeCapturedLink(undefined, url);
+      expect(placed).toEqual({ location: url, link: undefined, outcome: 'call-to-location' });
+      expect(describeLocation(placed.location).links).toEqual([
+        expect.objectContaining({ kind: 'call', service, href: safeExternalHref(url) }),
+      ]);
+    });
+
+    it(`${service}, with a venue: the link follows the venue, both kept`, () => {
+      const placed = placeCapturedLink('Community Hall, Room 2', url);
+      expect(placed).toEqual({
+        location: `Community Hall, Room 2 ${url}`,
+        link: undefined,
+        outcome: 'call-to-location',
+      });
+      const view = describeLocation(placed.location);
+      expect(view.plain).toBe('Community Hall, Room 2');
+      expect(view.links).toEqual([expect.objectContaining({ kind: 'call', service })]);
+    });
+  }
+
+  it('a web link stays the plain link', () => {
+    expect(placeCapturedLink('Hall', 'https://school.example.org/signup')).toEqual({
+      location: 'Hall',
+      link: 'https://school.example.org/signup',
+      outcome: 'web-link',
+    });
+  });
+
+  it('a call link already in the location is not repeated, and the link field is emptied', () => {
+    const location = 'Online: https://meet.google.com/abc-defg-hij';
+    expect(placeCapturedLink(location, 'https://meet.google.com/abc-defg-hij')).toEqual({
+      location,
+      link: undefined,
+      outcome: 'call-to-location',
+    });
+  });
+
+  it('a Teams link the parser would cut at `}` does not read back, so it stays in the link field', () => {
+    // The regression test for the read-back: it compares against the WHOLE screened link.
+    const link = safeHttpsUrl(
+      'https://teams.microsoft.com/l/meetup-join/19%3ameeting_x%40thread.v2/0?context={"Tid":"a"}'
+    )!;
+    expect(link).toContain('}');
+    expect(placeCapturedLink('Room 3', link)).toEqual({
+      location: 'Room 3',
+      link,
+      outcome: 'call-kept-in-link',
+    });
+  });
+
+  it('a link with a trailing dot does not read back, so it stays in the link field', () => {
+    expect(placeCapturedLink('Room 3', 'https://zoom.us/j/123.')).toEqual({
+      location: 'Room 3',
+      link: 'https://zoom.us/j/123.',
+      outcome: 'call-kept-in-link',
+    });
+  });
+
+  it.each([
+    // eslint-disable-next-line @microsoft/sdl/no-insecure-url -- the insecure scheme IS the case under test
+    'http://zoom.us/j/123',
+    'https://zoom.us:8443/j/123',
+  ])('%s is a call link the strict screen rejects: never placed, kept and logged', (link) => {
+    expect(placeCapturedLink('Room 3', link)).toEqual({
+      location: 'Room 3',
+      link,
+      outcome: 'call-kept-in-link',
+    });
+  });
+
+  it.each([
+    'https://zoom.us.evil.example/j/1',
+    'https://evilzoom.us/j/1',
+    'https://zoom.us@evil.example/j/1',
+  ])('%s is never placed (web-link, both unchanged)', (link) => {
+    expect(placeCapturedLink('Room 3', link)).toEqual({
+      location: 'Room 3',
+      link,
+      outcome: 'web-link',
+    });
+  });
+
+  it('the same link already in the location without a scheme: unchanged, link cleared', () => {
+    const location = 'zoom.us/j/84512207719';
+    const placed = placeCapturedLink(location, 'https://zoom.us/j/84512207719');
+    expect(placed).toEqual({ location, link: undefined, outcome: 'call-to-location' });
+    const parsed = parseLocation(placed.location);
+    expect(parsed.links.filter((l) => l.kind === 'call')).toHaveLength(1);
+    expect(parsed.place).toBe('');
+  });
+
+  it('a different spelling of the meeting already in the location: both kept, nothing appended', () => {
+    expect(
+      placeCapturedLink('Online: https://zoom.us/j/123', 'https://zoom.us/j/123?pwd=abc')
+    ).toEqual({
+      location: 'Online: https://zoom.us/j/123',
+      link: 'https://zoom.us/j/123?pwd=abc',
+      outcome: 'call-kept-in-link',
+    });
+  });
+
+  it('a host written in a different case is the same link (the parser lowercases the host)', () => {
+    const location = 'https://Zoom.us/j/123';
+    const placed = placeCapturedLink(location, 'https://zoom.us/j/123');
+    expect(placed).toEqual({ location, link: undefined, outcome: 'call-to-location' });
+    expect(parseLocation(placed.location).links).toHaveLength(1);
+  });
+
+  it.each(['https://zoom.us/j/123 ', 'https://zoom.us/j/123\n'])(
+    'a link with trailing whitespace already in the location: unchanged, link cleared',
+    (link) => {
+      expect(placeCapturedLink('Room 3 https://zoom.us/j/123', link)).toEqual({
+        location: 'Room 3 https://zoom.us/j/123',
+        link: undefined,
+        outcome: 'call-to-location',
+      });
+    }
+  );
+
+  it('a link with surrounding whitespace and no location is placed trimmed', () => {
+    expect(placeCapturedLink('', '  https://zoom.us/j/123\n')).toEqual({
+      location: 'https://zoom.us/j/123',
+      link: undefined,
+      outcome: 'call-to-location',
+    });
+  });
+
+  it('a LONGER url in the location that merely starts with the link: two links, both kept', () => {
+    const location = 'Zoom https://zoom.us/j/123456?pwd=x';
+    expect(placeCapturedLink(location, 'https://zoom.us/j/123')).toEqual({
+      location,
+      link: 'https://zoom.us/j/123',
+      outcome: 'call-kept-in-link',
+    });
   });
 });
 

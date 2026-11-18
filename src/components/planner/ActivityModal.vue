@@ -28,7 +28,8 @@ import { calculateMonthlyFee } from '@/utils/finance';
 import { resolveActivityRule, activityShadowFromRule } from '@/services/recurrence/adapters';
 import { monthlyFactor, occurrenceCount } from '@/services/recurrence/recurrenceEngine';
 import { diffPayload } from '@/utils/diffPayload';
-import { locationLinksEnabled } from '@/utils/location/locationLinks';
+import { locationLinksEnabled, placeCapturedLink } from '@/utils/location/locationLinks';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { useLocationPair } from '@/composables/useLocationPair';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -284,8 +285,19 @@ function applyPrefill(): void {
   }
   if (p.title !== undefined) title.value = p.title;
   if (p.date) date.value = p.date;
-  if (p.location !== undefined) {
-    locationPair.seed({ location: p.location });
+  // A captured call link goes with the place, where it reads as Join Call (#153); any other
+  // link stays the plain link below. Decided once, on the values this form receives.
+  const placed = placeCapturedLink(p.location, p.link);
+  if (placed.outcome === 'call-to-location' || placed.outcome === 'call-kept-in-link') {
+    logEvent({
+      level: 'info',
+      surface: 'ai-activity-capture',
+      message: 'captured link placed',
+      context: { action: placed.outcome },
+    });
+  }
+  if (placed.location !== undefined) {
+    locationPair.seed({ location: placed.location });
   }
   if (p.description !== undefined) description.value = p.description;
   // AI-extracted prep notes route to the VISIBLE `notes` field, which lives inside the
@@ -296,8 +308,8 @@ function applyPrefill(): void {
     showMoreDetails.value = true;
   }
   // The event's web address (#113) sits in the same collapsed section, so it is revealed too.
-  if (p.link) {
-    link.value = p.link;
+  if (placed.link) {
+    link.value = placed.link;
     showMoreDetails.value = true;
   }
   if (p.isAllDay !== undefined) isAllDay.value = p.isAllDay;

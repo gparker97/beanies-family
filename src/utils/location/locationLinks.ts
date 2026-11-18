@@ -16,7 +16,7 @@
 import { isFlagEnabled } from '@/config/flags';
 import { CALL_SERVICES, MAPS_HOSTS, hostMatches } from '@/constants/callServices';
 import type { PlaceRef } from '@/types/models';
-import { extractUrlSpans, safeExternalHref, type UrlSpan } from '@/utils/url';
+import { extractUrlSpans, safeExternalHref, safeHttpsUrl, type UrlSpan } from '@/utils/url';
 import { composePlaceText, detailOf, mapsHref, placeLead, validPlace } from './placeText';
 
 /**
@@ -336,6 +336,49 @@ export function withMeetingUrl(
   if (!url) return base;
   if (base.includes(url)) return base;
   return base.trim() ? `${base.trimEnd()} ${url}` : url;
+}
+
+/**
+ * Which field a captured link belongs in on a NEW activity (#153). A call link goes with the
+ * place, in the Location or Link text (where it reads as Join Call); anything else stays the
+ * plain link. Decided once, when the new form is filled; never applied to an existing activity.
+ *
+ * Outcomes: 'none' (no link, or the flag is off); 'web-link' (not a call link: it stays the
+ * plain link); 'call-to-location' (the link is now in the location text, or was already there
+ * however it was written, so the link field is emptied); 'call-kept-in-link' (a call link that
+ * stays the plain link, both fields unchanged: it fails the https-only screen, an `http://`
+ * link or an odd port say; the location already carries a different call link; or the appended
+ * text would not read back through `parseLocation` as that WHOLE link, a Teams `?context={...}`
+ * or a trailing period). Pure; the caller logs the call outcomes.
+ */
+export function placeCapturedLink(
+  location: string | undefined,
+  link: string | undefined
+): {
+  location: string | undefined;
+  link: string | undefined;
+  outcome: 'none' | 'call-to-location' | 'call-kept-in-link' | 'web-link';
+} {
+  const unchanged = { location, link };
+  if (!link || !locationLinksEnabled()) return { ...unchanged, outcome: 'none' };
+  const href = safeHttpsUrl(link);
+  if (!href) {
+    const loose = safeExternalHref(link);
+    const call = !!loose && linkKindOf(loose).kind === 'call';
+    return { ...unchanged, outcome: call ? 'call-kept-in-link' : 'web-link' };
+  }
+  if (linkKindOf(href).kind !== 'call') return { ...unchanged, outcome: 'web-link' };
+  // "Already there" by parsed link, not by substring: "zoom.us/j/1" holds "https://zoom.us/j/1".
+  const calls = parseLocation(location).links.filter((l) => l.kind === 'call');
+  if (calls.some((l) => l.href === href)) {
+    return { location, link: undefined, outcome: 'call-to-location' };
+  }
+  if (calls.length) return { ...unchanged, outcome: 'call-kept-in-link' };
+  const next = withMeetingUrl(location, link.trim());
+  const readsBack = parseLocation(next).links.some((l) => l.kind === 'call' && l.href === href);
+  return readsBack
+    ? { location: next, link: undefined, outcome: 'call-to-location' }
+    : { ...unchanged, outcome: 'call-kept-in-link' };
 }
 
 /** The read row's label: "Location", or "Location or Link" once the text holds a link. */
