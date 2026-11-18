@@ -135,12 +135,14 @@ export const numericPrice = (price: string): string => price.replace(/[^0-9.]/g,
 
 /**
  * The v1 launch offer on /pricing: a Stripe promotion code a family types at checkout, for the
- * first `families` who redeem it, on the MONTHLY magic beans plan only (live coupon
- * `V1_LAUNCH_20_3MO`, limited to that product; the billing Lambda shows the code field on
- * list-price monthly checkouts only). The page states these figures, so they live here and not
- * in the markup; the live coupon and promotion code must match them.
+ * first `families` who redeem it: `pctOff` off the first year on any plan, monthly or yearly
+ * (live coupon `V1_LAUNCH_20_12MO`: `percent_off`, `repeating` 12 months, no `applies_to`). The
+ * billing Lambda shows the code field on every list-price checkout, and Stripe cannot vary a
+ * coupon by interval, so a whole-year percentage is what keeps monthly and yearly fair. The page
+ * states these figures, so they live here and not in the markup; the live coupon and promotion
+ * code must match them.
  */
-export const V1_COUPON = { code: 'beaniev1', pctOff: 20, months: 3, families: 100 } as const;
+export const V1_COUPON = { code: 'beaniev1', pctOff: 20, families: 100 } as const;
 
 /** Length of the everything-included trial that starts at v1. */
 export const TRIAL_DAYS = 90;

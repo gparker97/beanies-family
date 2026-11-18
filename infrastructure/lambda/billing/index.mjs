@@ -533,12 +533,13 @@ async function handleCheckout(body, event, cfg, ddb) {
       };
     }
     params.discounts = [{ coupon: cfg.coupon }];
-  } else if (cohort === null && interval === 'month') {
-    // The v1 coupon on /pricing (`V1_COUPON` in packages/brand/pricing.ts) is monthly-only: its
-    // live coupon is 20% for 3 months, which on a yearly invoice would take 20% off the whole
-    // year. So only a list-price monthly checkout shows Stripe's promotion-code field. Never
-    // beside a cohort price: Stripe refuses `discounts` with it, and `first_ten` is already the
-    // founding price.
+  } else if (cohort === null) {
+    // Every list-price checkout, monthly or yearly, on either plan, shows Stripe's promotion-code
+    // field. Stripe cannot restrict a coupon by billing interval (`applies_to` takes products
+    // only), so every code must be interval-fair by construction: a percentage over whole years
+    // (`duration_in_months` a multiple of 12), as `V1_COUPON` in packages/brand/pricing.ts is.
+    // Never beside a cohort price: Stripe refuses `discounts` with it, and `first_ten` is
+    // already the founding price.
     params.allow_promotion_codes = true;
   }
 

@@ -363,7 +363,11 @@ describe('billing Lambda handler', () => {
       assert.equal(p.get('customer_email'), 'o@x.test');
       assert.equal(p.get('customer'), null);
       assert.equal(p.get('discounts[0][coupon]'), null);
-      assert.equal(p.get('allow_promotion_codes'), null, 'the v1 code is monthly-only');
+      assert.equal(
+        p.get('allow_promotion_codes'),
+        'true',
+        'a list-price yearly checkout takes codes'
+      );
       assert.equal(p.get('branding_settings[background_color]'), '#1e2a36');
       assert.equal(p.get('return_url'), null);
       assert.equal(create.headers['Stripe-Version'], STRIPE_API_VERSION);
@@ -424,7 +428,7 @@ describe('billing Lambda handler', () => {
       assert.equal(p.get('allow_promotion_codes'), null, 'first_ten is already the founding price');
       assert.equal(keys[1], 'first_ten.full.month.sgd');
     });
-    it('a list-price monthly checkout offers the promotion-code field (the v1 coupon)', async () => {
+    it('a list-price monthly checkout offers the promotion-code field too', async () => {
       const t = fakeDdb({ registry: { [FAMILY]: { familyId: FAMILY, ownerEmail: 'o@x.test' } } });
       const calls = fakeStripe({
         'GET /v1/prices': { data: [{ id: 'price_month' }] },
