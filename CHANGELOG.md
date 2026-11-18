@@ -14,6 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Coupon codes can now be entered at checkout on every plan, beanies basic or magic beans, monthly or yearly (previously monthly magic beans only).
 - The v1 launch offer is now 20% off your first year on any plan, instead of 20% off the first three months of monthly magic beans.
+- The beanstalk newsletter now lives at `everybeancounts.beanies.family`, and the website's links to it point there.
 
 ## 2026-11-17
 
