@@ -8,7 +8,7 @@ import { computed } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import WallMemoriesViewer from '../WallMemoriesViewer.vue';
-import { __resetEscapeCloseForTests } from '@/composables/useEscapeClose';
+import { __resetEscapeCloseForTests, escapeLayerCount } from '@/composables/useEscapeClose';
 import type { ScrapbookEntry, ScrapType } from '@/composables/useScrapbookFeed';
 import type { FamilyMember } from '@/types/models';
 
@@ -33,6 +33,18 @@ vi.mock('@/composables/useMemberAvatar', () => ({
   useMemberAvatarBindings: () => ({ memberAvatarBindings: () => ({}) }),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+const { logEventMock } = vi.hoisted(() => ({ logEventMock: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: logEventMock }));
+vi.mock('@/stores/photoStore', () => ({
+  usePhotoStore: () => ({
+    photos: {},
+    isUnresolved: () => false,
+    getPublicUrl: (id: string) => `https://example.test/${id}`,
+    markUnresolved: vi.fn(),
+  }),
+}));
+vi.mock('@/utils/deliverFile', () => ({ deliverFile: vi.fn() }));
+vi.mock('@/utils/pdfRender', () => ({ pdfToPageImages: vi.fn() }));
 
 const beans = [
   { id: 'm1', name: 'Leo' },
@@ -56,6 +68,54 @@ function mountViewer(types: ReadonlySet<ScrapType> = ALL) {
     props: { beans, types },
     attachTo: document.body,
     global: { stubs: { BeanieAvatar: true, ScrapbookPiece: true } },
+  });
+}
+
+/** A bare piece whose photo emits `photo-click`, as the real one does with `photoPress`. */
+const PhotoPieceStub = {
+  name: 'ScrapbookPiece',
+  props: {
+    entry: Object,
+    photoPress: Boolean,
+    noteIndex: Number,
+    emphasizePhoto: Boolean,
+    photoSize: String,
+  },
+  emits: ['photo-click'],
+  template:
+    '<button v-if="photoPress" class="photo" :data-id="entry.id" @click="$emit(\'photo-click\', entry)" />',
+};
+const BaseModalStub = {
+  name: 'BaseModal',
+  props: ['open'],
+  template: '<div v-if="open" class="photo-modal"><slot /><slot name="footer" /></div>',
+};
+
+function milestone(id: string, photoIds: string[]): ScrapbookEntry {
+  return {
+    id,
+    type: 'milestone',
+    memberId: 'm1',
+    effectiveDate: '2026-11-06',
+    createdAt: '2026-11-06T12:00:00',
+    payload: { id, title: id, photoIds } as unknown as ScrapbookEntry['payload'],
+  };
+}
+
+/** `realModal`: keep the real BaseModal, which is what puts the photo on the Escape stack. */
+function mountWithPhotos({ realModal = false } = {}) {
+  return mount(WallMemoriesViewer, {
+    props: { beans, types: ALL },
+    attachTo: document.body,
+    global: {
+      stubs: {
+        BeanieAvatar: true,
+        BeanieIcon: true,
+        BeanieSpinner: true,
+        ScrapbookPiece: PhotoPieceStub,
+        ...(realModal ? {} : { BaseModal: BaseModalStub }),
+      },
+    },
   });
 }
 
@@ -136,6 +196,48 @@ describe('WallMemoriesViewer', () => {
   it('with memories: reports nothing', () => {
     const w = mountViewer();
     expect(w.emitted('empty')).toBeUndefined();
+    w.unmount();
+  });
+
+  it("a photo tap opens the photo viewer, read-only, with that memory's photos, and logs it", async () => {
+    entriesRef.value = [milestone('swim', ['p1', 'p2', 'p3'])];
+    const w = mountWithPhotos();
+    expect(w.find('.photo-modal').exists()).toBe(false);
+
+    await w.find('.photo').trigger('click');
+    const viewer = w.findComponent({ name: 'PhotoViewer' });
+    expect(viewer.props('open')).toBe(true);
+    expect(viewer.props('photoIds')).toEqual(['p1', 'p2', 'p3']);
+    expect(viewer.props('readOnly')).toBe(true);
+    // No link off the wall: nothing in the viewer's actions slot.
+    expect(w.find('.photo-modal a').exists()).toBe(false);
+    expect(logEventMock).toHaveBeenCalledWith({
+      level: 'info',
+      surface: 'beanie-wall',
+      message: 'wall_memories_photo',
+      context: { kind: 'open' },
+    });
+    w.unmount();
+  });
+
+  it('one Escape closes only the photo; the next closes the scrapbook', async () => {
+    entriesRef.value = [milestone('swim', ['p1'])];
+    const w = mountWithPhotos({ realModal: true });
+    const viewer = w.findComponent({ name: 'PhotoViewer' });
+    const scrapbookOnly = escapeLayerCount();
+    await w.find('.photo').trigger('click');
+    expect(viewer.props('open')).toBe(true);
+    // The photo is one more layer, not two.
+    expect(escapeLayerCount()).toBe(scrapbookOnly + 1);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await w.vm.$nextTick();
+    expect(viewer.props('open')).toBe(false);
+    expect(escapeLayerCount()).toBe(scrapbookOnly);
+    expect(w.emitted('close')).toBeUndefined();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(w.emitted('close')).toEqual([['escape']]);
     w.unmount();
   });
 });

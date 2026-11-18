@@ -410,7 +410,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'A digital memory-book you can flip through — a page for each family member, plus an “Everyone” page — filled in automatically from the things you add to your beans.',
     icon: '📖',
     readTime: 4,
-    updatedDate: '2026-11-12',
+    updatedDate: '2026-11-18',
     sections: [
       {
         type: 'heading',
@@ -443,7 +443,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'There’s a spine down the side with everyone’s names. Tap a name to flip to that bean’s page, or tap <strong>Everyone</strong> for the family page — the pages turn with a little animation, just like a real book. On a phone, the spine and page-turns work the same way; you’ll just see one page at a time.',
+          'There’s a spine down the side with everyone’s names. Tap a name to flip to that bean’s page, or tap <strong>Everyone</strong> for the family page — the pages turn with a little animation, just like a real book. On a phone, the spine and page-turns work the same way; you’ll just see one page at a time. Tap any photo to see it bigger, and from there you can open that family member’s page.',
       },
       {
         type: 'paragraph',

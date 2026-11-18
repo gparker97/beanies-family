@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { computed, ref, type Ref } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import WallSheet from '../WallSheet.vue';
+import WallStarsSheet from '../WallStarsSheet.vue';
 import type { WallSheetTarget } from '@/types/wall';
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -49,10 +50,11 @@ vi.mock('@/composables/useWallPeripherals', () => ({
 
 const TRIP: WallSheetTarget = { kind: 'trip' } as WallSheetTarget;
 
-function mountSheet() {
+function mountSheet(target: WallSheetTarget = TRIP, { attach = false } = {}) {
   return mount(WallSheet, {
+    ...(attach ? { attachTo: document.body } : {}),
     props: {
-      target: TRIP,
+      target,
       isPending: () => false,
       visibleMemberIds: null,
       todosFor: () => [],
@@ -67,6 +69,7 @@ function mountSheet() {
         WallTripTimeline: true,
         HandwrittenLine: true,
         CelebrationConfetti: true,
+        WallStarsSheet: true,
       },
     },
   });
@@ -126,5 +129,39 @@ describe('WallSheet trip header', () => {
     await chips()[1]!.trigger('click');
     expect(chips().map((c) => c.attributes('aria-pressed'))).toEqual(['false', 'true']);
     expect(header(w).find('h2').text()).toBe('Grandma in the mountains');
+  });
+});
+
+/**
+ * The stars sheet (#154): a head in the chore lanes opens it for one bean. A child chip inside it
+ * switches to that child through the sheet's existing `open`, and a member this device no longer
+ * knows gets the feature's own title.
+ */
+describe('WallSheet stars', () => {
+  it('renders the stars body and re-emits a chip switch as open with a stars target', () => {
+    const w = mountSheet({ kind: 'stars', memberId: 'gone' });
+    const body = w.findComponent(WallStarsSheet);
+    expect(body.exists()).toBe(true);
+    expect(body.props('memberId')).toBe('gone');
+    expect(header(w).find('h2').text()).toBe('choreStars.title');
+    body.vm.$emit('switch-member', 'kid');
+    expect(w.emitted('open')).toEqual([[{ kind: 'stars', memberId: 'kid' }]]);
+  });
+
+  it('a chip switch keeps focus inside the dialog, on the new title', async () => {
+    // The chip that had focus belongs to the old body; once the target changes it is gone, and
+    // focus would fall to <body> behind the aria-modal dialog.
+    const w = mountSheet({ kind: 'stars', memberId: 'gone' }, { attach: true });
+    const chip = document.createElement('button');
+    w.find('.wall-sheet-panel').element.appendChild(chip);
+    chip.focus();
+    chip.remove();
+
+    await w.setProps({ target: { kind: 'stars', memberId: 'kid' } });
+    const title = header(w).find('h2');
+    expect(title.attributes('tabindex')).toBe('-1');
+    expect(document.activeElement).toBe(title.element);
+    expect(w.find('[role="dialog"]').element.contains(document.activeElement)).toBe(true);
+    w.unmount();
   });
 });

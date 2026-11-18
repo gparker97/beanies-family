@@ -25,6 +25,11 @@
  * `secondary-500` / `ink`; small text `secondary-400` / `ink-faint`; the saved-up line
  * `secondary-500` / `ink-soft`; Achieved is green-700 / `success-lift` on `--tint-success-10`.
  * Markers are `bg-white` / `surface-raised`. The only scoped rule is geometry (no paint).
+ *
+ * `size` (#154): `md`, the default, is the app's look (a grown-up's home card, the Star Report).
+ * `lg` is the wall's, read from a few steps away: taller steps and markers, a bigger avatar,
+ * and the "N more stars" line as the card's headline, drawn above the path (CSS `order`, so the
+ * DOM and the spoken summary are the same at both sizes). Sizes only; every colour is shared.
  */
 import { computed } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -51,6 +56,8 @@ const props = withDefaults(
     barPct?: number;
     /** Whose week: their avatar rides on the step reached. */
     member?: FamilyMember | null;
+    /** `md`: the app's strip; `lg`: the wall's, read across a room. */
+    size?: 'md' | 'lg';
   }>(),
   {
     nearest: null,
@@ -59,8 +66,50 @@ const props = withDefaults(
     rewardEmoji: '',
     barPct: 100,
     member: null,
+    size: 'md',
   }
 );
+
+/** Every size-dependent class, per size; `md` is the strip as it has always been drawn. */
+const SIZES = {
+  md: {
+    root: 'gap-1.5',
+    markers: 'h-7',
+    reward: 'h-6 w-6 rounded-lg text-sm',
+    award: 'h-5 w-5 rounded-md text-xs',
+    avatar: 'xs',
+    steps: 'h-3.5 gap-0.5',
+    step: 'h-2',
+    stepThin: 'h-1',
+    nextRing: 'ring-1',
+    notch: 'h-3.5 w-0.5',
+    caption: 'gap-2 text-sm leading-snug',
+    words: 'font-semibold',
+    count: 'font-bold',
+    pill: 'px-2 py-0.5 text-xs',
+    small: 'text-xs',
+    saved: 'text-xs',
+  },
+  lg: {
+    root: 'gap-3',
+    markers: 'h-11',
+    reward: 'h-10 w-10 rounded-xl text-xl',
+    award: 'h-8 w-8 rounded-lg text-base',
+    avatar: 'md',
+    steps: 'h-6 gap-1',
+    step: 'h-4',
+    stepThin: 'h-2',
+    nextRing: 'ring-2',
+    notch: 'h-6 w-1',
+    caption: 'order-first flex-wrap gap-x-3 gap-y-1 text-2xl leading-tight',
+    words: 'font-extrabold',
+    count: 'font-extrabold',
+    pill: 'px-3 py-1 text-sm',
+    small: 'text-sm',
+    saved: 'text-base',
+  },
+} as const;
+const sz = computed(() => SIZES[props.size]);
 
 const { t } = useTranslation();
 const { memberAvatarBindings } = useMemberAvatarBindings();
@@ -168,22 +217,24 @@ const spoken = computed(() => {
 
 <template>
   <div
-    class="flex flex-col gap-1.5"
+    class="flex flex-col"
+    :class="sz.root"
     role="img"
     :aria-label="spoken"
     data-testid="star-path-strip"
     :data-steps="path.steps"
   >
     <!-- Markers: the reward over the notch, a This Week award, the child on the step reached. -->
-    <div v-if="path.steps > 0" class="relative h-7" aria-hidden="true">
+    <div v-if="path.steps > 0" class="relative" :class="sz.markers" aria-hidden="true">
       <span
         v-if="barPos !== null && hasBar"
-        class="strip-marker grid h-6 w-6 place-items-center rounded-lg text-sm leading-none"
-        :class="
+        class="strip-marker grid place-items-center leading-none"
+        :class="[
+          sz.reward,
           path.reached
             ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br shadow-[0_3px_8px_rgba(241,93,34,0.3)]'
-            : 'border-primary-500 dark:border-accent-lift dark:bg-surface-raised border-[1.5px] border-dashed bg-white'
-        "
+            : 'border-primary-500 dark:border-accent-lift dark:bg-surface-raised border-[1.5px] border-dashed bg-white',
+        ]"
         :style="{ left: at(barPos) }"
         data-testid="star-path-reward"
         :data-reached="path.reached ? 'true' : 'false'"
@@ -191,7 +242,8 @@ const spoken = computed(() => {
       >
       <span
         v-if="awardPos !== null && thisWeek"
-        class="strip-marker dark:border-line-strong dark:bg-surface-raised grid h-5 w-5 place-items-center rounded-md border border-dashed border-[var(--color-border-strong)] bg-white text-xs leading-none"
+        class="strip-marker dark:border-line-strong dark:bg-surface-raised grid place-items-center border border-dashed border-[var(--color-border-strong)] bg-white leading-none"
+        :class="sz.award"
         :style="{ left: at(awardPos) }"
         data-testid="star-path-award"
         >{{ thisWeek.emoji }}</span
@@ -202,21 +254,24 @@ const spoken = computed(() => {
         :style="{ left: at(avatarPos), transform: `translateX(${avatarShift})` }"
         data-testid="star-path-avatar"
       >
-        <BeanieAvatar v-bind="memberAvatarBindings(member)" size="xs" />
+        <BeanieAvatar v-bind="memberAvatarBindings(member)" :size="sz.avatar" />
       </span>
     </div>
 
     <!-- The steps, with the bar's notch after its step. -->
-    <div v-if="path.steps > 0" class="flex h-3.5 items-center gap-0.5" aria-hidden="true">
+    <div v-if="path.steps > 0" class="flex items-center" :class="sz.steps" aria-hidden="true">
       <template v-for="s in steps" :key="s.i">
         <i
           class="block min-w-0 flex-1 rounded-full"
           :class="[
-            s.thin ? 'h-1' : 'h-2',
+            s.thin ? sz.stepThin : sz.step,
             s.tone === 'earned'
               ? 'bg-primary-500'
               : s.tone === 'next'
-                ? 'ring-primary-500 dark:ring-accent-lift bg-[var(--tint-orange-15)] ring-1 ring-inset'
+                ? [
+                    'ring-primary-500 dark:ring-accent-lift bg-[var(--tint-orange-15)] ring-inset',
+                    sz.nextRing,
+                  ]
                 : 'bg-[var(--tint-slate-10)]',
           ]"
           data-testid="star-path-step"
@@ -225,40 +280,45 @@ const spoken = computed(() => {
         />
         <b
           v-if="s.notchAfter"
-          class="bg-primary-600 dark:bg-accent-lift block h-3.5 w-0.5 flex-none rounded-sm"
+          class="bg-primary-600 dark:bg-accent-lift block flex-none rounded-sm"
+          :class="sz.notch"
           data-testid="star-path-notch"
         />
       </template>
     </div>
 
-    <div class="font-outfit flex items-baseline gap-2 text-sm leading-snug" aria-hidden="true">
+    <div class="font-outfit flex items-baseline" :class="sz.caption" aria-hidden="true">
       <template v-if="caption === 'achieved'">
         <span
-          class="dark:text-success-lift rounded-full bg-[var(--tint-success-10)] px-2 py-0.5 text-xs font-bold text-green-700"
+          class="dark:text-success-lift rounded-full bg-[var(--tint-success-10)] font-bold text-green-700"
+          :class="sz.pill"
           data-testid="star-path-achieved"
           >✓ {{ t('choreStars.achieved') }}</span
         >
-        <span class="text-secondary-500 dark:text-ink-soft min-w-0 truncate font-semibold">{{
+        <span class="text-secondary-500 dark:text-ink-soft min-w-0 truncate" :class="sz.words">{{
           achievedOn
         }}</span>
       </template>
       <span
         v-else-if="caption === 'more'"
-        class="text-secondary-500 dark:text-ink min-w-0 font-semibold"
+        class="text-secondary-500 dark:text-ink min-w-0"
+        :class="sz.words"
         data-testid="star-path-more"
         >{{ toRewardParts.before
-        }}<b class="text-primary-700 dark:text-accent-lift font-bold">{{ moreText }}</b
+        }}<b class="text-primary-700 dark:text-accent-lift" :class="sz.count">{{ moreText }}</b
         >{{ toRewardParts.after }}</span
       >
       <span
         v-else
-        class="text-secondary-500 dark:text-ink min-w-0 font-semibold"
+        class="text-secondary-500 dark:text-ink min-w-0"
+        :class="sz.words"
         data-testid="star-path-plain"
         >{{ plainText }}</span
       >
       <small
         v-if="smallCaption"
-        class="font-inter text-secondary-400 dark:text-ink-faint ml-auto text-xs font-medium whitespace-nowrap"
+        class="font-inter text-secondary-400 dark:text-ink-faint ml-auto font-medium whitespace-nowrap"
+        :class="sz.small"
         data-testid="star-path-caption"
         >{{ smallCaption }}</small
       >
@@ -266,7 +326,8 @@ const spoken = computed(() => {
 
     <p
       v-if="savedLine && nearest"
-      class="text-secondary-500 dark:text-ink-soft text-xs leading-snug"
+      class="text-secondary-500 dark:text-ink-soft leading-snug"
+      :class="sz.saved"
       aria-hidden="true"
       data-testid="star-path-saved"
     >

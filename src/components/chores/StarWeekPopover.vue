@@ -11,7 +11,7 @@
  * when known, the stars from chores), then the week's bonus and take-away entries (each with who
  * and the note), or one net line when only the frozen net is known, then the total, and, when a
  * take-away would have taken the week below zero, one plain line saying a week never does.
- * Presentational: it knows nothing of the store.
+ * Presentational: it knows nothing of the store. Each entry is the shared `StarGiftRow`.
  *
  * Dark mode: the shell is `StarPopoverShell`'s; day rows and entry tiles `--tint-slate-5` /
  * `surface-hover`; text `secondary-*` / `ink*`; a bonus amount green-700 / `success-lift`, a
@@ -19,7 +19,8 @@
  */
 import { computed } from 'vue';
 import StarPopoverShell from '@/components/chores/StarPopoverShell.vue';
-import type { BonusEntryLine } from '@/components/chores/StarBonusPopover.vue';
+import StarGiftRow from '@/components/chores/StarGiftRow.vue';
+import type { BonusEntryLine } from '@/components/chores/starText';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { FamilyMember } from '@/types/models';
@@ -107,35 +108,15 @@ const tile =
           {{ t('choreStars.report.weekPop.bonusTitle') }}
         </p>
         <ul v-if="lines.entries" class="flex flex-col gap-1.5" data-testid="star-week-entries">
-          <li
+          <StarGiftRow
             v-for="entry in lines.entries"
             :key="entry.gift.id"
+            :entry="entry"
+            amount-testid="star-week-entry-amount"
             :class="tile"
             data-testid="star-week-entry"
             :data-kind="entry.take ? 'take' : 'bonus'"
-          >
-            <span class="min-w-0 flex-1">
-              <span
-                class="font-outfit text-secondary-500 dark:text-ink block text-sm font-semibold"
-                >{{ entry.title }}</span
-              >
-              <span
-                v-if="entry.sub"
-                class="text-secondary-500 dark:text-ink-soft block text-xs break-words"
-                >{{ entry.sub }}</span
-              >
-            </span>
-            <b
-              class="font-outfit flex-none text-sm font-extrabold tabular-nums"
-              :class="
-                entry.take
-                  ? 'text-secondary-500 dark:text-ink'
-                  : 'dark:text-success-lift text-green-700'
-              "
-              data-testid="star-week-entry-amount"
-              >{{ entry.amount }}</b
-            >
-          </li>
+          />
         </ul>
         <div v-else :class="tile" class="text-sm" data-testid="star-week-net">
           <span class="text-secondary-500 dark:text-ink min-w-0 flex-1">{{

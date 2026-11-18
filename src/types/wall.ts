@@ -244,6 +244,11 @@ export type WallSheetTarget =
   | { kind: 'trip' }
   | { kind: 'meals'; ymd: string }
   /**
+   * One bean's stars and rewards (#154), opened by a tap on their head in the chore lanes.
+   * Read-only; a grown-up's or a pet's head opens it too and gets an explanation.
+   */
+  | { kind: 'stars'; memberId: string }
+  /**
    * A view-only external event (plan 2026-11-17, C4). NOT a drawer: the page opens the
    * shared read-only `ExternalEventDetailsModal` for it, with no edit controls, no PIN
    * prompt and no Google link. The event itself rides along because it lives in memory

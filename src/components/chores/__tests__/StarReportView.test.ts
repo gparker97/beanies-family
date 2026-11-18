@@ -64,6 +64,7 @@ const ss = vi.hoisted(() => ({
 }));
 vi.mock('@/stores/starStore', async () => {
   const kit = await import('./choreTestKit');
+  const { weekBonusEntries } = await import('@/utils/choreStars');
   return {
     useStarStore: () => ({
       earners: ['kid', 'sib'],
@@ -84,6 +85,17 @@ vi.mock('@/stores/starStore', async () => {
       weekFor: (id: string, ymd?: string) => {
         ss.weekFor(id, ymd);
         return ss.state!.weeks[id]?.[ymd ?? THIS] ?? null;
+      },
+      // The store's getter: the one rule over that kid's week and gifts (`[]` with no week).
+      // `week` is a week start, or the week itself when the caller already holds it.
+      weekGiftsFor: (id: string, week?: string | WeekStars) => {
+        const w = typeof week === 'object' ? week : ss.state!.weeks[id]?.[week ?? THIS];
+        return w
+          ? weekBonusEntries(
+              w,
+              ss.state!.gifts.filter((g) => g.memberId === id)
+            )
+          : [];
       },
       // Pip reached Disneyland on Friday 11-13 (LAST week); as of any later week it stays
       // achieved (a one-time award), with that day.

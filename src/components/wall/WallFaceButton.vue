@@ -24,7 +24,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<{
   /** The bean's name, for the accessible label. */
   name: string;
-  source: Extract<WallMemoriesOpenSource, 'face-chore' | 'face-sheet'>;
+  source: Extract<WallMemoriesOpenSource, 'face-sheet'>;
 }>();
 
 const memories = inject(WALL_MEMORIES, null);

@@ -50,14 +50,23 @@ const celebrate = vi.fn();
  * prediction), each marks `refresh`, `celebrate:<member>[:settled]`, `release:<member>`.
  */
 const order = vi.hoisted(() => [] as string[]);
+/** The expected-celebration calls (#154), with `celebrate:` mirrored in for their order. */
+const expected = vi.hoisted(() => [] as string[]);
+/** Every `noteChoreTick` (#154): the bean, per tick or untick that passed the guards. */
+const ticked = vi.hoisted(() => [] as string[]);
 vi.mock('@/composables/useCelebration', () => ({
   celebrateChore: (req: { memberId: string; settled?: boolean }) => {
     order.push(`celebrate:${req.memberId}${req.settled ? ':settled' : ''}`);
+    expected.push(`celebrate:${req.memberId}`);
     celebrate(req);
     return `${req.memberId}:morning`;
   },
   holdChoreBlock: (memberId: string) => order.push(`hold:${memberId}`),
   releaseChoreBlock: (memberId: string) => order.push(`release:${memberId}`),
+  // Kept out of `order` (which the hold tests compare whole): their own log.
+  expectChoreCelebration: (memberId: string) => expected.push(`expect:${memberId}`),
+  endChoreCelebrationExpected: (memberId: string) => expected.push(`end:${memberId}`),
+  noteChoreTick: (memberId: string) => ticked.push(memberId),
 }));
 const budget = vi.hoisted(() => ({ allow: true, calls: [] as string[] }));
 vi.mock('@/utils/autoWriteBudget', () => ({
@@ -511,6 +520,59 @@ describe('the once-only celebration', () => {
     await Promise.all([finishing, settled]);
     expect(order.indexOf('celebrate:kid')).toBeGreaterThanOrEqual(0);
     expect(order.indexOf('settled')).toBeGreaterThan(order.indexOf('celebrate:kid'));
+  });
+
+  it('a celebration is EXPECTED from the tap until it starts or will not, with or without an anchor (#154)', async () => {
+    await setup([chore('c1')]);
+    expected.length = 0;
+    // No anchor: no hold, but the celebration is still expected (the reward waits behind it).
+    const finishing = store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid' });
+    expect(expected).toEqual(['expect:kid']);
+    await finishing;
+    expect(expected).toEqual(['expect:kid', 'celebrate:kid', 'end:kid']);
+    // A predicted finish whose write fails: expected, then ended, nothing played.
+    await setup([chore('c1')]);
+    expected.length = 0;
+    db.failNext = new Error('boom');
+    expect(await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid' })).toBeNull();
+    expect(expected).toEqual(['expect:kid', 'end:kid']);
+    // A tick that predicts no finish expects nothing.
+    await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
+    expected.length = 0;
+    await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid' });
+    expect(expected).toEqual([]);
+  });
+
+  it('every tick and untick of a bean is noted at the tap, finishing or not; a refused one is not (#154)', async () => {
+    await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
+    ticked.length = 0;
+    const first = store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid' });
+    expect(ticked).toEqual(['kid']); // synchronously, before the write lands
+    await first;
+    await store.toggleChore('c2', 'kid', { surface: 'wall', by: 'kid' }); // finishes the block
+    await store.toggleChore('c2', 'kid', { surface: 'wall', by: 'kid' }); // untick
+    expect(ticked).toEqual(['kid', 'kid', 'kid']);
+    family.currentMemberId = 'sib';
+    await store.toggleChore('c1', 'kid', { surface: 'app' }); // refused: not-yours
+    expect(ticked).toHaveLength(3);
+    family.currentMemberId = 'mom';
+  });
+
+  it('found done only after the write (another device): expected while its mark is written (#154)', async () => {
+    await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
+    db.marks.set(choreMarkId('done', 'kid', FRI, 'c1'), {
+      id: choreMarkId('done', 'kid', FRI, 'c1'),
+      kind: 'done',
+      memberId: 'kid',
+      date: FRI,
+      ref: 'c1',
+      by: 'kid',
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as never);
+    expected.length = 0;
+    await store.toggleChore('c2', 'kid', { surface: 'app' });
+    expect(expected).toEqual(['expect:kid', 'celebrate:kid', 'end:kid']);
   });
 
   it('two beans finishing at the same moment on the wall each hold and celebrate their own', async () => {

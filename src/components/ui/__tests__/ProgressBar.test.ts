@@ -15,6 +15,12 @@ describe('ProgressBar', () => {
     expect(md.classes()).not.toContain('h-1.5');
   });
 
+  it('lg is the tallest height (the wall)', () => {
+    const lg = mount(ProgressBar, { props: { percent: 40, size: 'lg' } });
+    expect(lg.classes()).toContain('h-3');
+    expect(lg.classes()).not.toContain('h-2');
+  });
+
   it('clamps the fill and is decorative unless the caller gives it a role', () => {
     const w = mount(ProgressBar, { props: { percent: 140, fillTestid: 'fill' } });
     expect(w.get('[data-testid="fill"]').attributes('style')).toContain('width: 100%');

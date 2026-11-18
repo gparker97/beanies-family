@@ -46,18 +46,23 @@ vi.mock('@/utils/autoWriteBudget', () => ({
 }));
 /**
  * The banner, as `celebrateReward` orders it: an optional wait (`duringWait` runs inside it, so a
- * test can untick or leave meanwhile), then `stillClaimable()`, then `claim()`; `shown` counts the
- * banners actually shown. `result` is what a shown banner answers (`played` or `waited`).
+ * test can untick or leave meanwhile), then `stillClaimable()`, then `claim()`, then the showing:
+ * `shown` counts the banners actually shown, each reported through `onShow` as `result` (`shown`
+ * or `shown-after-wait`), or `skipped-no-host` when `hasHost` says no. `hangAfterClaim` never
+ * gets to the showing (a tab closed, a wall asleep).
  */
 const banner = vi.hoisted(() => ({
-  result: 'played' as 'played' | 'waited',
+  result: 'shown' as 'shown' | 'shown-after-wait',
   duringWait: null as null | (() => void),
+  hangAfterClaim: false,
   shown: 0,
   calls: [] as {
     memberId: string;
     beanName: string;
     stillClaimable: () => boolean;
     claim: () => Promise<boolean>;
+    hasHost?: () => boolean;
+    onShow?: (action: string) => void;
   }[],
 }));
 vi.mock('@/composables/useCelebration', () => ({
@@ -69,7 +74,13 @@ vi.mock('@/composables/useCelebration', () => ({
     }
     if (!req.stillClaimable()) return 'dropped';
     if (!(await req.claim())) return 'claimed-elsewhere';
+    if (banner.hangAfterClaim) await new Promise(() => {});
+    if (req.hasHost && !req.hasHost()) {
+      req.onShow?.('skipped-no-host');
+      return 'skipped-no-host';
+    }
     banner.shown++;
+    req.onShow?.(banner.result);
     return banner.result;
   },
 }));
@@ -425,7 +436,8 @@ beforeEach(() => {
   readFail.next = null;
   budget.allow = true;
   budget.calls = [];
-  banner.result = 'played';
+  banner.result = 'shown';
+  banner.hangAfterClaim = false;
   banner.duringWait = null;
   banner.shown = 0;
   banner.calls = [];
@@ -467,6 +479,7 @@ describe('getters answer nothing while off or not loaded', () => {
     expect(store.arcFor('kid')).toBeNull();
     expect(store.stripFor('kid')).toBeNull();
     expect(store.notesFor('kid')).toEqual([]);
+    expect(store.weekGiftsFor('kid')).toEqual([]);
     expect(store.lookbackWeeks).toEqual([]);
     expect(store.wallStarsFor('kid')).toBeNull();
     expect(store.valueFor('kid')).toBeNull();
@@ -608,6 +621,31 @@ describe('awards, the arc, the strip, notes, look-back', () => {
       ],
     });
     expect(store.notesFor('kid').map((g) => g.id)).toEqual(['today', 'yesterday']);
+  });
+
+  it('weekGiftsFor: the week’s entries oldest first; nothing for a grown-up; null when they no longer add up', async () => {
+    await setup({
+      gifts: [
+        gift('kid', shiftChoreDay(MON, 1), -1, 'take'),
+        gift('kid', MON, 2, 'bonus'),
+        gift('kid', shiftChoreDay(MON, -1), 3, 'last-week'),
+        gift('sib', MON, 4, 'sibling'),
+        gift('kid', shiftChoreDay(W0, 2), 1, 'late-sync'),
+      ],
+      // Last week was frozen with a bonus of 5; this device's entries for it add up to 4.
+      weeks: [record('kid', W0, { bonus: 5 })],
+    });
+    chores.todayYmd = shiftChoreDay(MON, 2);
+    expect(store.weekGiftsFor('kid')?.map((g) => g.id)).toEqual(['bonus', 'take']);
+    expect(store.weekGiftsFor('kid', MON)?.map((g) => g.id)).toEqual(['bonus', 'take']);
+    expect(store.weekGiftsFor('mom')).toEqual([]);
+    // The net-only state: a normal answer, not an error.
+    expect(store.weekGiftsFor('kid', W0)).toBeNull();
+    // A caller holding the week passes it: the same answers, the same gate and net-only state.
+    const thisWeek = store.weekFor('kid')!;
+    expect(store.weekGiftsFor('kid', thisWeek)?.map((g) => g.id)).toEqual(['bonus', 'take']);
+    expect(store.weekGiftsFor('kid', store.weekFor('kid', W0)!)).toBeNull();
+    expect(store.weekGiftsFor('mom', thisWeek)).toEqual([]);
   });
 
   it('lookbackWeeks: this week and four back, never a fifth', async () => {
@@ -1231,7 +1269,11 @@ describe('the achieved banner: claimed only while a banner host is mounted', () 
       detail: 'wall',
       stage: 'marked',
     });
-    expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'played' });
+    expect(logged('reward-banner')[0]!.context).toEqual({
+      kind: 'weekly',
+      action: 'shown',
+      detail: 'wall',
+    });
     // It waited for this device's ticks of the kid to settle before the banner's own wait.
     expect(ticking.waits).toBe(1);
   });
@@ -1418,13 +1460,56 @@ describe('the achieved banner: claimed only while a banner host is mounted', () 
     expect(banner.shown).toBe(1);
   });
 
-  it('the banner outcome (played, waited) is logged as the composable answers it', async () => {
+  it('each showing is logged as the composable reports it (reward-banner, by action)', async () => {
     await nearTheBar();
-    banner.result = 'waited';
+    banner.result = 'shown-after-wait';
     host();
     tickSunday();
     await settle();
-    expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'waited' });
+    expect(logged('reward-banner')[0]!.context).toEqual({
+      kind: 'weekly',
+      action: 'shown-after-wait',
+      detail: 'app',
+    });
+    expect(logged('achieved-banner')).toEqual([]);
+  });
+
+  it('the claim is logged AT the claim, even if the showing never happens (a tab closed)', async () => {
+    await nearTheBar();
+    banner.hangAfterClaim = true;
+    host('kid', 'wall');
+    tickSunday();
+    await settle();
+    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+    expect(banner.shown).toBe(0);
+    expect(logged('reward-achieved')[0]!.context).toEqual({
+      kind: 'weekly',
+      detail: 'wall',
+      stage: 'marked',
+    });
+    expect(logged('reward-banner')).toEqual([]);
+  });
+
+  it('the showing asks the host again: none mounted by then logs skipped-no-host (the mark is written)', async () => {
+    await nearTheBar();
+    const release = host('kid', 'wall');
+    const orig = chores.writeCelebratedMark;
+    chores.writeCelebratedMark = async (...args: Parameters<typeof orig>) => {
+      const out = await orig.apply(chores, args);
+      release(); // the grown-up leaves the child's day while the mark is written
+      return out;
+    };
+    tickSunday();
+    await settle();
+    chores.writeCelebratedMark = orig;
+    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+    expect(banner.shown).toBe(0);
+    expect(logged('reward-achieved')).toHaveLength(1);
+    expect(logged('reward-banner')[0]!.context).toEqual({
+      kind: 'weekly',
+      action: 'skipped-no-host',
+      detail: 'wall',
+    });
   });
 
   it('a mark another device wrote first shows nothing (skipped-exists)', async () => {

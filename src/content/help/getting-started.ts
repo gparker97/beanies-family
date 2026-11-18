@@ -811,7 +811,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Turn a spare tablet into the family wall display, and set the two device settings that keep it awake and keep small hands inside the app.',
     icon: '\u{1F9F1}',
     readTime: 6,
-    updatedDate: '2026-11-15',
+    updatedDate: '2026-11-18',
     sections: [
       {
         type: 'paragraph',
@@ -1044,7 +1044,12 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Tap the scrapbook picture at the bottom of the wall, beside the beanies.family name, to open the family scrapbook as a timeline, newest first, to read. A bean\u2019s face opens it too, on a lane in <strong>Chores</strong> or in an activity\u2019s details. In the bottom row, tapping a bean filters the wall to them; tapping that same bean again while it is the only one lit opens the scrapbook as well. <strong>Everyone</strong> clears the filter.',
+          'Tap the scrapbook in the bottom right of the wall to open the family scrapbook as a timeline, newest first, to read. The scrapbook picture and the beanies.family name beside it are one button, so either one opens it. A bean\u2019s face chip in an activity\u2019s or a trip\u2019s details opens it too. In the bottom row, tapping a bean filters the wall to them; tapping that same bean again while it is the only one lit opens the scrapbook as well. <strong>Everyone</strong> clears the filter. Tap a photo in the scrapbook to see it big, and step through that memory\u2019s other photos.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A face on a lane in <strong>Chores</strong> opens that person\u2019s stars and rewards instead. That sheet is read only, and anyone at the wall can read it, bonus notes included. More in <a href="/help/features/stars-and-rewards#on-the-wall">Stars and Rewards: on the beanie wall</a>.',
       },
       {
         type: 'list',

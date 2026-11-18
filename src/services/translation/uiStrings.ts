@@ -705,6 +705,10 @@ const STRING_DEFS = {
     en: "What's happening lately",
     beanie: "what's happening lately",
   },
+  'scrapbook.everyone.openBeanPage': {
+    en: "Open {name}'s scrapbook page",
+    beanie: "open {name}'s scrapbook page",
+  },
   'scrapbook.everyone.empty': {
     en: 'no scraps yet — tap + to add the first one',
     beanie: 'no scraps yet — tap + to add the first one',
@@ -8389,8 +8393,8 @@ const STRING_DEFS = {
   'settings.wall.memories.speed.medium': { en: 'Medium', beanie: 'medium' },
   'settings.wall.memories.speed.fast': { en: 'Fast', beanie: 'fast' },
   'settings.wall.memories.hint': {
-    en: "psst: tap a bean's face on the wall to open the scrapbook",
-    beanie: "psst: tap a bean's face on the wall to open the scrapbook",
+    en: 'psst: tap the scrapbook in the bottom right of the wall to open it',
+    beanie: 'psst: tap the scrapbook in the bottom right of the wall to open it',
   },
   'wall.memories.title': { en: 'Our Family Scrapbook', beanie: 'our family scrapbook' },
   'wall.memories.titleFor': { en: "{name}'s Moments", beanie: "{name}'s moments" },
@@ -8411,6 +8415,8 @@ const STRING_DEFS = {
     en: 'No memories here yet. Add milestones, sayings, favorites and notes in the Scrapbook.',
     beanie: 'no memories here yet. add milestones, sayings, favorites and notes in the scrapbook.',
   },
+  // The Scrapbook page's photo viewer (#154): the way to the bean's page the photo tap used to be.
+  'scrapbook.photo.beanPage': { en: "Open {name}'s Page", beanie: "open {name}'s page" },
   'wall.sleep.deviceOnly': {
     en: 'These wall settings apply to this device only.',
     beanie: 'these wall settings apply to this device only.',
@@ -17326,9 +17332,15 @@ const STRING_DEFS = {
   },
   'choreStars.value.one': { en: 'Worth {count} star', beanie: 'worth {count} star' },
   'choreStars.value.other': { en: 'Worth {count} stars', beanie: 'worth {count} stars' },
+  // {name} is still passed by the caller; the words lead with the reward (#154).
   'choreStars.banner.title': {
-    en: '{name} earned {reward} this week',
-    beanie: '{name} earned {reward} this week',
+    en: '{reward} earned!',
+    beanie: '{reward} earned!',
+  },
+  // The same title when the family has not named the weekly reward (no {reward} to lead with).
+  'choreStars.banner.titleFallback': {
+    en: 'Weekly reward earned!',
+    beanie: 'weekly reward earned!',
   },
   'choreStars.banner.body.one': {
     en: '{count} star. Nice work, {name}.',
@@ -17723,6 +17735,43 @@ const STRING_DEFS = {
     en: "The child's stars this week go back to how they were without it.",
     beanie: "the child's stars this week go back to how they were without it.",
   },
+  // The wall's stars sheet (#154): a tap on a head in the chore lanes opens one bean's stars.
+  'choreStars.wall.headAria': { en: "Open {name}'s Stars", beanie: "open {name}'s stars" },
+  'choreStars.wall.title': { en: "{name}'s Stars", beanie: "{name}'s stars" },
+  'choreStars.wall.bonusTitle': { en: 'Bonus Stars This Week', beanie: 'bonus stars this week' },
+  'choreStars.wall.earned': { en: 'Earned!', beanie: 'earned!' },
+  'choreStars.wall.reached.one': {
+    en: '{name} reached the weekly reward on {day} with {count} star.',
+    beanie: '{name} reached the weekly reward on {day} with {count} star.',
+  },
+  'choreStars.wall.reached.other': {
+    en: '{name} reached the weekly reward on {day} with {count} stars.',
+    beanie: '{name} reached the weekly reward on {day} with {count} stars.',
+  },
+  'choreStars.wall.bare.body': {
+    en: 'No reward is set up for {name} yet. A grown-up can add a weekly reward or a special reward in the app, under The Choreboard, then Rewards.',
+    beanie:
+      'no reward is set up for {name} yet. a grown-up can add a weekly reward or a special reward in the app, under the choreboard, then rewards.',
+  },
+  'choreStars.wall.off.title': {
+    en: 'Stars and Rewards Is Not Turned On',
+    beanie: 'stars and rewards is not turned on',
+  },
+  'choreStars.wall.off.body': {
+    en: 'When it is on, every chore ticked here earns a star toward a weekly reward. A grown-up can turn it on in the app, under The Choreboard, then Rewards.',
+    beanie:
+      'when it is on, every chore ticked here earns a star toward a weekly reward. a grown-up can turn it on in the app, under the choreboard, then rewards.',
+  },
+  'choreStars.wall.adult.title': { en: 'Stars Are for the Kids', beanie: 'stars are for the kids' },
+  'choreStars.wall.adult.body': {
+    en: 'Grown-ups and pets do their chores for free.',
+    beanie: 'grown-ups and pets do their chores for free.',
+  },
+  'choreStars.wall.adult.pick': {
+    en: 'Tap a child to see their stars.',
+    beanie: 'tap a child to see their stars.',
+  },
+  'choreStars.wall.chip': { en: "Show {name}'s Stars", beanie: "show {name}'s stars" },
 } satisfies Record<string, StringEntry>;
 
 /**

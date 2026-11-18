@@ -4,8 +4,8 @@
  *
  * Three ways in, one rule each:
  *  - the scrapbook button in the footer (`WallScrapbookButton`), which calls `open` directly;
- *  - a tap on a face that does nothing today (the chore lanes, a details sheet), via
- *    `WallFaceButton`, which calls `open` directly;
+ *  - a tap on a face chip inside a details sheet, via `WallFaceButton`, which calls `open`
+ *    directly (a head in the chore lanes opens that bean's stars instead, #154);
  *  - a SECOND tap on the only lit bean in the footer or a lane header. `opensOnTap` is the
  *    one place that rule lives, read by the page to route the tap and by the footer and the
  *    lane headers for `aria-haspopup`, so the gesture and its announcement cannot disagree.
@@ -32,7 +32,7 @@ export const WALL_MEMORIES_IDLE_MS = 3 * 60_000;
 
 /** Which door opened the viewer. Logged, so "did anyone find it" has an answer. */
 export type WallMemoriesOpenSource =
-  'face-chore' | 'face-sheet' | 'chip-second-tap' | 'lane-second-tap' | 'footer-button';
+  'face-sheet' | 'chip-second-tap' | 'lane-second-tap' | 'footer-button';
 
 export type WallMemoriesCloseKind = 'button' | 'escape' | 'idle' | 'night';
 

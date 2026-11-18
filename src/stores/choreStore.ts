@@ -29,7 +29,14 @@ import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { createGuardedWrites } from '@/composables/useGuardedWrites';
-import { celebrateChore, holdChoreBlock, releaseChoreBlock } from '@/composables/useCelebration';
+import {
+  celebrateChore,
+  endChoreCelebrationExpected,
+  expectChoreCelebration,
+  holdChoreBlock,
+  noteChoreTick,
+  releaseChoreBlock,
+} from '@/composables/useCelebration';
 import { useChoreClock } from '@/composables/useChoreClock';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { isDocLoaded } from '@/services/automerge/docService';
@@ -494,6 +501,9 @@ export const useChoreStore = defineStore('chores', () => {
       return { action: 'refused', detail: 'in-flight' };
     }
 
+    // Every tick and untick that passed the guards, at the tap: the weekly reward's banner shows
+    // only once the bean has stopped ticking for a moment (#154).
+    noteChoreTick(memberId);
     const block = choreBlockOf(chore);
     const doneId = choreMarkId('done', memberId, clock.ymd, choreId);
     const wasDone = markIndex.value.get(memberId)?.get(clock.ymd)?.done.has(choreId) ?? false;
@@ -529,6 +539,8 @@ export const useChoreStore = defineStore('chores', () => {
     const predicted = !!completed && finish.celebrates;
     if (predicted) {
       celebrating.add(latch);
+      // The weekly reward's banner waits behind an expected celebration too (#154).
+      expectChoreCelebration(memberId, block);
       if (opts.anchor) holdChoreBlock(memberId, block);
     }
     try {
@@ -601,6 +613,7 @@ export const useChoreStore = defineStore('chores', () => {
       if (predicted) {
         // The celebration (if it started) holds the rows through its own burst now.
         releaseChoreBlock(memberId, block);
+        endChoreCelebrationExpected(memberId, block);
         celebrating.delete(latch);
       }
     }
@@ -692,6 +705,7 @@ export const useChoreStore = defineStore('chores', () => {
     if (!after?.allDone) return { completed: null, celebrated: false };
     if (after.celebrated || celebrating.has(latch)) return { completed: block, celebrated: false };
     celebrating.add(latch);
+    expectChoreCelebration(memberId, block);
     try {
       const mark = await writeCelebratedMark(memberId, ymd, block, by);
       if (mark !== 'created') return { completed: block, celebrated: false };
@@ -699,6 +713,7 @@ export const useChoreStore = defineStore('chores', () => {
       celebrateBlock(memberId, block, after.total, anchor, true);
       return { completed: block, celebrated: true };
     } finally {
+      endChoreCelebrationExpected(memberId, block);
       celebrating.delete(latch);
     }
   }

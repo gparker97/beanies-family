@@ -32,6 +32,7 @@ import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useQuickAdd } from '@/composables/useQuickAdd';
 import { usePersistedChoice } from '@/composables/usePersistedChoice';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { WALL_MEMORY_TYPES } from '@/utils/wallMemories';
 import { useMilestoneLightbox } from '@/composables/useMilestoneLightbox';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -170,6 +171,7 @@ const TYPE_TO_TAB: Record<ScrapType, string> = {
 
 function onEntryClick(entry: ScrapbookEntry): void {
   if (entry.type === 'milestone' && entry.memberId === null) {
+    photoEntry.value = null;
     lightbox.openFor(entry.payload as Milestone);
     return;
   }
@@ -177,6 +179,42 @@ function onEntryClick(entry: ScrapbookEntry): void {
   const tab = TYPE_TO_TAB[entry.type];
   if (!tab) return;
   router.push(`/pod/${entry.memberId}/${tab}`);
+}
+
+// --- Photo tap (#154) ---------------------------------------------------
+//
+// A tap on a polaroid's photo (Timeline or Spreads) enlarges it in the page's one viewer; the
+// rest of the card still routes through `onEntryClick`. The tapped entry is kept so the
+// viewer can offer a way to that bean's page, the door the photo used to be. Only a bean's
+// memory has a page: a family-wide milestone gets no button.
+
+const photoEntry = ref<ScrapbookEntry | null>(null);
+
+function onPhotoClick(entry: ScrapbookEntry): void {
+  if (entry.type !== 'milestone') return;
+  photoEntry.value = entry;
+  lightbox.openFor(entry.payload as Milestone);
+}
+
+/** The bean whose page the viewer's button opens, or null for none. */
+const photoBean = computed(() => {
+  const id = lightbox.isOpen.value ? photoEntry.value?.memberId : null;
+  return id ? (familyStore.members.find((m) => m.id === id) ?? null) : null;
+});
+
+const photoBeanLabel = computed(() =>
+  photoBean.value ? fillTemplate(t('scrapbook.photo.beanPage'), { name: photoBean.value.name }) : ''
+);
+
+function openPhotoBeanPage(): void {
+  const entry = photoEntry.value;
+  closePhoto();
+  if (entry) onEntryClick(entry);
+}
+
+function closePhoto(): void {
+  lightbox.close();
+  photoEntry.value = null;
 }
 </script>
 
@@ -246,6 +284,7 @@ function onEntryClick(entry: ScrapbookEntry): void {
       :types="timelineTypes"
       :read-only="false"
       @entry-click="onEntryClick"
+      @photo-click="onPhotoClick"
     >
       <template #empty>
         <p class="font-caveat dark:text-ink-soft text-secondary-500 py-8 text-center text-xl">
@@ -267,6 +306,7 @@ function onEntryClick(entry: ScrapbookEntry): void {
             v-if="activeSpread === 'everyone'"
             key="everyone"
             @entry-click="onEntryClick"
+            @photo-click="onPhotoClick"
             @open-add="openAddSheet"
             @select-bean="onSpineSelect"
           />
@@ -283,14 +323,26 @@ function onEntryClick(entry: ScrapbookEntry): void {
 
     <!-- Read-only lightbox for milestone photos. Wired to the
          module-level `useMilestoneLightbox` singleton so any
-         deeply-nested card opens it directly via `openFor`. -->
+         deeply-nested card opens it directly via `openFor`. A tapped
+         bean's photo carries a button to that bean's page (#154). -->
     <PhotoViewer
       :open="lightbox.isOpen.value"
       :photo-ids="lightbox.photoIds.value"
       :initial-index="0"
       read-only
-      @close="lightbox.close"
-    />
+      @close="closePhoto"
+    >
+      <template v-if="photoBean" #actions>
+        <button
+          type="button"
+          class="font-outfit rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-sm transition-colors duration-150 hover:bg-white/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#AED6F1]"
+          data-test="scrapbook-photo-bean-page"
+          @click="openPhotoBeanPage"
+        >
+          {{ photoBeanLabel }}
+        </button>
+      </template>
+    </PhotoViewer>
   </div>
 </template>
 

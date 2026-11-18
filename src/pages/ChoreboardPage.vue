@@ -45,10 +45,11 @@
  *
  * Stars and rewards (#148), each drawn only from a `starStore` getter that answers nothing while
  * the feature is off (so off means absent, with no "is it on" test here):
- *  - a kid's day head: a thin arc around the avatar toward the weekly reward (the reward's emoji
- *    as a badge once achieved) and a quiet star count beside the day's count; while
- *    `rewardBannerFor` is set, the existing celebration banner under the head ("Max earned Ice
- *    Cream this week"), nothing to press;
+ *  - a kid's day head: a thin arc around the avatar toward the weekly reward (`StarRingAvatar`:
+ *    the reward's emoji as a badge and a star on the ring once achieved, #154) and a quiet star
+ *    count beside the day's count; while `rewardBannerFor` is set, the existing celebration
+ *    banner under the head ("Ice Cream earned!"), nothing to press, with the reward's picture
+ *    bursting up from it (`RewardBurst`, not under reduced motion);
  *  - every chore of a kid shows its value (`starStore.valueFor`);
  *  - a grown-up viewing a kid's day with the feature on: a small "Give Stars" button on the head;
  *  - a kid's own day: their bonus and take-back notes from today and yesterday, newest first,
@@ -98,7 +99,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter, type LocationQuery } from 'vue-router';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
-import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ChoreBeanCard from '@/components/chores/ChoreBeanCard.vue';
 import ChoreBlockSection from '@/components/chores/ChoreBlockSection.vue';
 import ChoreBlockSummary from '@/components/chores/ChoreBlockSummary.vue';
@@ -115,8 +115,9 @@ import StarReportView from '@/components/chores/StarReportView.vue';
 import StarGiftModal from '@/components/chores/StarGiftModal.vue';
 import StarNote from '@/components/chores/StarNote.vue';
 import StarPathStrip from '@/components/chores/StarPathStrip.vue';
+import StarRingAvatar from '@/components/chores/StarRingAvatar.vue';
+import RewardBurst from '@/components/chores/RewardBurst.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
-import ProgressRing from '@/components/ui/ProgressRing.vue';
 import ProgressBar from '@/components/ui/ProgressBar.vue';
 import ChoreAwardModal from '@/components/chores/ChoreAwardModal.vue';
 import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
@@ -124,7 +125,6 @@ import { rewardBannerText } from '@/components/chores/starText';
 import { rewardBannerFor } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
-import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useChoreClock } from '@/composables/useChoreClock';
 import { useChoreTicks } from '@/composables/useChoreTicks';
 import { useRewardBannerHost } from '@/composables/useRewardBannerHost';
@@ -163,7 +163,6 @@ const starStore = useStarStore();
 const settingsStore = useSettingsStore();
 const { choreClock } = useChoreClock();
 const ticks = useChoreTicks();
-const { memberAvatarBindings } = useMemberAvatarBindings();
 const { isMobile } = useBreakpoint();
 /** Tailwind's `xl`: the bean's day rail (its Today summary and its own week). */
 const isWide = useMediaQuery('(min-width: 80rem)');
@@ -528,9 +527,6 @@ const dayRail = computed(
 
 /** The day head's arc and count, or null (stars off, a grown-up's day, nothing to draw). */
 const dayArc = computed(() => (viewBeanId.value ? starStore.arcFor(viewBeanId.value) : null));
-const dayArcSegments = computed(() =>
-  dayArc.value ? [{ value: dayArc.value.percent / 100, tone: 'fill' as const }] : []
-);
 /**
  * The day head is a banner host for its bean while it is drawn (the store ignores a grown-up):
  * the same condition as the day's template, so a host is registered only where the banner can
@@ -540,9 +536,12 @@ useRewardBannerHost(
   () => (viewBeanId.value && dayMember.value && day.value ? [viewBeanId.value] : []),
   'app'
 );
-/** The achieved moment's banner on this kid's day, while it is up. */
+/** The achieved moment's banner on this kid's day, while it is up, and its words. */
+const dayRewardBannerRaw = computed(() =>
+  viewBeanId.value ? rewardBannerFor(viewBeanId.value) : null
+);
 const dayRewardBanner = computed(() => {
-  const banner = viewBeanId.value ? rewardBannerFor(viewBeanId.value) : null;
+  const banner = dayRewardBannerRaw.value;
   return banner ? rewardBannerText(banner, dayArc.value?.count ?? 0, t) : null;
 });
 
@@ -660,24 +659,13 @@ function revealBlock(block: ChoreBlock): void {
         data-testid="chore-day-head"
         :data-member-id="viewBeanId"
       >
-        <ProgressRing
-          v-if="dayArc"
-          class="h-20 w-20 flex-none"
-          :segments="dayArcSegments"
-          :stroke-width="6"
-          data-testid="chore-day-ring"
-          :data-percent="dayArc.percent"
-        >
-          <BeanieAvatar v-bind="memberAvatarBindings(dayMember)" size="xl" />
-          <template v-if="dayArc.badgeEmoji" #badge>
-            <span
-              class="dark:bg-surface-raised dark:border-line grid h-7 w-7 place-items-center rounded-full border border-[var(--color-border-strong)] bg-white text-sm leading-none"
-              data-testid="chore-day-badge"
-              >{{ dayArc.badgeEmoji }}</span
-            >
-          </template>
-        </ProgressRing>
-        <BeanieAvatar v-else v-bind="memberAvatarBindings(dayMember)" size="xl" />
+        <StarRingAvatar
+          :member="dayMember"
+          :arc="dayArc"
+          size="day"
+          ring-testid="chore-day-ring"
+          badge-testid="chore-day-badge"
+        />
         <div class="min-w-0 flex-1">
           <h2 class="font-outfit dark:text-ink text-secondary-500 text-2xl leading-tight font-bold">
             {{ greeting }}
@@ -736,15 +724,18 @@ function revealBlock(block: ChoreBlock): void {
         <StarNote v-for="n in dayNotes" :key="n.gift.id" :gift="n.gift" :by-name="n.byName" />
       </div>
 
-      <!-- Stars (#148): the weekly reward's achieved moment, once, nothing to press. -->
-      <CelebrationBanner
-        v-if="dayRewardBanner"
-        compact
-        :title="dayRewardBanner.title"
-        :body="dayRewardBanner.body"
-        :image-alt="t('choreboard.done.imageAlt')"
-        data-testid="chore-day-reward-banner"
-      />
+      <!-- Stars (#148): the weekly reward's achieved moment, once, nothing to press; the
+           reward's picture bursts up from it (#154, `RewardBurst`, not under reduced motion). -->
+      <div v-if="dayRewardBanner && dayRewardBannerRaw" class="relative">
+        <CelebrationBanner
+          compact
+          :title="dayRewardBanner.title"
+          :body="dayRewardBanner.body"
+          :image-alt="t('choreboard.done.imageAlt')"
+          data-testid="chore-day-reward-banner"
+        />
+        <RewardBurst :key="dayRewardBannerRaw.id" :banner="dayRewardBannerRaw" />
+      </div>
 
       <!-- One DOM for both layouts: from 1280px the blocks fill the main column and the summary
            and the week sit in the rail beside them; below, they stack (summary, blocks, week). -->

@@ -55,14 +55,21 @@
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import ProgressBar from '@/components/ui/ProgressBar.vue';
+import AwardProgressCell from '@/components/chores/AwardProgressCell.vue';
 import ChoreWeekPanel, {
   type WeekPanelExtras,
   type WeekPanelFact,
 } from '@/components/chores/ChoreWeekPanel.vue';
-import StarBonusPopover, { type BonusEntryLine } from '@/components/chores/StarBonusPopover.vue';
+import StarBonusPopover from '@/components/chores/StarBonusPopover.vue';
 import StarWeekPopover, { type WeekBreakdownLines } from '@/components/chores/StarWeekPopover.vue';
-import { awardForKids, choreDayShort, rewardName } from '@/components/chores/starText';
+import {
+  awardForKids,
+  bonusLine as bonusLineOf,
+  choreDayShort,
+  rewardName,
+  signedStars,
+  type BonusEntryLine,
+} from '@/components/chores/starText';
 import { confirm } from '@/composables/useConfirm';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
@@ -74,7 +81,6 @@ import { DEFAULT_REWARD_EMOJI } from '@/constants/choreStars';
 import {
   awardIsFor,
   awardProgressLabel,
-  weekBonusEntries,
   weekBreakdown,
   weeklyAchieved,
   type WeekStars,
@@ -136,13 +142,7 @@ const achievedOn = (ymd: string | undefined) =>
   });
 
 /** A signed star count: "+2", "-1", or a plain "0". */
-function signed(n: number): string {
-  const count = Math.abs(Math.round(n));
-  if (count === 0) return t('choreStars.report.bonusNone');
-  return fillTemplate(t(n > 0 ? 'choreStars.report.bonusPlus' : 'choreStars.report.bonusMinus'), {
-    count,
-  });
-}
+const signed = (n: number) => signedStars(n, t);
 
 function logAction(
   action: 'add-award' | 'edit-award' | 'rewards-settings' | 'bonus-summary' | 'week-breakdown'
@@ -191,54 +191,20 @@ const rows = computed<KidRow[]>(() =>
 
 const nameOf = (id: string) => firstName(familyStore.members.find((m) => m.id === id)?.name);
 
-/** One bonus or take-away as both summaries word it: who, how many, the day and the note. */
-function bonusLine(gift: ChoreStarGift): BonusEntryLine {
-  const count = Math.abs(Math.round(gift.stars));
-  const take = gift.stars < 0;
-  const who = { by: nameOf(gift.by) || t('choreStars.note.someone') };
-  return {
-    gift,
-    take,
-    title: take
-      ? plural(count, 'choreStars.takeBack.entry.one', 'choreStars.takeBack.entry.other', who)
-      : plural(
-          count,
-          'choreStars.report.bonusEntry.one',
-          'choreStars.report.bonusEntry.other',
-          who
-        ),
-    amount: signed(gift.stars),
-    // The day and the note in one template, so each language punctuates it its own way.
-    sub: gift.note
-      ? fillTemplate(t('choreStars.report.bonusEntry.sub'), {
-          day: dayShort(gift.date),
-          note: fillTemplate(t('choreStars.bonus.note.quote'), { note: gift.note }),
-        })
-      : dayShort(gift.date),
-  };
-}
-
-/** Each kid's gifts, any week (`weekBonusEntries` picks a week's). */
-const giftsByKid = computed(() => {
-  const by = new Map<string, ChoreStarGift[]>();
-  for (const g of starStore.gifts) {
-    const list = by.get(g.memberId);
-    if (list) list.push(g);
-    else by.set(g.memberId, [g]);
-  }
-  return by;
-});
+/** One bonus or take-away as every list of them words it (`bonusLine`, `starText.ts`). */
+const bonusLine = (gift: ChoreStarGift): BonusEntryLine => bonusLineOf(gift, nameOf, t);
 
 /**
  * Each kid's bonus and take-away entries for the week showing, newest first, as the summary
- * lists them: exactly the breakdown's (`weekBonusEntries` over that kid's week). A kid with no
- * record, no entry, or entries that do not add up to the week's net has none here.
+ * lists them: exactly the breakdown's (`starStore.weekGiftsFor`, the one rule over that kid's
+ * week). A kid with no record, no entry, or entries that do not add up to the week's net has
+ * none here.
  */
 const entriesByKid = computed(() => {
   const by = new Map<string, BonusEntryLine[]>();
   for (const r of rows.value) {
     if (!r.week) continue;
-    const entries = weekBonusEntries(r.week, giftsByKid.value.get(r.member.id) ?? []);
+    const entries = starStore.weekGiftsFor(r.member.id, r.week);
     if (entries?.length) by.set(r.member.id, [...entries].reverse().map(bonusLine));
   }
   return by;
@@ -316,7 +282,10 @@ const weekLines = computed<WeekBreakdownLines | null>(() => {
   const week = open && row ? (row.byWeek.get(open.weekStart) ?? null) : null;
   if (!open || !week) return null;
   const record = choreStore.weekFor(open.memberId, open.weekStart, choreDayOfWeek(open.weekStart));
-  const b = weekBreakdown(week, giftsByKid.value.get(open.memberId) ?? [], record, todayYmd.value);
+  // The week's own entries (`weekGiftsFor`); `null` (only the net is known) passes none, which
+  // `weekBreakdown` reads the same way: one net line.
+  const gifts = starStore.weekGiftsFor(open.memberId, week) ?? [];
+  const b = weekBreakdown(week, gifts, record, todayYmd.value);
   const starsText = (n: number) =>
     plural(n, 'choreStars.report.trend.total.one', 'choreStars.report.trend.total.other');
   return {
@@ -814,24 +783,13 @@ const barExpanded = (memberId: string, ws: string) =>
                   >✓ {{ line.achieved }}</span
                 >
               </span>
-              <span v-else class="flex min-w-0 items-center gap-2">
-                <ProgressBar
-                  class="min-w-8 flex-1"
-                  size="md"
-                  :percent="line.percent"
-                  role="progressbar"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  :aria-valuenow="line.percent"
-                  :aria-label="line.aria"
-                  fill-testid="star-report-award-bar"
-                />
-                <span
-                  class="text-secondary-500 dark:text-ink-soft flex-none text-xs font-semibold whitespace-nowrap"
-                  aria-hidden="true"
-                  >{{ line.label }}</span
-                >
-              </span>
+              <AwardProgressCell
+                v-else
+                :label="line.label"
+                :percent="line.percent"
+                :aria="line.aria"
+                fill-testid="star-report-award-bar"
+              />
             </div>
           </div>
         </section>

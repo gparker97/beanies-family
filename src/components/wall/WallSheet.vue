@@ -19,6 +19,7 @@ import WallTripTimeline from '@/components/wall/WallTripTimeline.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import WallFaceButton from '@/components/wall/WallFaceButton.vue';
 import WallBucketIcon from '@/components/wall/WallBucketIcon.vue';
+import WallStarsSheet from '@/components/wall/WallStarsSheet.vue';
 import HandwrittenLine from '@/components/ui/HandwrittenLine.vue';
 import { useWallPeripherals, wallTripDates } from '@/composables/useWallPeripherals';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -164,6 +165,24 @@ const isOpen = ref(true);
 useEscapeClose(isOpen, () => emit('close'));
 
 /**
+ * A new target while the sheet is open puts focus on the title (#154).
+ *
+ * The sheet is re-targeted in place: a child chip on a grown-up's or pet's stars sheet re-opens
+ * it on that child, so this component stays mounted while the body swaps and the chip that had
+ * focus is unmounted. Focus then fell to `<body>`, behind this `aria-modal` dialog, stranding a
+ * keyboard, switch or screen reader user outside it. The title (`tabindex="-1"`) keeps them
+ * inside and is read out, so they hear whose sheet it is now. Post-flush, so the new title is
+ * the one in the DOM. Switching trips is not a new target (it is local state), so a trip chip
+ * keeps its focus.
+ */
+const titleEl = ref<HTMLElement | null>(null);
+watch(
+  () => props.target,
+  () => titleEl.value?.focus({ preventScroll: true }),
+  { flush: 'post' }
+);
+
+/**
  * The day the open activity falls on.
  *
  * Read through a narrowed computed rather than `target.ymd` in the template:
@@ -226,6 +245,14 @@ const tripDetail = computed(() => {
   };
 });
 
+/** The bean whose stars are showing (#154), narrowed here for the template; null if unknown. */
+const starsMemberId = computed(() => (target.value.kind === 'stars' ? target.value.memberId : ''));
+const starsMember = computed(() =>
+  starsMemberId.value
+    ? (familyStore.members.find((m) => m.id === starsMemberId.value) ?? null)
+    : null
+);
+
 const sheetTitle = computed(() => {
   const value = target.value;
   switch (value.kind) {
@@ -239,6 +266,11 @@ const sheetTitle = computed(() => {
       return t('wall.sheet.meals');
     case 'trip':
       return trip.value?.name ?? t('wall.trip');
+    case 'stars':
+      // A member deleted on another device has no name: the feature's own title stands in.
+      return starsMember.value
+        ? fillTemplate(t('choreStars.wall.title'), { name: starsMember.value.name })
+        : t('choreStars.title');
     default:
       return '';
   }
@@ -377,8 +409,18 @@ const { identityFor } = useActivityIdentity();
           aria-hidden="true"
           >{{ activityEmoji(activity) }}</span
         >
+        <!-- The bean's face beside "Mia's Stars" (#154); the title names them. -->
+        <BeanieAvatar
+          v-if="target.kind === 'stars' && starsMember"
+          v-bind="memberAvatarBindings(starsMember)"
+          fallback="initials"
+          size="lg"
+          aria-hidden="true"
+        />
         <h2
           :id="titleId"
+          ref="titleEl"
+          tabindex="-1"
           class="font-outfit text-secondary-500 wall-sheet-title dark:text-ink font-extrabold"
           :class="tripChipsInHeader ? 'sr-only' : ''"
         >
@@ -769,6 +811,13 @@ const { identityFor } = useActivityIdentity();
             {{ t('wall.sheet.noMeals') }}
           </p>
         </template>
+
+        <!-- one bean's stars and rewards (#154), read only; a child chip re-opens it on them -->
+        <WallStarsSheet
+          v-else-if="target.kind === 'stars'"
+          :member-id="starsMemberId"
+          @switch-member="emit('open', { kind: 'stars', memberId: $event })"
+        />
 
         <!-- the trip -->
         <template v-else-if="target.kind === 'trip'">

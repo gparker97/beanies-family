@@ -61,6 +61,7 @@ import {
   planWeekClose,
   rewardsOf,
   starsOf,
+  weekBonusEntries,
   weeklyAchieved,
   type AwardDraft,
   type AwardProgress,
@@ -328,6 +329,22 @@ export const useStarStore = defineStore('stars', () => {
         (a, b) =>
           b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
       );
+  }
+
+  /**
+   * A child's bonus and take-away entries for a week, oldest first: `weekBonusEntries`, the one
+   * rule, over the child's own week. `week` is a day of it (its start; this week by default), or
+   * the week itself when the caller already holds `weekFor`'s answer (a report row, a strip), so
+   * the week is not built twice. `[]` with no week (off, not loaded, not a kid: the gate
+   * `notesFor` has), or a closed week with no record. `null` is a normal state, not an error: the
+   * entries on this device no longer add up to the week's bonus, so a surface shows the net alone
+   * (`week.bonus`).
+   */
+  function weekGiftsFor(memberId: string, week?: string | WeekStars): ChoreStarGift[] | null {
+    if (!active.value || !earnerSet.value.has(memberId)) return [];
+    const held = typeof week === 'object' ? week : weekFor(memberId, week ?? todayYmd.value);
+    if (!held) return [];
+    return weekBonusEntries(held, giftsByMember.value.get(memberId) ?? []);
   }
 
   /** The week starts a grown-up's week stepper offers, newest first (this week + up to 4). */
@@ -625,7 +642,8 @@ export const useStarStore = defineStore('stars', () => {
    * sync, the stores becoming authoritative), the ONE claim sequence runs (`claimReward`):
    *  1. wait for any tick of that kid still being written on this device to settle
    *     (`choreStore.whenTicksSettled`), so a block celebration it starts has started;
-   *  2. wait for that kid's block celebration to end (`celebrateReward`);
+   *  2. wait for that kid's block celebration to end and for the kid to stop ticking for a
+   *     moment, bounded (`celebrateReward`: ALL its waiting is before the claim);
    *  3. ask again: still the same week, still at or above the bar, still not marked, and a host
    *     for that kid still mounted. If not, nothing is written and nothing plays; the next time
    *     it holds (a re-tick, the host mounted again) the sequence runs again;
@@ -633,7 +651,10 @@ export const useStarStore = defineStore('stars', () => {
    *     A failed write still shows it on this device, once (`shownUnmarked`), and the mark is
    *     retried silently ONCE, the next time the claim runs this session (`markRetried`); a
    *     second failure leaves that kid-week alone until the next app session. A mark another
-   *     device wrote first shows nothing.
+   *     device wrote first shows nothing. The claim is logged at that write (`reward-achieved`);
+   *     the showing after it asks only whether a host is still mounted (none: nothing shown,
+   *     `skipped-no-host`) and is logged as it happens (`reward-banner`, by `action`), as is the
+   *     one resume after a block celebration cut it.
    * So: a device with no host mounted claims nothing; a marked week never replays; a grown-up's
    * tick on the Chores view's home cards plays it the next time the child's day or lane is on
    * screen. Two hosts on one device make one claim (one key in flight). Two devices each with a
@@ -756,7 +777,7 @@ export const useStarStore = defineStore('stars', () => {
         return;
       }
       await choreStore.whenTicksSettled(memberId);
-      let mark: Awaited<ReturnType<typeof writeMark>> | null = null;
+      const hosted = () => hostOf(memberId) !== null;
       const child = familyStore.members.find((m) => m.id === memberId);
       const result = await celebrateReward({
         memberId,
@@ -764,37 +785,45 @@ export const useStarStore = defineStore('stars', () => {
         title: rewards.value.title ?? '',
         emoji: rewards.value.emoji ?? '',
         stillClaimable: () => {
-          if (hostOf(memberId) === null || isMarked(memberId, weekStart)) return false;
+          if (!hosted() || isMarked(memberId, weekStart)) return false;
           // Turned read-only during the wait: no write (and no gate toast); claimed once writable.
           if (readWriteGate()?.block) return false;
           const now = weekFor(memberId);
           return !!now && now.weekStart === weekStart && weeklyAchieved(now);
         },
         claim: async () => {
-          mark = await writeMark();
+          const mark = await writeMark();
+          // Logged HERE, at the mark write's outcome, so a tab closed or a wall asleep before
+          // the showing still leaves the claim on record. `exists` was another device's.
+          if (mark === 'exists') {
+            log('info', 'achieved-banner', { detail: 'skipped-exists' });
+            return false;
+          }
           // `failed` (reported by the chore store, `celebrate-mark-failed`, slot `reward`) still
-          // shows here, once; `exists` was another device's.
+          // shows here, once.
           if (mark === 'failed') shownUnmarked.add(key);
-          return mark !== 'exists';
+          log('info', 'reward-achieved', {
+            kind: 'weekly',
+            detail: hostOf(memberId) ?? surface,
+            stage: mark === 'failed' ? 'unmarked' : 'marked',
+          });
+          return true;
         },
+        hasHost: hosted,
+        // Each showing as it happens: the claim's, and the one resume after a cut.
+        onShow: (action) =>
+          log('info', 'reward-banner', {
+            kind: 'weekly',
+            action,
+            detail: hostOf(memberId) ?? surface,
+          }),
       });
-      if (result === 'claimed-elsewhere') {
-        log('info', 'achieved-banner', { detail: 'skipped-exists' });
-        return;
-      }
       if (result === 'dropped') {
-        // Why it did not play: the host left during the wait, or the week fell below the bar.
+        // Why nothing was claimed: the host left during the wait, or the week fell below the bar.
         log('info', 'achieved-banner', {
-          detail: hostOf(memberId) === null ? 'host-left' : 'dropped',
+          detail: hosted() ? 'dropped' : 'host-left',
         });
-        return;
       }
-      log('info', 'reward-achieved', {
-        kind: 'weekly',
-        detail: hostOf(memberId) ?? surface,
-        stage: mark === 'failed' ? 'unmarked' : 'marked',
-      });
-      log('info', 'achieved-banner', { detail: result });
     } catch (e) {
       reportError({
         surface: SURFACE,
@@ -1028,6 +1057,7 @@ export const useStarStore = defineStore('stars', () => {
     arcFor,
     stripFor,
     notesFor,
+    weekGiftsFor,
     lookbackWeeks,
     valueFor,
     wallStarsFor,

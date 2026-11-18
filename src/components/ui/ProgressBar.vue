@@ -5,7 +5,8 @@
  * the "This Week" card (`ChoreWeekSummary`, #146) for its second use, the Star Report's special
  * rewards (#148), and used for a child's day head on the Choreboard.
  *
- * `size` is the bar's height: `sm` (the default, 0.375rem) or `md` (0.5rem). The root's class
+ * `size` is the bar's height: `sm` (the default, 0.375rem), `md` (0.5rem) or `lg` (0.75rem, the
+ * wall's stars sheet, #154, read from a few steps away). The root's class
  * adds spacing and width only. `percent` is clamped to 0..100. Decorative by default
  * (`aria-hidden`): the words beside it say the number. A caller that needs the bar itself
  * spoken passes `role="progressbar"` and its own `aria-*`, which fall through to the root.
@@ -17,14 +18,14 @@ const props = withDefaults(
     /** 0..100. */
     percent: number;
     /** The bar's height. */
-    size?: 'sm' | 'md';
+    size?: 'sm' | 'md' | 'lg';
     /** The fill's `data-testid`. */
     fillTestid?: string;
   }>(),
   { size: 'sm', fillTestid: undefined }
 );
 
-const HEIGHT = { sm: 'h-1.5', md: 'h-2' } as const;
+const HEIGHT = { sm: 'h-1.5', md: 'h-2', lg: 'h-3' } as const;
 
 const attrs = useAttrs();
 const width = computed(() =>

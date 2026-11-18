@@ -24,7 +24,7 @@ function context(enabled: boolean) {
 
 function mountFace(provide?: WallMemoriesContext) {
   return mount(WallFaceButton, {
-    props: { name: 'Leo', source: 'face-chore' },
+    props: { name: 'Leo', source: 'face-sheet' },
     attrs: { class: 'flex items-center gap-2' },
     slots: { default: '<i class="face">L</i>' },
     global: provide ? { provide: { [WALL_MEMORIES as symbol]: provide } } : {},
@@ -45,7 +45,7 @@ describe('WallFaceButton', () => {
     expect(button.find('i.face').exists()).toBe(true);
 
     await button.trigger('click');
-    expect(open).toHaveBeenCalledWith('face-chore', button.element);
+    expect(open).toHaveBeenCalledWith('face-sheet', button.element);
   });
 
   it('with the viewer off: the plain element, nothing to press', () => {

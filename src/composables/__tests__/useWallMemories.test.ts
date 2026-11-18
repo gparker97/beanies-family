@@ -69,7 +69,7 @@ describe('which tap opens the scrapbook', () => {
     const { focus, memories } = setup({ viewer: false });
     focus.toggle('m1');
     expect(memories.opensOnTap('m1')).toBe(false);
-    memories.open('face-chore');
+    memories.open('face-sheet');
     expect(memories.isOpen.value).toBe(false);
     expect(logEvent).not.toHaveBeenCalled();
   });
@@ -78,10 +78,8 @@ describe('which tap opens the scrapbook', () => {
 describe('opening and closing', () => {
   it('logs the door it opened through and the way it closed', () => {
     const { memories } = setup();
-    memories.open('face-chore');
-    expect(memories.isOpen.value).toBe(true);
-    memories.close('button');
     memories.open('face-sheet');
+    expect(memories.isOpen.value).toBe(true);
     memories.close('escape');
     memories.open('chip-second-tap');
     memories.close('button');
@@ -91,34 +89,27 @@ describe('opening and closing', () => {
     memories.close('button');
 
     expect(kinds('wall_memories_open')).toEqual([
-      'face-chore',
       'face-sheet',
       'chip-second-tap',
       'lane-second-tap',
       'footer-button',
     ]);
-    expect(kinds('wall_memories_close')).toEqual([
-      'button',
-      'escape',
-      'button',
-      'escape',
-      'button',
-    ]);
+    expect(kinds('wall_memories_close')).toEqual(['escape', 'button', 'escape', 'button']);
     expect(logEvent.mock.calls.every(([e]) => e.surface === 'beanie-wall')).toBe(true);
   });
 
   it('a second open while open, or a close while closed, logs nothing', () => {
     const { memories } = setup();
     memories.close('button');
-    memories.open('face-chore');
+    memories.open('footer-button');
     memories.open('face-sheet');
-    expect(kinds('wall_memories_open')).toEqual(['face-chore']);
+    expect(kinds('wall_memories_open')).toEqual(['footer-button']);
     expect(kinds('wall_memories_close')).toEqual([]);
   });
 
   it('switching the viewer off hides it at once (derived, no watcher)', () => {
     const { settings, memories } = setup();
-    memories.open('face-chore');
+    memories.open('face-sheet');
     settings.value = { ...settings.value, viewer: false };
     expect(memories.isOpen.value).toBe(false);
   });
@@ -148,7 +139,7 @@ describe('opening and closing', () => {
     const { memories } = setup();
     const opener = document.createElement('button');
     document.body.appendChild(opener);
-    memories.open('face-chore', opener);
+    memories.open('face-sheet', opener);
     document.body.focus();
     memories.close('button');
     expect(document.activeElement).toBe(opener);
@@ -159,7 +150,7 @@ describe('opening and closing', () => {
 describe('closing on its own', () => {
   it('closes after three minutes with nobody at the wall', () => {
     const { memories } = setup();
-    memories.open('face-chore');
+    memories.open('face-sheet');
     vi.advanceTimersByTime(WALL_MEMORIES_IDLE_MS - 1);
     expect(memories.isOpen.value).toBe(true);
     vi.advanceTimersByTime(1);
@@ -169,7 +160,7 @@ describe('closing on its own', () => {
 
   it('any touch restarts the three minutes', () => {
     const { memories, target } = setup();
-    memories.open('face-chore');
+    memories.open('face-sheet');
     vi.advanceTimersByTime(WALL_MEMORIES_IDLE_MS - 1000);
     target.dispatchEvent(new Event('touchstart'));
     vi.advanceTimersByTime(WALL_MEMORIES_IDLE_MS - 1000);
@@ -180,7 +171,7 @@ describe('closing on its own', () => {
 
   it('activity after a close does not re-arm a timer', () => {
     const { memories, target } = setup();
-    memories.open('face-chore');
+    memories.open('face-sheet');
     memories.close('button');
     target.dispatchEvent(new Event('pointerdown'));
     vi.advanceTimersByTime(WALL_MEMORIES_IDLE_MS * 2);
@@ -189,7 +180,7 @@ describe('closing on its own', () => {
 
   it('closes when the wall goes to sleep', async () => {
     const { memories, asleep } = setup();
-    memories.open('face-chore');
+    memories.open('face-sheet');
     asleep.value = true;
     await nextTick();
     expect(memories.isOpen.value).toBe(false);
@@ -199,13 +190,13 @@ describe('closing on its own', () => {
   it('cannot open while the wall is asleep', () => {
     const { memories, asleep } = setup();
     asleep.value = true;
-    memories.open('face-chore');
+    memories.open('face-sheet');
     expect(memories.isOpen.value).toBe(false);
   });
 
   it('leaves no timer behind when the wall unmounts', () => {
     const { memories, scope } = setup();
-    memories.open('face-chore');
+    memories.open('face-sheet');
     scope.stop();
     vi.advanceTimersByTime(WALL_MEMORIES_IDLE_MS * 2);
     expect(kinds('wall_memories_close')).toEqual([]);

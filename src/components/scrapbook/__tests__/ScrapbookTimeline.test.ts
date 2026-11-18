@@ -68,8 +68,17 @@ const ALL = new Set<ScrapType>(['milestone', 'favorite', 'saying', 'note']);
 
 const PieceStub = {
   name: 'ScrapbookPiece',
-  props: ['entry', 'photoSize', 'emphasizePhoto', 'noteIndex', 'interactive'],
-  template: '<div class="piece" :data-id="entry.id" :data-size="photoSize" />',
+  props: {
+    entry: Object,
+    photoSize: String,
+    emphasizePhoto: Boolean,
+    noteIndex: Number,
+    interactive: Boolean,
+    photoPress: Boolean,
+  },
+  emits: ['photo-click'],
+  template:
+    '<div class="piece" :data-id="entry.id" :data-size="photoSize" :data-press="String(!!photoPress)"><span data-scrap-photo class="photo" @click="photoPress && $emit(\'photo-click\', entry)" /></div>',
 };
 
 function mountTimeline(props: Record<string, unknown> = {}) {
@@ -193,6 +202,22 @@ describe('ScrapbookTimeline', () => {
     expect(card.exists()).toBe(true);
     await card.trigger('click');
     expect(w.emitted('entry-click')?.[0]?.[0]).toMatchObject({ id: 'nov' });
+  });
+
+  it('read-only: only the bare piece gets photoPress, and its photo-click is forwarded', async () => {
+    const w = mountTimeline({ readOnly: true });
+    expect(w.findAll('.piece').every((p) => p.attributes('data-press') === 'true')).toBe(true);
+    await w.find('.photo').trigger('click');
+    expect(w.emitted('photo-click')?.[0]?.[0]).toMatchObject({ id: 'nov' });
+    expect(w.emitted('entry-click')).toBeUndefined();
+  });
+
+  it('interactive: the card never passes photoPress; a photo tap inside it is forwarded', async () => {
+    const w = mountTimeline();
+    expect(w.findAll('.piece').every((p) => p.attributes('data-press') === 'false')).toBe(true);
+    await w.find('.st-card button .photo').trigger('click');
+    expect(w.emitted('photo-click')?.[0]?.[0]).toMatchObject({ id: 'nov' });
+    expect(w.emitted('entry-click')).toBeUndefined();
   });
 
   it('shows the empty slot when every type is off, never everything', () => {

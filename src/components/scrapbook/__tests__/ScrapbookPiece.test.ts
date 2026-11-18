@@ -210,6 +210,43 @@ describe('ScrapbookPiece', () => {
     }
   });
 
+  it('marks the polaroid photo region, but makes it no button without photoPress', async () => {
+    const w = mount(ScrapbookPiece, {
+      props: { entry: milestone(['photo-1', 'photo-2']), emphasizePhoto: true },
+    });
+    const region = w.find('[data-scrap-photo]');
+    expect(region.exists()).toBe(true);
+    expect(region.element.tagName).toBe('SPAN');
+    expect(w.find('button').exists()).toBe(false);
+    await region.trigger('click');
+    expect(w.emitted('photo-click')).toBeUndefined();
+  });
+
+  it('photoPress: the photo is a labelled button that emits photo-click with the entry', async () => {
+    const m = milestone(['photo-1', 'photo-2']);
+    const w = mount(ScrapbookPiece, {
+      props: { entry: m, emphasizePhoto: true, photoPress: true },
+    });
+    const button = w.find('button[data-scrap-photo]');
+    expect(button.exists()).toBe(true);
+    expect(button.attributes('type')).toBe('button');
+    expect(button.attributes('aria-label')).toBe('photos.viewer.open');
+    // Only the photo: the caption is not part of the tap target.
+    expect(button.text()).not.toContain('First swim');
+    await button.trigger('click');
+    expect(w.emitted('photo-click')).toEqual([[m]]);
+  });
+
+  it('photoPress draws no photo button where there is no polaroid', () => {
+    for (const e of [milestone(['photo-1']), note, favorite]) {
+      expect(
+        mount(ScrapbookPiece, { props: { entry: e, photoPress: true } })
+          .find('button')
+          .exists()
+      ).toBe(false);
+    }
+  });
+
   it('only lifts on hover when interactive', () => {
     expect(mount(ScrapbookPiece, { props: { entry: note } }).classes()).not.toContain(
       'hover:scale-[1.02]'
@@ -227,6 +264,29 @@ describe('ScrapbookEntryCard', () => {
     expect(w.find('.rounded-2xl').classes()).toContain('hover:scale-[1.02]');
     await w.trigger('click');
     expect(w.emitted('click')?.[0]).toEqual([favorite]);
+  });
+
+  it('a tap on the photo emits photo-click; anywhere else on the card emits click', async () => {
+    const m = milestone(['photo-1', 'photo-2']);
+    const w = mount(ScrapbookEntryCard, { props: { entry: m, emphasizePhoto: true } });
+    // Never a button inside the card's button.
+    expect(w.findAll('button')).toHaveLength(1);
+
+    await w.find('img.emphasized-photo-img').trigger('click');
+    expect(w.emitted('photo-click')).toEqual([[m]]);
+    expect(w.emitted('click')).toBeUndefined();
+
+    await w.find('.emphasized-photo-caption').trigger('click');
+    expect(w.emitted('click')).toEqual([[m]]);
+    expect(w.emitted('photo-click')).toHaveLength(1);
+  });
+
+  it('keyboard activation (a click aimed at the button itself) still routes as the card', async () => {
+    const m = milestone(['photo-1']);
+    const w = mount(ScrapbookEntryCard, { props: { entry: m, emphasizePhoto: true } });
+    await w.trigger('click');
+    expect(w.emitted('click')).toEqual([[m]]);
+    expect(w.emitted('photo-click')).toBeUndefined();
   });
 
   it('does not lift the sticky saying', () => {

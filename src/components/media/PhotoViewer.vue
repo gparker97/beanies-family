@@ -175,6 +175,16 @@ function goNext(): void {
   if (canGoNext.value) currentIndex.value += 1;
 }
 
+/**
+ * The arrow keys only. Escape is not read here.
+ *
+ * `BaseModal` already registers the viewer on the app's Escape stack (`useFullscreenOverlay`
+ * -> `useEscapeClose`), and this component forwards its `@close`. The key used to ALSO be read
+ * here on `document`, outside the stack, so one Escape closed the photo AND whatever layer sat
+ * under it (the wall's scrapbook, #154). Left to the stack, only the topmost layer closes,
+ * wherever the viewer is mounted. Registering a second token here would count the viewer as
+ * two layers in `escapeLayerCount()`.
+ */
 function handleKeydown(e: KeyboardEvent): void {
   if (!props.open) return;
   if (e.key === 'ArrowLeft') {
@@ -183,14 +193,6 @@ function handleKeydown(e: KeyboardEvent): void {
   } else if (e.key === 'ArrowRight') {
     e.preventDefault();
     goNext();
-  } else if (e.key === 'Escape') {
-    // The floating X was the ONLY way out of this viewer — no backdrop close, and neither
-    // this component nor BaseModal handled Escape. That is an accessibility problem on its
-    // own (a modal must be dismissable from the keyboard), and it is what made the
-    // safe-area bug above so painful: with the X sitting under the status bar on native,
-    // there was no second way out at all.
-    e.preventDefault();
-    emit('close');
   }
 }
 
@@ -443,18 +445,33 @@ async function handleSaveDocument(): Promise<void> {
         away from the image. Aria-live announces position change for
         screen readers, since the dots themselves are decorative.
       -->
+      <!--
+        `#actions`: an optional caller control on the photo itself (the Scrapbook page's
+        "Open Mia's Page"), stacked above the pips so the two never overlap. It sits on this
+        fixed dark backdrop in both themes, so a caller styles it like the controls here:
+        white ink on a translucent fill. Read-only viewers can carry it; it is not the
+        edit footer.
+      -->
       <div
-        v-if="photoIds.length > 1"
-        class="absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-3 py-2 backdrop-blur-sm"
+        v-if="photoIds.length > 1 || $slots.actions"
+        class="absolute left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2"
         style="bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem)"
-        aria-hidden="true"
       >
-        <span
-          v-for="(_id, i) in photoIds"
-          :key="i"
-          class="block h-1.5 rounded-full transition-all duration-200"
-          :class="i === currentIndex ? 'bg-primary-500 w-5' : 'w-1.5 bg-white/55 hover:bg-white/80'"
-        />
+        <slot name="actions" />
+        <div
+          v-if="photoIds.length > 1"
+          class="flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-2 backdrop-blur-sm"
+          aria-hidden="true"
+        >
+          <span
+            v-for="(_id, i) in photoIds"
+            :key="i"
+            class="block h-1.5 rounded-full transition-all duration-200"
+            :class="
+              i === currentIndex ? 'bg-primary-500 w-5' : 'w-1.5 bg-white/55 hover:bg-white/80'
+            "
+          />
+        </div>
       </div>
       <span class="sr-only" aria-live="polite">{{ positionLabel }}</span>
     </div>

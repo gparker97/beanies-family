@@ -14,9 +14,10 @@ export const SCRAPBOOK_PIECE_TYPES: ReadonlySet<string> = new Set([
 
 <script setup lang="ts">
 /**
- * Single source for entry-type → renderer dispatch for a scrapbook entry. Presentational
- * only: no click handling, no routing. `ScrapbookEntryCard` wraps it in a `<button>` for
- * the Family Scrapbook page; the wall's timeline renders it directly. Adding a new
+ * Single source for entry-type → renderer dispatch for a scrapbook entry. Presentational:
+ * no routing, and no click handling except the opt-in `photoPress` photo button (#154).
+ * `ScrapbookEntryCard` wraps it in a `<button>` for the Family Scrapbook page; the wall's
+ * timeline renders it directly. Adding a new
  * scrapbook entry type means one branch in this file, nothing else.
  *
  * Trusts `entry.type` (a discriminated union from `useScrapbookFeed`) and casts the payload
@@ -41,6 +42,7 @@ import { usePhotoStore, type PhotoSize } from '@/stores/photoStore';
 import { reportError } from '@/utils/errorReporter';
 import { formatDateShort } from '@/utils/date';
 import { logScrapbookImageFailed } from '@/utils/scrapbookImageFailed';
+import { useTranslation } from '@/composables/useTranslation';
 import type { ScrapbookEntry } from '@/composables/useScrapbookFeed';
 import type {
   FavoriteCategory,
@@ -66,9 +68,21 @@ const props = withDefaults(
     photoSize?: PhotoSize;
     /** Set by the clickable card: enables the hover lift and the polaroid photo zoom. */
     interactive?: boolean;
+    /**
+     * The polaroid's photo is its own button, emitting `photo-click` (#154). ONLY for a bare
+     * piece with no button around it (the wall's read-only timeline): `ScrapbookEntryCard` is
+     * itself a `<button>` and must never pass this, or a button lands inside a button. The
+     * card tells a photo tap apart by the `data-scrap-photo` mark instead, which the photo
+     * region carries either way.
+     */
+    photoPress?: boolean;
   }>(),
-  { noteIndex: 0, emphasizePhoto: false, photoSize: 'full', interactive: false }
+  { noteIndex: 0, emphasizePhoto: false, photoSize: 'full', interactive: false, photoPress: false }
 );
+
+const emit = defineEmits<{ 'photo-click': [entry: ScrapbookEntry] }>();
+
+const { t } = useTranslation();
 
 const photoStore = usePhotoStore();
 
@@ -130,6 +144,11 @@ function onPhotoError(): void {
 }
 
 const showPolaroid = computed(() => !!emphasizedPhotoUrl.value && !failed.value);
+
+/** Only the bare piece's own photo button emits; a card's photo region is just a mark. */
+function onPhotoPress(): void {
+  if (props.photoPress) emit('photo-click', props.entry);
+}
 
 const liftClass = computed(() =>
   props.interactive ? 'transition-transform hover:scale-[1.02]' : ''
@@ -209,7 +228,19 @@ function sayingFooter(s: SayingItem): string {
          photo dominates the card; title + date are a Caveat caption
          underneath. Falls back to the standard taped card below when no
          photo is resolvable or the image fails to load. -->
-    <span class="emphasized-photo-img-button block w-full overflow-hidden">
+    <component
+      :is="photoPress ? 'button' : 'span'"
+      :type="photoPress ? 'button' : undefined"
+      :aria-label="photoPress ? t('photos.viewer.open') : undefined"
+      class="emphasized-photo-img-button block w-full overflow-hidden"
+      :class="
+        photoPress
+          ? 'cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#AED6F1]'
+          : ''
+      "
+      data-scrap-photo
+      @click="onPhotoPress"
+    >
       <img
         :src="emphasizedPhotoUrl!"
         referrerpolicy="no-referrer"
@@ -225,7 +256,7 @@ function sayingFooter(s: SayingItem): string {
       >
         +{{ (milestone.photoIds?.length ?? 0) - 1 }}
       </span>
-    </span>
+    </component>
     <span class="emphasized-photo-caption block w-full text-left">
       <span
         class="font-outfit text-primary-700 dark:text-accent-lift block text-xs font-semibold tracking-wide uppercase"

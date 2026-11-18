@@ -982,6 +982,8 @@ describe('stars and rewards', () => {
     const w = await mountPage({ bean: 'kid' });
     expect(w.get('[data-testid="chore-day-badge"]').text()).toBe('🍦');
     expect(w.get('[data-testid="chore-day-ring"]').attributes('data-percent')).toBe('100');
+    // #154: the star on top of the ring, for the rest of the week.
+    expect(w.find('[data-testid="star-ring-star"]').exists()).toBe(true);
   });
 
   it("a grown-up's day (no arc) draws the head as before, and no values", async () => {

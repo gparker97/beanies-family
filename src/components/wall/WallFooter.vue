@@ -104,12 +104,16 @@ const popupFor = (id: string) => (memories?.opensOnTap(id) ? 'dialog' : undefine
       </button>
     </div>
 
+    <!-- One door (#154): the wordmark is the scrapbook button's slot. With the scrapbook on,
+         the icon and the name are one button; with it off (or outside a wall) the button draws
+         only the slot, so the wordmark stands plain as before. One lockup, same footer height. -->
     <div class="flex shrink-0 items-center gap-3 pt-3 pb-4">
-      <WallScrapbookButton />
-      <span class="font-outfit wall-brand font-bold opacity-70">
-        <span class="text-[var(--muted-text,#4d5d6c)]">beanies</span
-        ><span class="text-[var(--heritage-orange)]">.family</span>
-      </span>
+      <WallScrapbookButton>
+        <span class="font-outfit wall-brand font-bold opacity-70" data-test="wall-brand">
+          <span class="text-[var(--muted-text,#4d5d6c)]">beanies</span
+          ><span class="text-[var(--heritage-orange)]">.family</span>
+        </span>
+      </WallScrapbookButton>
     </div>
   </div>
 </template>

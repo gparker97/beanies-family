@@ -34,16 +34,21 @@
  *
  * Stars (#148), on a child's lane only and only while `lane.stars` is set (the bundle leaves it
  * out while stars are off, for a grown-up or a pet, and when there is nothing to draw): a thin
- * arc around the avatar (`ProgressRing` inside `WallFaceButton`, drawn in the header's padding so
- * the header's height never changes), filling toward the weekly reward (or the nearest saved-up
- * award), with the reward's emoji as a badge once achieved; and a quiet `StarCount` at the end of
- * the name row, spoken as this week's stars or the stars saved up (the arc's `kind`). The header is a size container, so the count drops out before the name
- * truncates on a narrow lane. With `lane.stars` absent the header is exactly as it was (no ring
- * wrapper in the DOM). Every lane drawn is a banner host for its bean (`useRewardBannerHost`),
- * so the weekly reward's achieved banner is claimed while the lane is on screen, whoever ticked
- * the week past the bar; while `rewardBannerFor(member)` is set, the existing
- * `CelebrationBanner` (compact) plays once at the top of the lane body: "Max earned Ice Cream
- * this week", nothing to press. The green all-done ring is untouched.
+ * arc around the avatar (`StarRingAvatar`, drawn in the header's padding so the header's height
+ * never changes), filling toward the weekly reward (or the nearest saved-up award), with the
+ * reward's emoji as a badge and a star on top of the ring once the weekly goal is reached (#154);
+ * and a quiet `StarCount` at the end of the name row, spoken as this week's stars or the stars
+ * saved up (the arc's `kind`). The header is a size container, so the count drops out before the
+ * name truncates on a narrow lane. With `lane.stars` absent the avatar is drawn alone. Every lane
+ * drawn is a banner host for its bean (`useRewardBannerHost`), so the weekly reward's achieved
+ * banner is claimed while the lane is on screen, whoever ticked the week past the bar; while
+ * `rewardBannerFor(member)` is set, the existing `CelebrationBanner` (compact) plays once at the
+ * top of the lane body ("Ice Cream earned!"), nothing to press, and the reward's picture bursts
+ * up over the lane with a shower of stars (`RewardBurst`, not under reduced motion). The green
+ * all-done ring is untouched.
+ *
+ * The head (#154): every bean's avatar is a button that opens their stars sheet, through the
+ * page's existing `open` (`{ kind: 'stars', memberId }`), whatever the scrapbook setting.
  *
  * Editing is one thing only: while unlocked, each lane has an add row that adds a chore for
  * that bean in the block happening now (`WALL_EDIT.addChore`, bound by the page to the grown-up
@@ -54,10 +59,9 @@
  * `.chore-block-*` (whose tokens carry their dark values, so the done line switches with
  * them), the done line's tick is a fixed Success Green disc with white ink in both themes
  * (a filled mark, like a filled button), and the celebration banner is the fixed brand
- * gradient with white ink in both themes. The stars arc's track and fill are `ProgressRing`'s
- * (its own `html.dark` partner); the badge is `bg-white` / `surface-raised` with a
- * `--color-border-strong` / `line` edge; the count is `StarCount`'s (terracotta glyph with its
- * lift, `ink-soft` number).
+ * gradient with white ink in both themes. The ring, badge and star are `StarRingAvatar`'s; the
+ * burst is emoji only; the count is `StarCount`'s (terracotta glyph with its lift, `ink-soft`
+ * number).
  */
 import { computed, inject, nextTick, provide, ref } from 'vue';
 import {
@@ -68,13 +72,11 @@ import {
 import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import WallAddRow from '@/components/wall/WallAddRow.vue';
-import WallFaceButton from '@/components/wall/WallFaceButton.vue';
-import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
-import ProgressRing from '@/components/ui/ProgressRing.vue';
+import RewardBurst from '@/components/chores/RewardBurst.vue';
 import StarCount from '@/components/chores/StarCount.vue';
+import StarRingAvatar from '@/components/chores/StarRingAvatar.vue';
 import { rewardBannerText } from '@/components/chores/starText';
-import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useRewardBannerHost } from '@/composables/useRewardBannerHost';
 import { useWallLock } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
@@ -90,7 +92,13 @@ import { wallChoreProgressText } from '@/components/wall/wallChoreText';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { CHORE_BLOCKS } from '@/utils/chores';
 import type { ChoreBlock, FamilyMember } from '@/types/models';
-import type { WallChoreBlock, WallChoreLane, WallJob, WallPeripheralData } from '@/types/wall';
+import type {
+  WallChoreBlock,
+  WallChoreLane,
+  WallJob,
+  WallPeripheralData,
+  WallSheetTarget,
+} from '@/types/wall';
 import { choreTickAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 
@@ -102,7 +110,12 @@ const props = defineProps<{
   isPending: (job: WallJob) => boolean;
   backLabel: string;
 }>();
-const emit = defineEmits<{ toggle: [WallJob, ChoreCelebrationAnchor | null]; back: [] }>();
+const emit = defineEmits<{
+  toggle: [WallJob, ChoreCelebrationAnchor | null];
+  back: [];
+  /** A head: that bean's stars sheet (#154), through the page's existing `open`. */
+  open: [WallSheetTarget];
+}>();
 
 type TimedBlock = Exclude<ChoreBlock, 'anytime'>;
 
@@ -129,7 +142,6 @@ const { canEdit } = useWallLock();
 /** The write channel. A lane mounted without it (or without `addChore`) offers no add row. */
 const edit = inject(WALL_EDIT, undefined);
 const canAdd = computed(() => canEdit.value && !!edit?.addChore);
-const { memberAvatarBindings } = useMemberAvatarBindings();
 
 const members = computed(() => {
   const humans = familyStore.sortedHumans;
@@ -349,11 +361,6 @@ function expandLabel(memberId: string, b: WallChoreBlock): string {
   );
 }
 
-/** The stars arc as `ProgressRing` draws it: one gradient segment. */
-function arcSegments(percent: number) {
-  return [{ value: percent / 100, tone: 'fill' as const }];
-}
-
 /**
  * The reward banner's words per lane, while one is up: worked out ONCE per lane per render
  * (the template reads the map), never once per binding.
@@ -411,7 +418,7 @@ function addChore(memberId: string, title: string): Promise<boolean> {
       <section
         v-for="{ member, lane } in lanes"
         :key="member.id"
-        class="wall-chore-lane dark:border-line flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] shadow-[var(--card-shadow)] dark:border"
+        class="wall-chore-lane dark:border-line relative flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] shadow-[var(--card-shadow)] dark:border"
         :class="laneAllDone(lane) ? 'ring-[2.5px] ring-[#27AE60]' : ''"
         :style="{ '--bean': member.color }"
         data-testid="wall-chore-lane"
@@ -423,31 +430,25 @@ function addChore(memberId: string, title: string): Promise<boolean> {
           :class="lane.stars ? 'has-stars' : ''"
           data-testid="wall-chore-lane-header"
         >
-          <WallFaceButton :name="member.name" source="face-chore" class="inline-flex shrink-0">
-            <ProgressRing
-              v-if="lane.stars"
-              class="wall-star-ring"
-              :segments="arcSegments(lane.stars.percent)"
-              :stroke-width="6"
-              data-testid="wall-chore-lane-ring"
-              :data-percent="lane.stars.percent"
-            >
-              <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="lg" />
-              <template v-if="lane.stars.badgeEmoji" #badge>
-                <span
-                  class="dark:bg-surface-raised dark:border-line grid h-6 w-6 place-items-center rounded-full border border-[var(--color-border-strong)] bg-white text-xs leading-none"
-                  data-testid="wall-chore-lane-badge"
-                  >{{ lane.stars.badgeEmoji }}</span
-                >
-              </template>
-            </ProgressRing>
-            <BeanieAvatar
-              v-else
-              v-bind="memberAvatarBindings(member)"
+          <!-- The head opens this bean's stars (#154), a grown-up's or a pet's too (they get an
+               explanation there). Always a button, whatever the scrapbook setting. -->
+          <button
+            type="button"
+            class="inline-flex shrink-0 cursor-pointer rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#AED6F1]"
+            :aria-label="fillTemplate(t('choreStars.wall.headAria'), { name: member.name })"
+            aria-haspopup="dialog"
+            data-testid="wall-chore-lane-head-button"
+            @click="emit('open', { kind: 'stars', memberId: member.id })"
+          >
+            <StarRingAvatar
+              :member="member"
+              :arc="lane.stars"
+              size="lane"
               fallback="initials"
-              size="lg"
+              ring-testid="wall-chore-lane-ring"
+              badge-testid="wall-chore-lane-badge"
             />
-          </WallFaceButton>
+          </button>
           <span class="min-w-0" :class="lane.stars ? 'flex-1' : ''">
             <span v-if="lane.stars" class="flex min-w-0 items-center gap-2">
               <span
@@ -476,6 +477,13 @@ function addChore(memberId: string, title: string): Promise<boolean> {
             </span>
           </span>
         </header>
+
+        <!-- #154: the weekly reward's burst, over the whole lane (which clips it), once. -->
+        <RewardBurst
+          v-if="rewardBannerFor(member.id)"
+          :key="rewardBannerFor(member.id)!.id"
+          :banner="rewardBannerFor(member.id)!"
+        />
 
         <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
           <!-- Stars (#148): the weekly reward's achieved moment, once, nothing to press. -->
@@ -681,21 +689,14 @@ html.dark .wall-chore-lane-head {
 }
 
 /*
- * Stars (#148). The ring is drawn AROUND the avatar's own footprint: 3.6rem across (the 3rem
- * avatar plus a thin arc), pulled in by 0.3rem on every side, so it takes exactly the avatar's
- * 3rem in the layout and the arc sits in the header's padding. A child's header with stars is
- * the same height as without them and as a grown-up's, and the name starts where it always did.
- * The header is a size container while it carries stars, so the count drops out below about
- * 13.5rem, before the name has to truncate. Geometry only, nothing painted here.
+ * Stars (#148). The ring is `StarRingAvatar`'s, drawn AROUND the avatar's own footprint, so a
+ * child's header with stars is the same height as without them and as a grown-up's, and the name
+ * starts where it always did. The header is a size container while it carries stars, so the count
+ * drops out below about 13.5rem, before the name has to truncate. Geometry only, nothing painted
+ * here.
  */
 .wall-chore-lane-head.has-stars {
   container-type: inline-size;
-}
-
-.wall-star-ring {
-  height: 3.6rem;
-  margin: -0.3rem;
-  width: 3.6rem;
 }
 
 /* The query measures the header's content box (the lane less its 1.5rem of padding): 12rem here

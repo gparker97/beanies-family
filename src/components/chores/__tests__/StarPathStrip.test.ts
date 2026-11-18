@@ -171,4 +171,22 @@ describe('StarPathStrip', () => {
       '5 more stars to the weekly reward'
     );
   });
+
+  it('lg (the wall) draws the same strip bigger, the words as its headline; md stays the default', () => {
+    const w = week({ total: 11, openToday: 1, ahead: 8 });
+    const md = mountStrip(w);
+    expect(md.get('[data-testid="star-path-step"]').classes()).toContain('h-2');
+    expect(md.get('[data-testid="star-path-more"]').element.parentElement?.className).toContain(
+      'text-sm'
+    );
+    const lg = mountStrip(w, { size: 'lg' });
+    expect(tones(lg)).toEqual(tones(md));
+    expect(lg.attributes('aria-label')).toBe(md.attributes('aria-label'));
+    expect(lg.get('[data-testid="star-path-step"]').classes()).toContain('h-4');
+    expect(lg.get('[data-testid="star-path-reward"]').classes()).toContain('h-10');
+    const more = lg.get('[data-testid="star-path-more"]');
+    expect(more.text()).toBe('5 more stars to Ice cream');
+    expect(more.element.parentElement?.className).toContain('text-2xl');
+    expect(more.element.parentElement?.className).toContain('order-first');
+  });
 });

@@ -472,7 +472,8 @@ describe('WallChoreLanes: stars', () => {
   });
 
   it('the ring is drawn in the avatar’s own footprint (the header never grows with stars)', () => {
-    const css = repoFile('src/components/wall/WallChoreLanes.vue');
+    // The ring is `StarRingAvatar`'s (#154), shared with a child's day in the app.
+    const css = repoFile('src/components/chores/StarRingAvatar.vue');
     // 3.6rem pulled in by 0.3rem on every side: exactly the 3rem avatar in the layout.
     expect(css).toMatch(
       /\.wall-star-ring \{\s*height: 3\.6rem;\s*margin: -0\.3rem;\s*width: 3\.6rem;/
@@ -490,6 +491,15 @@ describe('WallChoreLanes: stars', () => {
     expect(css).toMatch(/@container \(width < 12rem\) \{\s*\.wall-star-count \{\s*display: none;/);
     const w = mountLanes({ pip: withStars({ percent: 50, count: 9, kind: 'week' }) });
     expect(w.find('[data-testid="wall-chore-lane-stars"]').classes()).toContain('wall-star-count');
+  });
+
+  it('the star on the ring shows once the weekly goal is reached, never before', () => {
+    const w = mountLanes({
+      pip: withStars({ percent: 100, count: 33, kind: 'week', badgeEmoji: '🍦' }),
+      juno: withStars({ percent: 40, count: 8, kind: 'week' }),
+    });
+    expect(header(w, 'pip').find('[data-testid="star-ring-star"]').exists()).toBe(true);
+    expect(header(w, 'juno').find('[data-testid="star-ring-star"]').exists()).toBe(false);
   });
 
   it("every lane drawn hosts its bean's reward banner while mounted, and only those", async () => {
@@ -523,6 +533,10 @@ describe('WallChoreLanes: stars', () => {
       const banners = w.findAll('[data-testid="wall-chore-reward-banner"]');
       expect(banners).toHaveLength(1);
       const pipLane = w.find('[data-testid="wall-chore-lane"][data-member="pip"]');
+      // #154: the reward's picture bursts over that lane only, inside its clip.
+      expect(w.findAll('[data-testid="reward-burst"]')).toHaveLength(1);
+      expect(pipLane.find('[data-testid="reward-burst-prize"]').text()).toBe('🍦');
+      expect(pipLane.attributes('data-celebration-clip')).toBeDefined();
       const banner = pipLane.findComponent(CelebrationBanner);
       expect(banner.props('title')).toBe('choreStars.banner.title');
       expect(banner.props('body')).toBe('choreStars.banner.body.other');
@@ -535,5 +549,22 @@ describe('WallChoreLanes: stars', () => {
       resetChoreCelebrationForTest();
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * The head (#154): every bean's avatar is a button that opens their stars sheet through the
+ * page's existing `open`, whatever the scrapbook setting (no `WALL_MEMORIES` is provided here).
+ */
+describe('WallChoreLanes: a head opens the stars', () => {
+  it('a tap on any head emits open with a stars target for that bean', async () => {
+    const w = mountLanes({ pip: pipMorning(), juno: { ...pipMorning(), memberId: 'juno' } });
+    const heads = w.findAll('[data-testid="wall-chore-lane-head-button"]');
+    expect(heads).toHaveLength(2);
+    expect(heads[0]!.element.tagName).toBe('BUTTON');
+    expect(heads[0]!.attributes('aria-label')).toBe('choreStars.wall.headAria');
+    expect(heads[0]!.attributes('aria-haspopup')).toBe('dialog');
+    await heads[1]!.trigger('click');
+    expect(w.emitted('open')).toEqual([[{ kind: 'stars', memberId: 'juno' }]]);
   });
 });

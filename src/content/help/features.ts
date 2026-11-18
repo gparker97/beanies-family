@@ -2530,7 +2530,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Give each child their own chores for the morning, afternoon and evening, let them tick them off, and celebrate when a time of day is done. Nothing to reset, ever.',
     icon: '\u{1F9F9}',
     readTime: 9,
-    updatedDate: '2026-11-16',
+    updatedDate: '2026-11-18',
     sections: [
       {
         type: 'paragraph',
@@ -2786,7 +2786,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'Each person with chores today gets a lane, with the time of day happening now open first and big ticks for small fingers. Anytime is open too. Later times of day, and ones that have passed, are a single line with a count; tap one to open it.',
           'Anyone can tick on the wall, even while it is locked. Finishing a time of day plays the same celebration, once, and leaves the all-done banner in that lane.',
           'Adding chores needs a grown-up. Tap the padlock, choose <strong>Unlock editing</strong> and enter a grown-up’s PIN, and each lane gets an add row (for example <strong>Add a morning chore</strong>). While the wall is unlocked, everyone gets a lane, so you can add someone’s first chore. A chore added there goes in the time of day happening now, every day. To rename, remove, change days or pictures, use the app.',
-          'With <a href="/help/features/stars-and-rewards">Stars and Rewards</a> on, each child’s lane also shows a thin arc around their picture and a star count for the week.',
+          'With <a href="/help/features/stars-and-rewards">Stars and Rewards</a> on, each child’s lane also shows a thin arc around their picture and a star count for the week, and reaching the weekly reward plays its own celebration in that lane, once.',
+          'Tap anyone’s face in their lane to see their stars and rewards on the wall. More in <a href="/help/features/stars-and-rewards#on-the-wall">Stars and Rewards: on the beanie wall</a>.',
         ],
       },
 
@@ -2848,7 +2849,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Turn every ticked chore into a star, pick an optional weekly reward and bigger special rewards, and see how each child’s week is going. Stars are never money.',
     icon: '\u{2B50}',
     readTime: 8,
-    updatedDate: '2026-11-16',
+    updatedDate: '2026-11-18',
     sections: [
       {
         type: 'paragraph',
@@ -2881,7 +2882,21 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Children keep doing exactly what they did before: tick their chores. On their day they see a thin arc around their picture, a star count like <strong>4 stars this week</strong>, and what each chore is worth, like <strong>Worth 2 stars</strong>. There is nothing to tap and nothing to set up. If a weekly reward is on, the arc fills toward it, and when it is reached a banner says so, like <strong>Pip earned Ice Cream this week</strong>. The same arc and count appear in each child’s lane on the <a href="/help/getting-started/set-up-the-beanie-wall">beanie wall</a>.',
+          'Children keep doing exactly what they did before: tick their chores. On their day they see a thin arc around their picture, a star count like <strong>4 stars this week</strong>, and what each chore is worth, like <strong>Worth 2 stars</strong>. There is nothing to tap and nothing to set up. If a weekly reward is on, the arc fills toward it. When it is reached, the reward’s picture bursts out with stars, a happy sound plays (if the device’s sound is on), and a banner says so, like <strong>Ice Cream earned!</strong> That celebration plays once per child per week, across all your devices, on the next screen that shows that child: their lane on the beanie wall or their day in the app. For the rest of the week a small star sits on the arc around their picture. The same arc and count appear in each child’s lane on the <a href="/help/getting-started/set-up-the-beanie-wall">beanie wall</a>.',
+      },
+
+      { type: 'heading', content: 'On the beanie wall', level: 3, id: 'on-the-wall' },
+      {
+        type: 'paragraph',
+        content:
+          'On the wall’s <strong>Chores</strong> view, a child can tap their own face in their lane to see their stars and rewards: this week’s path to the weekly reward, every special reward with its progress (a finished one says <strong>Earned</strong>), and this week’s bonus stars and stars taken away, with the note, the day and who gave them. Once the weekly reward is reached, the sheet opens with a banner like <strong>Ice Cream earned!</strong> every time that week. If Stars and Rewards is off, or a child has no reward set up yet, the sheet explains that a grown-up can set it up in the app. Tapping a grown-up’s face shows a button for each child, to look at theirs.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Nothing can be changed from the stars sheet, and anyone at the wall can read it, bonus notes included. Write notes you are happy for a visitor to see.',
+        title: 'Read only, and readable by anyone at the wall',
+        icon: '\u{1F440}',
       },
 
       { type: 'heading', content: 'Setting a weekly reward', level: 2, id: 'weekly-reward' },

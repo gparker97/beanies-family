@@ -28,6 +28,7 @@ import ScrapbookEntryCard from '@/components/scrapbook/ScrapbookEntryCard.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useFamilyScrapbookFeed } from '@/composables/useFamilyScrapbookFeed';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -42,6 +43,8 @@ const SUPPORTING_HERO_LIMIT = 4;
 
 const emit = defineEmits<{
   'entry-click': [entry: ScrapbookEntry];
+  /** A polaroid's photo was tapped (#154); the page opens the photo viewer. */
+  'photo-click': [entry: ScrapbookEntry];
   'open-add': [];
   /** Page-flip into a bean's full spread — used by the avatar polaroid + name link. */
   'select-bean': [id: UUID];
@@ -161,6 +164,10 @@ function onEntryClick(entry: ScrapbookEntry): void {
   emit('entry-click', entry);
 }
 
+function onPhotoClick(entry: ScrapbookEntry): void {
+  emit('photo-click', entry);
+}
+
 function onSelectBean(id: UUID): void {
   emit('select-bean', id);
 }
@@ -212,6 +219,7 @@ function onOpenAdd(): void {
             :entry="heroEntry"
             :emphasize-photo="heroHasPhoto"
             @click="onEntryClick"
+            @photo-click="onPhotoClick"
           />
         </div>
         <div
@@ -225,6 +233,7 @@ function onOpenAdd(): void {
             :entry="entry"
             :emphasize-photo="entryHasPhoto(entry)"
             @click="onEntryClick"
+            @photo-click="onPhotoClick"
           />
         </div>
       </div>
@@ -242,7 +251,9 @@ function onOpenAdd(): void {
         <button
           type="button"
           class="bean-section-header"
-          :aria-label="`Open ${section.bean.name}'s scrapbook page`"
+          :aria-label="
+            fillTemplate(t('scrapbook.everyone.openBeanPage'), { name: section.bean.name })
+          "
           @click="onSelectBean(section.bean.id)"
         >
           <span
@@ -266,7 +277,9 @@ function onOpenAdd(): void {
           <button
             type="button"
             class="bean-polaroid"
-            :aria-label="`Open ${section.bean.name}'s scrapbook page`"
+            :aria-label="
+              fillTemplate(t('scrapbook.everyone.openBeanPage'), { name: section.bean.name })
+            "
             :style="{ transform: `rotate(${rotationFor(section.bean.id, 6)}deg)` }"
             @click="onSelectBean(section.bean.id)"
           >
@@ -295,6 +308,7 @@ function onOpenAdd(): void {
               :note-index="idx"
               :emphasize-photo="entryHasPhoto(entry)"
               @click="onEntryClick"
+              @photo-click="onPhotoClick"
             />
           </div>
         </div>
@@ -326,6 +340,7 @@ function onOpenAdd(): void {
             :entry="entry"
             :emphasize-photo="entryHasPhoto(entry)"
             @click="onEntryClick"
+            @photo-click="onPhotoClick"
           />
         </div>
       </div>

@@ -11,6 +11,12 @@
  * the button occupies. An unknown entry type renders the piece's hidden span as the root,
  * as before, so a grid never gains an empty cell. The card emits `@click` with the entry;
  * the parent decides routing.
+ *
+ * PHOTO TAP (#154). The card is one `<button>`, so the photo cannot be a second button inside
+ * it. Instead the one click handler looks at what was tapped: inside the piece's
+ * `[data-scrap-photo]` region it emits `photo-click`, anywhere else `click`. Keyboard
+ * activation (Enter / Space) targets the button itself, so it keeps emitting `click` and
+ * routes as before; a keyboard user reaches the photo from the bean's page.
  */
 import ScrapbookPiece, { SCRAPBOOK_PIECE_TYPES } from '@/components/scrapbook/ScrapbookPiece.vue';
 import type { ScrapbookEntry } from '@/composables/useScrapbookFeed';
@@ -28,9 +34,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   click: [entry: ScrapbookEntry];
+  /** The polaroid's photo was tapped (only a milestone drawn as a polaroid has one). */
+  'photo-click': [entry: ScrapbookEntry];
 }>();
 
-function handleCardClick(): void {
+function handleCardClick(event: MouseEvent): void {
+  const target = event.target;
+  if (target instanceof Element && target.closest('[data-scrap-photo]')) {
+    emit('photo-click', props.entry);
+    return;
+  }
   emit('click', props.entry);
 }
 </script>

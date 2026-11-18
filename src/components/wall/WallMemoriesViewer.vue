@@ -10,17 +10,25 @@
  * bean was picked last time.
  *
  * Read-only by design: it works while the wall is locked, so it carries no add, edit or
- * delete control, no lightbox and no link off the wall. Matches `WallSheet`: a dialog with
- * `aria-modal` and Escape, no focus trap (the app has none). Focus moves to Close on open.
+ * delete control and no link off the wall. Matches `WallSheet`: a dialog with `aria-modal`
+ * and Escape, no focus trap (the app has none). Focus moves to Close on open.
+ *
+ * PHOTOS (#154). Tapping a polaroid's photo opens the app's `PhotoViewer`, read-only, with
+ * that memory's photos and nothing in its `#actions` slot. It is mounted here, so it unmounts
+ * with the scrapbook on idle and on sleep. Escape: both this viewer and the photo are on the
+ * app's Escape stack, so one Escape closes only the photo, the next the scrapbook. Taps in the
+ * teleported photo still reach the wall's window-level idle watch, so they keep it awake.
  */
 import { computed, onMounted, ref } from 'vue';
 import ScrapbookTimeline from '@/components/scrapbook/ScrapbookTimeline.vue';
+import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import { useEscapeClose } from '@/composables/useEscapeClose';
 import { useTranslation } from '@/composables/useTranslation';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { fillTemplate } from '@/utils/fillTemplate';
-import type { ScrapType } from '@/composables/useScrapbookFeed';
+import type { ScrapbookEntry, ScrapType } from '@/composables/useScrapbookFeed';
 import type { WallMemoriesCloseKind, WallMemoriesEmptyDetail } from '@/composables/useWallMemories';
-import type { FamilyMember, UUID } from '@/types/models';
+import type { FamilyMember, Milestone, UUID } from '@/types/models';
 
 const props = defineProps<{
   /** The bean row: the wall passes `familyStore.sortedHumans`, as the footer does. */
@@ -51,6 +59,27 @@ const heading = computed(() => {
 
 // Mounted only while open, so the overlay is open for this component's whole life.
 useEscapeClose(ref(true), () => emit('close', 'escape'));
+
+/** The tapped memory's photos while the photo viewer is open; empty when it is closed. */
+const photoIds = ref<UUID[]>([]);
+
+function openPhoto(entry: ScrapbookEntry): void {
+  // Only a milestone drawn as a polaroid has a photo to tap, and the piece draws one only
+  // when the first photo resolves, so this never opens an empty viewer.
+  const ids = entry.type === 'milestone' ? ((entry.payload as Milestone).photoIds ?? []) : [];
+  if (ids.length === 0) return;
+  photoIds.value = [...ids];
+  logEvent({
+    level: 'info',
+    surface: 'beanie-wall',
+    message: 'wall_memories_photo',
+    context: { kind: 'open' },
+  });
+}
+
+function closePhoto(): void {
+  photoIds.value = [];
+}
 
 onMounted(() => {
   closeButton.value?.focus();
@@ -93,6 +122,7 @@ onMounted(() => {
           :beans="beans"
           :types="types"
           read-only
+          @photo-click="openPhoto"
         >
           <template #empty>
             <p
@@ -108,6 +138,14 @@ onMounted(() => {
         </ScrapbookTimeline>
       </div>
     </div>
+
+    <PhotoViewer
+      :open="photoIds.length > 0"
+      :photo-ids="photoIds"
+      :initial-index="0"
+      read-only
+      @close="closePhoto"
+    />
   </div>
 </template>
 

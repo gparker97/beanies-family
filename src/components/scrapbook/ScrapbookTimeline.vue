@@ -22,8 +22,10 @@
  * scale (`BeanieWallPage.vue`) overrides from inside `.wall-root`. The wall rule is the more
  * specific one, so each surface gets its own size from one template.
  *
- * `readOnly` renders bare pieces with nothing to press and emits no `entry-click`; the bean
- * row and the rail still work, because they only move the reader around.
+ * `readOnly` renders bare pieces and emits no `entry-click`; the bean row and the rail still
+ * work, because they only move the reader around. The one thing to press on a read-only card
+ * is a polaroid's photo (`photoPress`), which emits `photo-click` to enlarge it (#154). The
+ * interactive cards emit `photo-click` too, from inside their own button.
  */
 import { computed } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -53,7 +55,11 @@ const props = withDefaults(
   { readOnly: false }
 );
 
-const emit = defineEmits<{ 'entry-click': [entry: ScrapbookEntry] }>();
+const emit = defineEmits<{
+  'entry-click': [entry: ScrapbookEntry];
+  /** A polaroid's photo was tapped, in either mode; the caller opens the photo viewer. */
+  'photo-click': [entry: ScrapbookEntry];
+}>();
 
 /** `null` is everyone; a bean id is that bean plus the whole-family moments. */
 const memberId = defineModel<UUID | null>('memberId', { default: null });
@@ -191,6 +197,8 @@ defineExpose({ isEmpty });
                 :note-index="index"
                 emphasize-photo
                 photo-size="screen"
+                photo-press
+                @photo-click="emit('photo-click', $event)"
               />
               <ScrapbookEntryCard
                 v-else
@@ -199,6 +207,7 @@ defineExpose({ isEmpty });
                 emphasize-photo
                 photo-size="screen"
                 @click="emit('entry-click', $event)"
+                @photo-click="emit('photo-click', $event)"
               />
             </div>
           </div>

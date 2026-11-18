@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- On the Beanie Wall, tapping a child's face on the Choreboard now shows their stars: progress to the weekly reward, every special reward, and this week's bonus stars.
+- Reaching the weekly reward is now celebrated with a burst and a sound, once per child each week, and a star sits on the ring around their face for the rest of the week.
+- Photos in the scrapbook can now be tapped to see them bigger, on the Beanie Wall and in the app.
 - Categories are now picked from what is typed. A new activity, transaction or Quick Add entry shows the guessed category under the field, with Change one tap away; a category picked by hand is never replaced.
 - Category pickers can now be searched by any related word, in English or Chinese ("ball" finds Softball and Baseball).
 - Address suggestions have been built behind a switch that is off, so nothing changes in the app yet. Once turned on, location and address fields will suggest places from Google Maps while typing, keep the unit or room detail typed, and open the exact place on the map. The activity field will become "Location or Link" and show a video call link as Join Call, with a button to copy the link. A pod manager will be able to turn it off in Settings.
@@ -23,6 +26,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- The scrapbook on the Beanie Wall now opens from the bottom right corner, where the icon and the beanies.family name are one button. Faces on the Choreboard open stars instead.
 - Quick Add now asks for the description before the category, so the category can be guessed from it.
 - Coupon codes can now be entered at checkout on every plan, beanies basic or magic beans, monthly or yearly (previously monthly magic beans only).
 - The v1 launch offer is now 20% off your first year on any plan, instead of 20% off the first three months of monthly magic beans.

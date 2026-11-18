@@ -96,6 +96,35 @@ describe('the scrapbook button', () => {
       false
     );
   });
+
+  it('one door: with the scrapbook on, the wordmark is inside the scrapbook button', () => {
+    const memories = {
+      enabled: computed(() => true),
+      opensOnTap: () => false,
+      open: vi.fn(),
+    } as unknown as WallMemoriesContext;
+    const w = mount(WallFooter, {
+      props: { focused: [] },
+      global: {
+        stubs: { BeanieAvatar: true },
+        provide: { [WALL_MEMORIES as symbol]: memories },
+      },
+    });
+
+    const button = w.find('[data-test="wall-scrapbook-button"]');
+    expect(button.find('[data-test="wall-brand"]').exists()).toBe(true);
+    expect(w.findAll('[data-test="wall-brand"]')).toHaveLength(1);
+    expect(button.attributes('aria-label')).toBe('wall.memories.open');
+  });
+
+  it('with the scrapbook off: the wordmark is plain, not a button', () => {
+    const w = mountFooter([]);
+    const brand = w.find('[data-test="wall-brand"]');
+    expect(brand.exists()).toBe(true);
+    expect(brand.text()).toBe('beanies.family');
+    expect(brand.element.closest('button')).toBeNull();
+    expect(w.find('[data-test="wall-scrapbook-button"]').exists()).toBe(false);
+  });
 });
 
 describe('what a tap asks for', () => {
