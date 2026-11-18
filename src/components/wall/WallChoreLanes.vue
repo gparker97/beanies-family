@@ -40,12 +40,12 @@
  * and a quiet `StarCount` at the end of the name row, spoken as this week's stars or the stars
  * saved up (the arc's `kind`). The header is a size container, so the count drops out before the
  * name truncates on a narrow lane. With `lane.stars` absent the avatar is drawn alone. Every lane
- * drawn is a banner host for its bean (`useRewardBannerHost`), so the weekly reward's achieved
- * banner is claimed while the lane is on screen, whoever ticked the week past the bar; while
- * `rewardBannerFor(member)` is set, the existing `CelebrationBanner` (compact) plays once at the
- * top of the lane body ("Ice Cream earned!"), nothing to press, and the reward's picture bursts
- * up over the lane with a shower of stars (`RewardBurst`, not under reduced motion). The green
- * all-done ring is untouched.
+ * drawn is a banner host for its bean (`useRewardBannerHost`) while nothing covers it (`covered`),
+ * so the weekly reward's achieved banner is claimed while the lane can be seen, whoever ticked
+ * the week past the bar; while `rewardBannerFor(member)` is set, the existing
+ * `CelebrationBanner` (compact) plays once at the top of the lane body ("Ice Cream earned!"),
+ * nothing to press, and the reward's picture bursts up over the lane with a shower of stars
+ * (`RewardBurst`, not under reduced motion). The green all-done ring is untouched.
  *
  * The head (#154): every bean's avatar is a button that opens their stars sheet, through the
  * page's existing `open` (`{ kind: 'stars', memberId }`), whatever the scrapbook setting.
@@ -109,6 +109,11 @@ const props = defineProps<{
   peripherals: WallPeripheralData;
   isPending: (job: WallJob) => boolean;
   backLabel: string;
+  /**
+   * Something covers the lanes (the night screen, an open sheet, the scrapbook viewer): they
+   * stay mounted but cannot be seen, so they host no reward banner meanwhile.
+   */
+  covered?: boolean;
 }>();
 const emit = defineEmits<{
   toggle: [WallJob, ChoreCelebrationAnchor | null];
@@ -168,8 +173,12 @@ const lanes = computed(() => {
   return built;
 });
 
-/** Every lane drawn hosts its bean's achieved banner (the store ignores a grown-up or a pet). */
-useRewardBannerHost(() => lanes.value.map((l) => l.member.id), 'wall');
+/**
+ * Every lane drawn hosts its bean's achieved banner while it can be seen (the store ignores a
+ * grown-up or a pet). Covered, it hosts none, so the once-only claim is never spent unseen; it
+ * hosts again once uncovered, which re-triggers a claim still owed.
+ */
+useRewardBannerHost(() => (props.covered ? [] : lanes.value.map((l) => l.member.id)), 'wall');
 
 const progress = computed(() => choreProgress(lanes.value.map((a) => a.lane)));
 const progressText = computed(() => wallChoreProgressText(progress.value, t));

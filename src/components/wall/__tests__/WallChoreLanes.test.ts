@@ -103,7 +103,7 @@ function lane(memberId: string, blocks: WallChoreBlock[]): WallChoreLane {
 
 function mountLanes(
   lanes: Record<string, WallChoreLane | null> | null,
-  opts: { unlocked?: boolean; edit?: Partial<WallEditContext> } = {}
+  opts: { unlocked?: boolean; edit?: Partial<WallEditContext>; covered?: boolean } = {}
 ) {
   const peripherals: WallPeripheralData = {
     todosFor: () => [],
@@ -115,7 +115,7 @@ function mountLanes(
     ...(lanes ? { choreLaneFor: (id: string) => lanes[id] ?? null } : {}),
   };
   return mount(WallChoreLanes, {
-    props: { peripherals, isPending: () => false, backLabel: 'week' },
+    props: { peripherals, isPending: () => false, backLabel: 'week', covered: opts.covered },
     global: {
       stubs: { BeanieAvatar: true, WallJobList: true },
       provide: opts.unlocked
@@ -512,6 +512,17 @@ describe('WallChoreLanes: stars', () => {
     expect(hosts).toEqual([]);
   });
 
+  it('covered (asleep, a sheet, the scrapbook viewer) the lanes host nothing; uncovered they host again (#154)', async () => {
+    hosts.length = 0;
+    const w = mountLanes({ pip: pipMorning(), juno: pipMorning() }, { covered: true });
+    expect(hosts).toEqual([]);
+    await w.setProps({ covered: false });
+    expect(hosts).toEqual(['pip:wall', 'juno:wall']);
+    await w.setProps({ covered: true });
+    expect(hosts).toEqual([]);
+    w.unmount();
+  });
+
   it("the achieved moment: the banner at the top of that child's lane, nothing to press", async () => {
     vi.useFakeTimers();
     try {
@@ -526,6 +537,7 @@ describe('WallChoreLanes: stars', () => {
         beanName: 'Pip',
         title: 'Ice cream',
         emoji: '🍦',
+        ticksSettled: async () => {},
         stillClaimable: () => true,
         claim: async () => true,
       });

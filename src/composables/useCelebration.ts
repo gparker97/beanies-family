@@ -399,9 +399,9 @@ export function releaseChoreBlock(memberId: string, block: ChoreBlock): void {
  * after another device's tick, whose mark is being written) until it has started (it is then in
  * `activeChores`) or will not (a failed or refused write, a block not done after all, a mark
  * another device wrote). Unlike a hold this is about the CELEBRATION, not the rows, so it is set
- * with or without an anchor. Read only by the weekly reward's wait (`choreCelebrating`), so a
- * reward never starts under a block celebration about to begin. Each entry has its own safety
- * release, so a write that never settles cannot hold the reward back for ever.
+ * with or without an anchor. Read only by the weekly reward's wait before its claim
+ * (`waitToClaim`), so a reward is never claimed under a block celebration about to begin. Each
+ * entry has its own safety release, so a write that never settles cannot hold it back for ever.
  */
 const expectedChores = shallowRef<
   ReadonlyMap<string, { memberId: string; timer: ReturnType<typeof setTimeout> }>
@@ -426,8 +426,8 @@ export function expectChoreCelebration(memberId: string, block: ChoreBlock): voi
 /**
  * When each bean last ticked or unticked a chore on this device (`performance.now()`), recorded
  * by the chore store at every tick (`noteChoreTick`). Read only by the weekly reward's quiet
- * period (`REWARD_TICK_QUIET_MS`): a child tapping through a list gets the block celebration
- * first and the reward right after it, never the reward under the next tap.
+ * period before its claim (`REWARD_TICK_QUIET_MS`): a child tapping through a list gets the
+ * block celebration first and the reward right after it, never the reward under the next tap.
  */
 const lastTickAt = new Map<string, number>();
 
@@ -610,7 +610,6 @@ export function celebrateChore(req: ChoreCelebrationRequest): string | null {
     endsAt,
   });
   activeChores.value = next;
-  cutRewardBanner(req.memberId, req.block);
   const timers: ReturnType<typeof setTimeout>[] = [];
   if (!calm && !req.settled) timers.push(setTimeout(() => arriveBanner(key), BEATS.swap));
   timers.push(setTimeout(() => dismissChoreCelebration(key), endsAt));
@@ -672,7 +671,7 @@ export function choreBannerCelebration(
   return value;
 }
 
-// ── The weekly reward's achieved banner (#148) ──────────────────────────────
+// ── The weekly reward's achieved banner (#148, #154) ────────────────────────
 
 /**
  * How long the "Ice Cream earned!" banner stays up, so the burst (`RewardBurst`) and the sound
@@ -682,33 +681,12 @@ export const REWARD_BANNER_MS = 6000;
 /** How long the weekly reward's burst (`RewardBurst`) plays, well inside the banner. */
 export const REWARD_BURST_MS = 2600;
 /**
- * The longest any one reward wait lasts: the claim's whole wait (behind that child's block
- * celebrations, expected or playing, and the quiet period after their ticks), and, on its own,
- * each showing's wait behind a block celebration (`showReward`). An expected one ends within
- * `CHORE_HOLD_SAFETY_MS` (its safety release) and a playing one on its own timer (`BEATS.done`),
- * so this is only a bound against a stuck one.
+ * The one deadline on the wait before the claim. A block celebration ends on its own timers, so
+ * this only bounds a stuck one, a write that never lands, or a child who never stops ticking.
  */
 export const REWARD_BANNER_WAIT_MAX_MS = CHORE_HOLD_SAFETY_MS + BEATS.done + 1000;
-/**
- * Before the claim, the child must not have ticked for this long (and no block celebration of
- * theirs may be playing or expected): taps about a second apart are one burst. Bounded, with the
- * waits behind block celebrations, by `REWARD_BANNER_WAIT_MAX_MS` in all.
- */
+/** Before the claim, no tick or untick for this long: taps about a second apart are one burst. */
 export const REWARD_TICK_QUIET_MS = 1500;
-
-/**
- * What one showing of a claimed reward did (`showReward`), reported through `onShow`:
- *  - `shown`: at once after the claim;
- *  - `shown-after-wait`: after waiting behind a block celebration of that child (before the
- *    claim, or one that a tick started while the mark was being written);
- *  - `resumed-after-cut`: shown again, in full, once the block celebration that cut it ended;
- *  - `cut`: taken down, or its wait ended (the child's banner state cleared: a reset, a newer
- *    claim of that child), and not shown again;
- *  - `skipped-no-host`: no banner host for the child was mounted at the showing, so nothing was
- *    shown or heard. The mark is written, so the week never replays.
- */
-export type RewardShowAction =
-  'shown' | 'shown-after-wait' | 'resumed-after-cut' | 'cut' | 'skipped-no-host';
 
 export interface RewardCelebrationRequest {
   memberId: string;
@@ -718,26 +696,21 @@ export interface RewardCelebrationRequest {
   title: string;
   emoji: string;
   /**
+   * Resolves once this device's ticks of the child are written (`choreStore.whenTicksSettled`),
+   * awaited at each pass of the wait: a tick's celebration has started, an untick has landed.
+   */
+  ticksSettled: () => Promise<void>;
+  /**
    * Is the claim still wanted (the store's re-check: the same week, still at or above the bar,
-   * not marked, and a banner host for the child still mounted)? Asked once every wait has ended,
-   * right before `claim` (the `stillDone` pattern): an untick below the bar, or leaving the
-   * child's day or lane, meanwhile plays nothing and claims nothing.
+   * not marked, and a banner host for the child on screen)? Asked once, after every wait and
+   * right before `claim` (the `stillDone` pattern).
    */
   stillClaimable: () => boolean;
   /**
-   * Claim the week's once-only celebration (the store writes its `reward` mark). Called only
-   * after every wait and `stillClaimable`; nothing waits between its answer and the showing's
-   * host check, and the banner shows only when it answers `true`.
+   * Claim the week's once-only celebration (the store writes its `reward` mark). The banner
+   * shows at once when it answers `true`, and not at all otherwise.
    */
   claim: () => Promise<boolean>;
-  /**
-   * Is a banner host for the child mounted now? The one part of `stillClaimable` asked again at
-   * each showing (the claim's, and the resume after a cut); with none, nothing is shown or heard.
-   * Absent: always hosted (a caller that draws the banner itself, a test).
-   */
-  hasHost?: () => boolean;
-  /** Told what each showing did, as it happens (the store logs it). */
-  onShow?: (action: RewardShowAction) => void;
 }
 
 /** A reward banner showing now, for one child. */
@@ -757,65 +730,35 @@ export interface ActiveRewardBanner {
 }
 
 /**
- * What `celebrateReward` did: the first showing's action (never `resumed-after-cut`), or nothing
- * claimed because the claim was no longer wanted (`dropped`: `stillClaimable` said no) or because
- * `claim` said no (`claimed-elsewhere`: another device celebrated it first).
+ * What `celebrateReward` did: shown at once (`shown`) or after waiting behind a block
+ * celebration of the child (`shown-after-wait`); or nothing claimed and nothing shown, because
+ * a tick write was still pending at the deadline (`unsettled`), the claim was no longer wanted
+ * (`dropped`), or another device claimed it first (`claimed-elsewhere`).
  */
-export type RewardBannerOutcome = RewardShowAction | 'dropped' | 'claimed-elsewhere';
+export type RewardBannerOutcome =
+  'shown' | 'shown-after-wait' | 'unsettled' | 'dropped' | 'claimed-elsewhere';
 
 /** Every reward banner showing now, by member id. Replaced, never mutated. */
 const rewardBanners = shallowRef<ReadonlyMap<string, ActiveRewardBanner>>(new Map());
 const rewardTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-/**
- * A claimed reward whose celebration is not over yet, by member id: from the claim until its
- * banner ends on its timer, or it is skipped or cut for good. It holds the request (for the
- * resume), whether the one resume after a cut is spent, and the showing's wait in flight, so
- * clearing the child's banner state (`dismissRewardBanner`) ends that wait at once. One per
- * child: a newer claim of that child replaces it.
- */
-interface RewardShowing {
-  req: RewardCelebrationRequest;
-  resumed: boolean;
-  wait: AbortController | null;
-}
-const rewardShowings = new Map<string, RewardShowing>();
 
 /** The banner a surface shows at the top of this child's lane or day, or `null`. */
 export function rewardBannerFor(memberId: string): ActiveRewardBanner | null {
   return rewardBanners.value.get(memberId) ?? null;
 }
 
-/** Take these children's banners (and their timers) down, leaving their showings alone. */
-function takeDownBanners(ids: Iterable<string>): void {
-  let next: Map<string, ActiveRewardBanner> | null = null;
+/** Take a child's reward banner down (its timer), or every one (no id). */
+function dismissRewardBanner(memberId?: string): void {
+  const ids = memberId === undefined ? [...rewardBanners.value.keys()] : [memberId];
+  if (!ids.some((id) => rewardBanners.value.has(id))) return;
+  const next = new Map(rewardBanners.value);
   for (const id of ids) {
     const timer = rewardTimers.get(id);
     if (timer !== undefined) clearTimeout(timer);
     rewardTimers.delete(id);
-    if (!rewardBanners.value.has(id)) continue;
-    next ??= new Map(rewardBanners.value);
     next.delete(id);
   }
-  if (next) rewardBanners.value = next;
-}
-
-/**
- * Clear a child's reward banner state (its timer, a newer claim), or every child's (no id: a
- * reset): the banner goes, and so does its showing, so a pending resume or a showing's wait ends
- * now (that showing reports `cut`) and nothing stale shows later.
- */
-export function dismissRewardBanner(memberId?: string): void {
-  const ids =
-    memberId === undefined
-      ? new Set([...rewardBanners.value.keys(), ...rewardShowings.keys()])
-      : [memberId];
-  for (const id of ids) {
-    const showing = rewardShowings.get(id);
-    rewardShowings.delete(id);
-    showing?.wait?.abort();
-  }
-  takeDownBanners(ids);
+  rewardBanners.value = next;
 }
 
 /** Is a block celebration of this child's playing now, or expected to start (`expectedChores`)? */
@@ -823,67 +766,76 @@ const choreCelebrating = (memberId: string) =>
   [...activeChores.value.values()].some((c) => c.memberId === memberId) ||
   [...expectedChores.value.values()].some((c) => c.memberId === memberId);
 
-/**
- * When a block celebration of this child is playing or expected, wait until none is, the
- * `deadline` (a `performance.now()` time) or `signal`'s abort, whichever is first; the watcher,
- * the timer and the abort listener all go on that one exit. Resolves whether it waited.
- */
-function waitForChoreCelebration(
-  memberId: string,
-  deadline: number,
-  signal?: AbortSignal
-): Promise<boolean> {
-  if (!choreCelebrating(memberId)) return Promise.resolve(false);
-  return new Promise((resolve) => {
-    let stop: (() => void) | null = null;
-    const timer = setTimeout(done, Math.max(0, deadline - performance.now()));
-    signal?.addEventListener('abort', done, { once: true });
-    function done(): void {
-      clearTimeout(timer);
-      stop?.();
-      signal?.removeEventListener('abort', done);
-      resolve(true);
-    }
-    // Both maps: an expected celebration hands over to a playing one within one synchronous
-    // step (`celebrateChore`, then the store's `endChoreCelebrationExpected`), never a gap.
-    stop = watch(
-      [activeChores, expectedChores],
-      () => {
-        if (!choreCelebrating(memberId)) done();
-      },
-      { flush: 'sync' }
-    );
+/** Resolves `true` once `settle` does, or `false` at the `deadline` (a write that never lands). */
+function settledBy(settle: Promise<void>, deadline: number): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(false), Math.max(0, deadline - performance.now()));
+    void settle.then(() => resolve(true), reject).finally(() => clearTimeout(timer));
   });
 }
 
 /**
- * Before the CLAIM: wait until no block celebration of this child is playing or expected AND the
- * child has not ticked for `REWARD_TICK_QUIET_MS`, re-checking both after every wait, until the
- * `deadline`. Resolves whether it waited behind a block celebration.
+ * Wait until the child has been quiet for `REWARD_TICK_QUIET_MS` and no block celebration of
+ * theirs is playing or expected, or the `deadline`. One watcher and one timer, both gone on its
+ * one exit. Resolves whether it waited behind a block celebration.
  */
-async function waitToClaim(memberId: string, deadline: number): Promise<boolean> {
-  let waited = false;
-  while (performance.now() < deadline) {
-    if (await waitForChoreCelebration(memberId, deadline)) {
-      waited = true;
-      continue;
+function waitToClaim(memberId: string, deadline: number): Promise<boolean> {
+  let behind = false;
+  return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Both maps: an expected celebration hands over to a playing one within one synchronous
+    // step (`celebrateChore`, then the store's `endChoreCelebrationExpected`), never a gap.
+    const stop = watch([activeChores, expectedChores], check, { flush: 'sync' });
+    check();
+    function check(): void {
+      clearTimeout(timer);
+      const now = performance.now();
+      const celebrating = choreCelebrating(memberId);
+      if (celebrating) behind = true;
+      const quietAt = (lastTickAt.get(memberId) ?? Number.NEGATIVE_INFINITY) + REWARD_TICK_QUIET_MS;
+      if (now >= deadline || (!celebrating && now >= quietAt)) {
+        stop();
+        resolve(behind);
+        return;
+      }
+      timer = setTimeout(check, (celebrating ? deadline : Math.min(quietAt, deadline)) - now);
     }
-    const quiet =
-      (lastTickAt.get(memberId) ?? Number.NEGATIVE_INFINITY) +
-      REWARD_TICK_QUIET_MS -
-      performance.now();
-    if (quiet <= 0) break;
-    await new Promise((resolve) =>
-      setTimeout(resolve, Math.min(quiet, deadline - performance.now()))
-    );
-  }
-  return waited;
+  });
 }
 
-/** Put the child's banner up (its timer, a celebration sound), replacing any it has. */
-function putRewardBanner(req: RewardCelebrationRequest): void {
+/**
+ * Celebrate the weekly reward for a child (#148, #154). Called only by the star store's claim
+ * (`claimReward`). ALL the waiting happens before the claim, under ONE deadline
+ * (`REWARD_BANNER_WAIT_MAX_MS`); nothing waits after it:
+ *  1. passes of: `ticksSettled()` (this device's ticks of the child written), then `waitToClaim`
+ *     (quiet for `REWARD_TICK_QUIET_MS`, no block celebration of theirs playing or expected),
+ *     until a pass ends with no tick since it began and nothing playing or expected. At the
+ *     deadline: a write still pending ends it (`unsettled`, retried on the store's next
+ *     recompute); ticks settled but never quiet go on to the claim;
+ *  2. `stillClaimable()`; if it says no, stop: nothing claimed, nothing shown;
+ *  3. `claim()` (the store's once-only mark); if it says no, stop;
+ *  4. show at once: the banner, its burst (drawn by the host unless `calm`) and the sound.
+ *
+ * The accepted overlap: a block celebration that starts while the banner is up (a finishing
+ * tick more than `REWARD_TICK_QUIET_MS` after the bar was reached and within the banner's
+ * `REWARD_BANNER_MS`) simply plays beside it; neither touches the other. The timers live here,
+ * not in a component. The store logs the outcome; the sound's own events carry `kind: 'reward'`.
+ */
+export async function celebrateReward(req: RewardCelebrationRequest): Promise<RewardBannerOutcome> {
   const id = req.memberId;
-  takeDownBanners([id]);
+  const deadline = performance.now() + REWARD_BANNER_WAIT_MAX_MS;
+  let waited = false;
+  for (;;) {
+    const passStart = performance.now();
+    if (!(await settledBy(req.ticksSettled(), deadline))) return 'unsettled';
+    if (performance.now() >= deadline) break; // settled, but never quiet: claim anyway
+    if (await waitToClaim(id, deadline)) waited = true;
+    const tickedSince = (lastTickAt.get(id) ?? Number.NEGATIVE_INFINITY) >= passStart;
+    if (!tickedSince && !choreCelebrating(id)) break;
+  }
+  if (!req.stillClaimable()) return 'dropped';
+  if (!(await req.claim())) return 'claimed-elsewhere';
+  dismissRewardBanner(id);
   rewardBanners.value = new Map(rewardBanners.value).set(id, {
     id: nextId++,
     memberId: id,
@@ -903,123 +855,7 @@ function putRewardBanner(req: RewardCelebrationRequest): void {
   // sound started within the gap (then `sound-skipped`, `kind: 'reward'`). Follows the device's
   // sound setting like every celebration sound.
   playSoundFor(`reward:${id}`, pickChoreSound(readRecentSounds()), 'reward');
-}
-
-/**
- * Show a claimed reward: the one step after the claim and for the resume after a cut. (a) While
- * a block celebration of that child is playing or expected (a tick that landed while the mark
- * was being written; on a resume, the one that cut it), wait for it to end, bounded by
- * `REWARD_BANNER_WAIT_MAX_MS`, and ended early by `dismissRewardBanner` (then `cut`). (b) With
- * no banner host for the child mounted, show nothing (`skipped-no-host`). (c) Otherwise the
- * banner, its burst (drawn by the host unless `calm`) and the sound. The bar and the mark are
- * NOT asked again: the claim settled those. Reports and resolves what it did.
- */
-async function showReward(
-  showing: RewardShowing,
-  waitedBefore: boolean
-): Promise<RewardShowAction> {
-  const { req } = showing;
-  const resuming = showing.resumed;
-  let waited = waitedBefore;
-  if (choreCelebrating(req.memberId)) {
-    const wait = new AbortController();
-    showing.wait = wait;
-    await waitForChoreCelebration(
-      req.memberId,
-      performance.now() + REWARD_BANNER_WAIT_MAX_MS,
-      wait.signal
-    );
-    showing.wait = null;
-    if (wait.signal.aborted) return reportShow(req, 'cut');
-    waited = true;
-  }
-  if (req.hasHost && !req.hasHost()) {
-    if (rewardShowings.get(req.memberId) === showing) rewardShowings.delete(req.memberId);
-    return reportShow(req, 'skipped-no-host');
-  }
-  putRewardBanner(req);
-  return reportShow(req, resuming ? 'resumed-after-cut' : waited ? 'shown-after-wait' : 'shown');
-}
-
-function reportShow(req: RewardCelebrationRequest, action: RewardShowAction): RewardShowAction {
-  req.onShow?.(action);
-  return action;
-}
-
-/**
- * A block celebration of this child started while their reward banner is up: the block
- * celebration takes over (a tick gets its feedback at once). The banner and its burst go now; a
- * reward sound still waiting to start never starts. The first cut of a claim RESUMES it: once
- * that block celebration (and any other of the child's) has ended, `showReward` plays the banner
- * again in full. A second cut ends it (`cut`), so two can never ping-pong.
- */
-function cutRewardBanner(memberId: string, block: ChoreBlock): void {
-  if (!rewardBanners.value.has(memberId)) return;
-  const owner = `reward:${memberId}`;
-  if (soundOwner === owner) {
-    cancelChoreCelebrationSound();
-    soundOwner = null;
-  }
-  takeDownBanners([memberId]);
-  const showing = rewardShowings.get(memberId);
-  const resume = !!showing && !showing.resumed;
-  logEvent({
-    level: 'info',
-    surface: CHORE_CELEBRATION_SURFACE,
-    message: resume
-      ? 'reward banner cut by a block celebration of the same child; it resumes after it'
-      : 'reward banner cut by a block celebration of the same child; already resumed, it ends',
-    context: { action: 'reward-banner-cut', slot: block, stage: resume ? 'resume' : 'final' },
-  });
-  if (!showing) return;
-  if (!resume) {
-    rewardShowings.delete(memberId);
-    reportShow(showing.req, 'cut');
-    return;
-  }
-  showing.resumed = true;
-  showReward(showing, false).catch((error: unknown) => {
-    if (rewardShowings.get(memberId) === showing) rewardShowings.delete(memberId);
-    reportError({
-      surface: CHORE_CELEBRATION_SURFACE,
-      message: 'the weekly reward banner could not resume after a block celebration cut it',
-      severity: 'warning',
-      error,
-      context: { action: 'reward-resume-failed', kind: 'reward' },
-    });
-  });
-}
-
-/**
- * Celebrate the weekly reward for a child (#148, #154). Called only by the star store's claim
- * (`claimReward`), which runs while a banner host for the child is mounted, after this device's
- * ticks of that child have settled. In this order, with ALL the waiting before the claim:
- *  1. wait until no block celebration of that child is playing or expected (`expectedChores`)
- *     AND the child has not ticked for `REWARD_TICK_QUIET_MS`, bounded by one deadline
- *     (`waitToClaim`);
- *  2. ask `stillClaimable()`, and stop if the claim is no longer wanted (an untick below the
- *     bar, the child's day or lane left meanwhile: nothing claimed, so it plays the next time it
- *     holds);
- *  3. `claim()` (the store's once-only mark), and stop unless it says `true`;
- *  4. show it (`showReward`): behind a block celebration a tick started while the mark was being
- *     written, then only if a banner host for the child is still mounted.
- * A block celebration starting while the banner is up cuts it and it resumes once after
- * (`cutRewardBanner`). The host draws the burst (`RewardBurst`) beside the banner unless
- * `calm`. Once per child per week. The timers live here, not in a component. The outcomes are
- * the store's to log: each showing is reported through `onShow`, and the sound's own events
- * carry `kind: 'reward'`.
- */
-export async function celebrateReward(req: RewardCelebrationRequest): Promise<RewardBannerOutcome> {
-  // ONE bound for the claim's whole wait, so it always claims (or drops) in the end.
-  const deadline = performance.now() + REWARD_BANNER_WAIT_MAX_MS;
-  const waited = await waitToClaim(req.memberId, deadline);
-  if (!req.stillClaimable()) return 'dropped';
-  if (!(await req.claim())) return 'claimed-elsewhere';
-  // Claimed: the week is this child's now. Straight on to the showing, which asks only the host.
-  dismissRewardBanner(req.memberId);
-  const showing: RewardShowing = { req, resumed: false, wait: null };
-  rewardShowings.set(req.memberId, showing);
-  return showReward(showing, waited);
+  return waited ? 'shown-after-wait' : 'shown';
 }
 
 /** Tests only: forget the rotation memory, the sound window, holds and every celebration. */

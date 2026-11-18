@@ -501,7 +501,7 @@ export const useChoreStore = defineStore('chores', () => {
       return { action: 'refused', detail: 'in-flight' };
     }
 
-    // Every tick and untick that passed the guards, at the tap: the weekly reward's banner shows
+    // Every tick and untick that passed the guards, at the tap: the weekly reward is claimed
     // only once the bean has stopped ticking for a moment (#154).
     noteChoreTick(memberId);
     const block = choreBlockOf(chore);
@@ -539,7 +539,7 @@ export const useChoreStore = defineStore('chores', () => {
     const predicted = !!completed && finish.celebrates;
     if (predicted) {
       celebrating.add(latch);
-      // The weekly reward's banner waits behind an expected celebration too (#154).
+      // The weekly reward's claim waits behind an expected celebration too (#154).
       expectChoreCelebration(memberId, block);
       if (opts.anchor) holdChoreBlock(memberId, block);
     }

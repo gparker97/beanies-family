@@ -964,6 +964,15 @@ function openSheet(target: WallSheetTarget) {
   sheet.value = target;
 }
 
+/**
+ * The current view is mounted but cannot be seen: under the night screen, an open sheet, the
+ * scrapbook viewer or the "leaving the wall" screen. The chore lanes host no reward banner
+ * meanwhile (#154).
+ */
+const viewCovered = computed(
+  () => nightNow.value || sheet.value !== null || memories.isOpen.value || isExiting.value
+);
+
 /** A view switch must not leave a sheet from the previous view floating. */
 watch(activeView, () => (sheet.value = null));
 
@@ -1255,6 +1264,7 @@ watch(
         :back-label="backLabel"
         :can-go-back="canGoBack"
         :board-title="choreboardOn ? t('wall.card.lists') : undefined"
+        :covered="viewCovered"
         @toggle="onToggle"
         @back="onGoBack"
         @open-day="onOpenDay"

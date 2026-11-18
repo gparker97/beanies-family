@@ -1010,6 +1010,7 @@ describe('stars and rewards', () => {
         beanName: 'Pip',
         title: 'Ice cream',
         emoji: '🍦',
+        ticksSettled: async () => {},
         stillClaimable: () => true,
         claim: async () => true,
       });

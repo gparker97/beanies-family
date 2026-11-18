@@ -197,3 +197,29 @@ describe('BeanieWallPage: a view-only event opens read-only details', () => {
     w.unmount();
   });
 });
+
+describe('BeanieWallPage: the chore lanes are covered under the night screen, a sheet or the leaving screen (#154)', () => {
+  it('WallChoreLanes gets covered while one is up, so it hosts no reward banner', async () => {
+    const w = mountPage();
+    await settle();
+    await selectView(w, 'chores');
+    const covered = () => w.findComponent({ name: 'WallChoreLanes' }).props('covered');
+    expect(covered()).toBe(false);
+    w.findComponent({ name: 'WallChoreLanes' }).vm.$emit('open', { kind: 'stars', memberId: 'm1' });
+    await settle();
+    expect(covered()).toBe(true);
+    w.findComponent({ name: 'WallSheet' }).vm.$emit('close');
+    await settle();
+    expect(covered()).toBe(false);
+    w.findComponent({ name: 'WallNightButton' }).vm.$emit('nightNow');
+    await settle();
+    expect(covered()).toBe(true);
+    w.findComponent({ name: 'WallNightScreen' }).vm.$emit('wake');
+    await settle();
+    expect(covered()).toBe(false);
+    w.findComponent({ name: 'WallLockMenu' }).vm.$emit('leave');
+    await settle();
+    expect(covered()).toBe(true);
+    w.unmount();
+  });
+});

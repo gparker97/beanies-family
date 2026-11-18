@@ -639,22 +639,28 @@ export const useStarStore = defineStore('stars', () => {
    * (`ChoreboardPage`), each registered through `useRewardBannerHost`. Whenever a host is
    * mounted for a kid whose current week has reached the weekly reward's bar and has no `reward`
    * mark (on mount, and whenever that becomes true: a tick on any device or surface, a bonus, a
-   * sync, the stores becoming authoritative), the ONE claim sequence runs (`claimReward`):
-   *  1. wait for any tick of that kid still being written on this device to settle
-   *     (`choreStore.whenTicksSettled`), so a block celebration it starts has started;
-   *  2. wait for that kid's block celebration to end and for the kid to stop ticking for a
-   *     moment, bounded (`celebrateReward`: ALL its waiting is before the claim);
-   *  3. ask again: still the same week, still at or above the bar, still not marked, and a host
-   *     for that kid still mounted. If not, nothing is written and nothing plays; the next time
-   *     it holds (a re-tick, the host mounted again) the sequence runs again;
-   *  4. write the once-only mark (`ifAbsent`) and show the banner only if THIS write created it.
-   *     A failed write still shows it on this device, once (`shownUnmarked`), and the mark is
-   *     retried silently ONCE, the next time the claim runs this session (`markRetried`); a
-   *     second failure leaves that kid-week alone until the next app session. A mark another
-   *     device wrote first shows nothing. The claim is logged at that write (`reward-achieved`);
-   *     the showing after it asks only whether a host is still mounted (none: nothing shown,
-   *     `skipped-no-host`) and is logged as it happens (`reward-banner`, by `action`), as is the
-   *     one resume after a block celebration cut it.
+   * sync, the stores becoming authoritative), the ONE claim sequence runs (`claimReward`, through
+   * `celebrateReward`, which holds the order: ALL the waiting is before the claim, none after):
+   *  1. under ONE deadline, repeat until a pass ends with no tick since it began: wait for this
+   *     device's ticks of that kid to settle (`choreStore.whenTicksSettled`), then until the kid
+   *     has not ticked or unticked for a moment and no block celebration of theirs is playing or
+   *     expected. A write still pending at the deadline claims nothing (`ticks-unsettled`; the
+   *     next recompute retries); a kid who never goes quiet is claimed at the deadline;
+   *  2. ask again: still the same week, still at or above the bar, still not marked, and a host
+   *     for that kid on screen. If not, nothing is written and nothing plays; the next time it
+   *     holds (a re-tick, the host on screen again) the sequence runs again;
+   *  3. write the once-only mark (`ifAbsent`), logged at the write (`reward-achieved`). A mark
+   *     another device wrote first shows nothing;
+   *  4. show the banner at once, logged as `reward-banner` (`shown`, or `shown-after-wait` when
+   *     it waited behind a block celebration). A failed mark write still shows it on this
+   *     device, once (`shownUnmarked`, latched at the failed write), and the mark is retried
+   *     silently ONCE, the next time the claim runs this session (`markRetried`); a second
+   *     failure leaves that kid-week alone until the next app session.
+   * A block celebration that starts while the banner is up simply plays beside it (a finishing
+   * tick after the quiet period and within the banner's 6 s): the accepted, rare overlap.
+   * A host reports itself only while the banner can be seen: the wall's lanes stop hosting
+   * under the night screen, an open sheet or the scrapbook viewer, so the claim is never spent
+   * unseen, and they host again (re-triggering the claim) once uncovered.
    * So: a device with no host mounted claims nothing; a marked week never replays; a grown-up's
    * tick on the Chores view's home cards plays it the next time the child's day or lane is on
    * screen. Two hosts on one device make one claim (one key in flight). Two devices each with a
@@ -712,7 +718,6 @@ export const useStarStore = defineStore('stars', () => {
   interface RewardClaim {
     memberId: string;
     weekStart: string;
-    surface: RewardBannerSurface;
   }
 
   /** The hosted kids whose current week is achieved and not marked: what is owed a claim. */
@@ -721,12 +726,12 @@ export const useStarStore = defineStore('stars', () => {
     if (!storesAuthoritative.value) return [];
     const out: RewardClaim[] = [];
     const seen = new Set<string>();
-    for (const { memberId, surface } of hosts.value.values()) {
+    for (const { memberId } of hosts.value.values()) {
       if (seen.has(memberId) || !earnerSet.value.has(memberId)) continue;
       seen.add(memberId);
       const week = weekFor(memberId);
       if (!week || !weeklyAchieved(week) || isMarked(memberId, week.weekStart)) continue;
-      out.push({ memberId, weekStart: week.weekStart, surface });
+      out.push({ memberId, weekStart: week.weekStart });
     }
     // Read-only: claim nothing (the mark write would be refused). Asked only when something is
     // owed; the gate's verdict is reactive, so the claim runs once the family is writable again.
@@ -761,7 +766,7 @@ export const useStarStore = defineStore('stars', () => {
   );
 
   /** The claim sequence (THE RULE above, steps 1 to 4). Never throws. */
-  async function claimReward({ memberId, weekStart, surface }: RewardClaim): Promise<void> {
+  async function claimReward({ memberId, weekStart }: RewardClaim): Promise<void> {
     const key = `${memberId}:${weekStart}`;
     if (rewarding.has(key)) return;
     rewarding.add(key);
@@ -776,16 +781,18 @@ export const useStarStore = defineStore('stars', () => {
         if ((await writeMark()) !== 'failed') shownUnmarked.delete(key);
         return;
       }
-      await choreStore.whenTicksSettled(memberId);
-      const hosted = () => hostOf(memberId) !== null;
       const child = familyStore.members.find((m) => m.id === memberId);
+      /** The surface hosting the kid at the last re-check: the one every event names. */
+      let hostedOn: RewardBannerSurface | null = null;
       const result = await celebrateReward({
         memberId,
         beanName: firstName(child?.name),
         title: rewards.value.title ?? '',
         emoji: rewards.value.emoji ?? '',
+        ticksSettled: () => choreStore.whenTicksSettled(memberId),
         stillClaimable: () => {
-          if (!hosted() || isMarked(memberId, weekStart)) return false;
+          hostedOn = hostOf(memberId);
+          if (hostedOn === null || isMarked(memberId, weekStart)) return false;
           // Turned read-only during the wait: no write (and no gate toast); claimed once writable.
           if (readWriteGate()?.block) return false;
           const now = weekFor(memberId);
@@ -793,36 +800,32 @@ export const useStarStore = defineStore('stars', () => {
         },
         claim: async () => {
           const mark = await writeMark();
-          // Logged HERE, at the mark write's outcome, so a tab closed or a wall asleep before
-          // the showing still leaves the claim on record. `exists` was another device's.
+          // `exists` was another device's.
           if (mark === 'exists') {
             log('info', 'achieved-banner', { detail: 'skipped-exists' });
             return false;
           }
           // `failed` (reported by the chore store, `celebrate-mark-failed`, slot `reward`) still
-          // shows here, once.
+          // shows here, once: latched now, as the showing follows this answer directly.
           if (mark === 'failed') shownUnmarked.add(key);
+          // Logged HERE, at the mark write's outcome, so the claim is on record however the
+          // showing goes.
           log('info', 'reward-achieved', {
             kind: 'weekly',
-            detail: hostOf(memberId) ?? surface,
+            detail: hostedOn,
             stage: mark === 'failed' ? 'unmarked' : 'marked',
           });
           return true;
         },
-        hasHost: hosted,
-        // Each showing as it happens: the claim's, and the one resume after a cut.
-        onShow: (action) =>
-          log('info', 'reward-banner', {
-            kind: 'weekly',
-            action,
-            detail: hostOf(memberId) ?? surface,
-          }),
       });
-      if (result === 'dropped') {
-        // Why nothing was claimed: the host left during the wait, or the week fell below the bar.
-        log('info', 'achieved-banner', {
-          detail: hosted() ? 'dropped' : 'host-left',
-        });
+      if (result === 'shown' || result === 'shown-after-wait') {
+        log('info', 'reward-banner', { kind: 'weekly', action: result, detail: hostedOn });
+      } else if (result === 'unsettled') {
+        // A tick write still pending at the deadline: nothing claimed; the next recompute retries.
+        log('info', 'achieved-banner', { detail: 'ticks-unsettled' });
+      } else if (result === 'dropped') {
+        // Why nothing was claimed: no host on screen by then, or the week fell below the bar.
+        log('info', 'achieved-banner', { detail: hostedOn === null ? 'host-left' : 'dropped' });
       }
     } catch (e) {
       reportError({

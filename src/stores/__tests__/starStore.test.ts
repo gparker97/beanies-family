@@ -45,42 +45,44 @@ vi.mock('@/utils/autoWriteBudget', () => ({
   },
 }));
 /**
- * The banner, as `celebrateReward` orders it: an optional wait (`duringWait` runs inside it, so a
- * test can untick or leave meanwhile), then `stillClaimable()`, then `claim()`, then the showing:
- * `shown` counts the banners actually shown, each reported through `onShow` as `result` (`shown`
- * or `shown-after-wait`), or `skipped-no-host` when `hasHost` says no. `hangAfterClaim` never
- * gets to the showing (a tab closed, a wall asleep).
+ * The banner, as `celebrateReward` orders it: `ticksSettled()`, an optional wait (`duringWait`
+ * runs inside it, so a test can untick or leave meanwhile), `ticksSettled()` again, then
+ * `stillClaimable()`, then `claim()`, then the showing at once: `shown` counts the banners
+ * shown, each resolved as `result` (`shown` or `shown-after-wait`). `unsettledOnce` ends the
+ * next call at the deadline with a write still pending; `throwAfterClaim` throws once the banner
+ * is up (counted in `shown`).
  */
 const banner = vi.hoisted(() => ({
   result: 'shown' as 'shown' | 'shown-after-wait',
   duringWait: null as null | (() => void),
-  hangAfterClaim: false,
+  unsettledOnce: false,
+  throwAfterClaim: false,
   shown: 0,
   calls: [] as {
     memberId: string;
     beanName: string;
+    ticksSettled: () => Promise<void>;
     stillClaimable: () => boolean;
     claim: () => Promise<boolean>;
-    hasHost?: () => boolean;
-    onShow?: (action: string) => void;
   }[],
 }));
 vi.mock('@/composables/useCelebration', () => ({
   celebrateReward: async (req: (typeof banner.calls)[number]) => {
+    await req.ticksSettled();
     banner.calls.push(req);
+    if (banner.unsettledOnce) {
+      banner.unsettledOnce = false;
+      return 'unsettled';
+    }
     if (banner.duringWait) {
       await Promise.resolve();
       banner.duringWait();
     }
+    await req.ticksSettled();
     if (!req.stillClaimable()) return 'dropped';
     if (!(await req.claim())) return 'claimed-elsewhere';
-    if (banner.hangAfterClaim) await new Promise(() => {});
-    if (req.hasHost && !req.hasHost()) {
-      req.onShow?.('skipped-no-host');
-      return 'skipped-no-host';
-    }
     banner.shown++;
-    req.onShow?.(banner.result);
+    if (banner.throwAfterClaim) throw new Error('after the banner went up');
     return banner.result;
   },
 }));
@@ -437,7 +439,8 @@ beforeEach(() => {
   budget.allow = true;
   budget.calls = [];
   banner.result = 'shown';
-  banner.hangAfterClaim = false;
+  banner.unsettledOnce = false;
+  banner.throwAfterClaim = false;
   banner.duringWait = null;
   banner.shown = 0;
   banner.calls = [];
@@ -1274,8 +1277,11 @@ describe('the achieved banner: claimed only while a banner host is mounted', () 
       action: 'shown',
       detail: 'wall',
     });
-    // It waited for this device's ticks of the kid to settle before the banner's own wait.
-    expect(ticking.waits).toBe(1);
+    // The claim is logged at the claim, the showing after it.
+    const order = logEvent.mock.calls.map(([e]) => (e as { message: string }).message);
+    expect(order.indexOf('reward-achieved')).toBeLessThan(order.indexOf('reward-banner'));
+    // It waited for this device's ticks of the kid to settle before the wait, and again after.
+    expect(ticking.waits).toBe(2);
   });
 
   it('a marked week never replays: not on a later tick, an untick and re-tick, or a remount (a reload)', async () => {
@@ -1315,10 +1321,10 @@ describe('the achieved banner: claimed only while a banner host is mounted', () 
     expect(banner.shown).toBe(1);
   });
 
-  it('leaving during the wait claims nothing; returning plays it', async () => {
+  it('leaving (or the wall covered) during the wait claims nothing; back on screen plays it', async () => {
     await nearTheBar();
     const release = host('kid', 'wall');
-    banner.duringWait = release; // the wall leaves the chore view behind the block celebration
+    banner.duringWait = release; // the wall falls asleep, or a sheet opens, during the wait
     tickSunday();
     await settle();
     expect(markWrites.calls).toEqual([]);
@@ -1460,7 +1466,7 @@ describe('the achieved banner: claimed only while a banner host is mounted', () 
     expect(banner.shown).toBe(1);
   });
 
-  it('each showing is logged as the composable reports it (reward-banner, by action)', async () => {
+  it('the showing is logged as the composable resolves it (reward-banner, by action), and nothing else', async () => {
     await nearTheBar();
     banner.result = 'shown-after-wait';
     host();
@@ -1474,42 +1480,61 @@ describe('the achieved banner: claimed only while a banner host is mounted', () 
     expect(logged('achieved-banner')).toEqual([]);
   });
 
-  it('the claim is logged AT the claim, even if the showing never happens (a tab closed)', async () => {
-    await nearTheBar();
-    banner.hangAfterClaim = true;
-    host('kid', 'wall');
-    tickSunday();
-    await settle();
-    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
-    expect(banner.shown).toBe(0);
-    expect(logged('reward-achieved')[0]!.context).toEqual({
-      kind: 'weekly',
-      detail: 'wall',
-      stage: 'marked',
-    });
-    expect(logged('reward-banner')).toEqual([]);
-  });
-
-  it('the showing asks the host again: none mounted by then logs skipped-no-host (the mark is written)', async () => {
+  it('a host that leaves while the mark is written: shown anyway, the events naming the surface that hosted', async () => {
     await nearTheBar();
     const release = host('kid', 'wall');
     const orig = chores.writeCelebratedMark;
     chores.writeCelebratedMark = async (...args: Parameters<typeof orig>) => {
       const out = await orig.apply(chores, args);
-      release(); // the grown-up leaves the child's day while the mark is written
+      release(); // nothing waits or asks after the claim
       return out;
     };
     tickSunday();
     await settle();
     chores.writeCelebratedMark = orig;
     expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
-    expect(banner.shown).toBe(0);
-    expect(logged('reward-achieved')).toHaveLength(1);
+    expect(banner.shown).toBe(1);
+    expect(logged('reward-achieved')[0]!.context).toMatchObject({ detail: 'wall' });
     expect(logged('reward-banner')[0]!.context).toEqual({
       kind: 'weekly',
-      action: 'skipped-no-host',
+      action: 'shown',
       detail: 'wall',
     });
+  });
+
+  it('a tick write still pending at the deadline (unsettled): nothing claimed, the claim released, a later recompute claims', async () => {
+    await nearTheBar();
+    host();
+    banner.unsettledOnce = true;
+    tickSunday();
+    await settle();
+    expect(markWrites.calls).toEqual([]);
+    expect(logged('achieved-banner')[0]!.context).toEqual({ detail: 'ticks-unsettled' });
+    chores.choreMarks = [...chores.choreMarks];
+    await settle();
+    expect(markWrites.calls).toEqual([['kid', MON, REWARD_MARK_REF, 'kid']]);
+    expect(banner.calls).toHaveLength(2);
+    expect(banner.shown).toBe(1);
+  });
+
+  it('a failed mark write is latched at the write: a throw after the banner went up never shows it twice', async () => {
+    await nearTheBar();
+    host();
+    markWrites.fail = true;
+    banner.throwAfterClaim = true;
+    tickSunday();
+    await settle();
+    expect(banner.shown).toBe(1);
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'achieved-check-failed' } })
+    );
+    banner.throwAfterClaim = false;
+    chores.choreMarks = [...chores.choreMarks];
+    await settle();
+    // Only the silent mark retry; no second celebration.
+    expect(markWrites.calls).toHaveLength(2);
+    expect(banner.calls).toHaveLength(1);
+    expect(banner.shown).toBe(1);
   });
 
   it('a mark another device wrote first shows nothing (skipped-exists)', async () => {

@@ -1,11 +1,11 @@
 /**
  * The weekly reward's achieved banner (#148, #154): `celebrateReward` does ALL its waiting before
- * the claim (behind that child's block celebrations and until their ticks go quiet, one bound),
- * asks `stillClaimable()` and drops the banner if the child unticked below the bar, THEN claims
- * the week (`claim()`, the store's mark) and shows only when the claim says yes, and only if a
- * banner host is still mounted (`hasHost`); the banner ends on its own timer. A block
- * celebration cutting the banner resumes it once. Each showing is reported through `onShow`
- * (the star store logs it).
+ * the claim (this device's ticks settled, then behind that child's block celebrations and until
+ * their ticks go quiet, one bound, then the ticks settled again), asks `stillClaimable()` and
+ * drops the banner if the child unticked below the bar, THEN claims the week (`claim()`, the
+ * store's mark) and shows at once when the claim says yes; the banner ends on its own timer. A
+ * block celebration starting while the banner is up changes nothing about it (the accepted
+ * overlap). A tick write still pending at the one deadline ends it with nothing asked.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
@@ -32,7 +32,6 @@ import {
   celebrateChore,
   celebrateReward,
   dismissChoreCelebration,
-  dismissRewardBanner,
   endChoreCelebrationExpected,
   expectChoreCelebration,
   noteChoreTick,
@@ -49,6 +48,7 @@ const req = (over: Partial<RewardCelebrationRequest> = {}): RewardCelebrationReq
   beanName: 'Max',
   title: 'Ice cream',
   emoji: '🍦',
+  ticksSettled: async () => {},
   stillClaimable: () => true,
   claim: async () => true,
   ...over,
@@ -93,7 +93,7 @@ describe('celebrateReward', () => {
   it('waits behind that child’s block celebration, then shows', async () => {
     celebrateChore({ memberId: 'max', block: 'morning', beanName: 'Max', count: 3 });
     const played = celebrateReward(req());
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
     expect(rewardBannerFor('max')).toBeNull();
     dismissChoreCelebration('max:morning');
     expect(await played).toBe('shown-after-wait');
@@ -120,7 +120,7 @@ describe('celebrateReward', () => {
     const claim = vi.fn(async () => true);
     celebrateChore({ memberId: 'max', block: 'evening', beanName: 'Max', count: 3 });
     const played = celebrateReward(req({ stillClaimable: () => still, claim }));
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
     expect(claim).not.toHaveBeenCalled();
     still = false;
     dismissChoreCelebration('max:evening');
@@ -143,7 +143,7 @@ describe('celebrateReward', () => {
     const claim = vi.fn(async () => true);
     expectChoreCelebration('max', 'afternoon');
     const played = celebrateReward(req({ claim }));
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
     expect(claim).not.toHaveBeenCalled();
     // The store's handover: the celebration starts, then the expectation ends. Still waiting.
     celebrateChore({ memberId: 'max', block: 'afternoon', beanName: 'Max', count: 4 });
@@ -168,34 +168,25 @@ describe('celebrateReward', () => {
   it('an expected celebration that will not play (its mark was another device’s) lets it go at once', async () => {
     expectChoreCelebration('max', 'afternoon');
     const played = celebrateReward(req());
+    await vi.advanceTimersByTimeAsync(0); // the ticks settled: the wait has begun
     endChoreCelebrationExpected('max', 'afternoon');
     expect(await played).toBe('shown-after-wait');
     expect(rewardBannerFor('max')).not.toBeNull();
   });
 
-  it('a finishing tick tapped while the mark is written: the banner (never the claim) waits behind its celebration', async () => {
+  it('a finishing tick tapped while the mark is written: the banner still shows at once after the claim', async () => {
     let finishMark!: (yes: boolean) => void;
     const claim = vi.fn(() => new Promise<boolean>((resolve) => (finishMark = resolve)));
     const played = celebrateReward(req({ claim }));
     await vi.advanceTimersByTimeAsync(0);
     expect(claim).toHaveBeenCalledTimes(1);
-    // The last tick of the block, tapped during the mark write (the wall walk's overlap).
+    // The last tick of the block, tapped during the mark write: nothing waits after the claim.
     expectChoreCelebration('max', 'afternoon');
-    finishMark(true);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(rewardBannerFor('max')).toBeNull();
     celebrateChore({ memberId: 'max', block: 'afternoon', beanName: 'Max', count: 4 });
     endChoreCelebrationExpected('max', 'afternoon');
-    await vi.advanceTimersByTimeAsync(0);
-    expect(rewardBannerFor('max')).toBeNull();
-    playSound.mockClear();
-    // The block celebration ends on its own timer; only then the banner and its own sound.
-    await vi.advanceTimersByTimeAsync(CHORE_CELEBRATION_BEATS.done - 1);
-    expect(rewardBannerFor('max')).toBeNull();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(await played).toBe('shown-after-wait');
+    finishMark(true);
+    expect(await played).toBe('shown');
     expect(rewardBannerFor('max')).not.toBeNull();
-    expect(playSound).toHaveBeenCalledTimes(1);
     expect(claim).toHaveBeenCalledTimes(1);
   });
 
@@ -264,131 +255,88 @@ describe('celebrateReward', () => {
     expect(await celebrateReward(req())).toBe('shown');
   });
 
-  it('a block celebration starting while the banner is up cuts it, then the banner resumes in full once it ends (#154)', async () => {
+  it('an untick below the bar during the quiet wait, written slowly: the re-check waits for it, so nothing is claimed or shown (#154)', async () => {
+    let below = false;
+    let pending: Promise<void> = Promise.resolve();
+    const stillClaimable = vi.fn(() => !below);
     const claim = vi.fn(async () => true);
-    const onShow = vi.fn();
-    await celebrateReward(req({ claim, onShow }));
-    const first = rewardBannerFor('max')!;
-    expect(first).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(3000);
-    logEvent.mockClear();
-    playSound.mockClear();
-    // Another child's celebration leaves it alone.
-    celebrateChore({ memberId: 'juno', block: 'afternoon', beanName: 'Juno', count: 2 });
+    noteChoreTick('max'); // the tick that crossed the bar
+    const played = celebrateReward(req({ ticksSettled: () => pending, stillClaimable, claim }));
+    await vi.advanceTimersByTimeAsync(1000);
+    // The untick, tapped now; its write lands well after the quiet period.
+    noteChoreTick('max');
+    let land!: () => void;
+    pending = new Promise<void>((resolve) => {
+      land = () => {
+        below = true;
+        resolve();
+      };
+    });
+    await vi.advanceTimersByTimeAsync(REWARD_TICK_QUIET_MS + 1000);
+    expect(stillClaimable).not.toHaveBeenCalled(); // waiting on the untick's write
+    land();
+    expect(await played).toBe('dropped');
+    expect(claim).not.toHaveBeenCalled();
+    expect(rewardBannerFor('max')).toBeNull();
+    expect(playSound).not.toHaveBeenCalled();
+  });
+
+  it('a tick write that never lands: the one deadline ends it (unsettled), nothing asked, claimed or shown', async () => {
+    const stillClaimable = vi.fn(() => true);
+    const claim = vi.fn(async () => true);
+    const played = celebrateReward(
+      req({ ticksSettled: () => new Promise<void>(() => {}), stillClaimable, claim })
+    );
+    await vi.advanceTimersByTimeAsync(REWARD_BANNER_WAIT_MAX_MS);
+    expect(await played).toBe('unsettled');
+    expect(vi.getTimerCount()).toBe(0);
+    expect(stillClaimable).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
+    expect(rewardBannerFor('max')).toBeNull();
+  });
+
+  it('a slow write still pending after the quiet wait, the finishing tick tapped meanwhile: the block celebration first, the claim after it', async () => {
+    const order: string[] = [];
+    let pending: Promise<void> = Promise.resolve();
+    const claim = vi.fn(async () => {
+      order.push('claim');
+      return true;
+    });
+    noteChoreTick('max'); // the tick that crossed the bar, written
+    const played = celebrateReward(req({ ticksSettled: () => pending, claim }));
+    await vi.advanceTimersByTimeAsync(1000);
+    // A non-finishing tick whose write is slow.
+    noteChoreTick('max');
+    let land!: () => void;
+    pending = new Promise<void>((resolve) => (land = resolve));
+    await vi.advanceTimersByTimeAsync(REWARD_TICK_QUIET_MS + 500);
+    expect(claim).not.toHaveBeenCalled(); // the next pass waits on that write
+    // The block's finishing tick, tapped while that write is still pending: its celebration plays.
+    noteChoreTick('max');
+    expectChoreCelebration('max', 'afternoon');
+    celebrateChore({ memberId: 'max', block: 'afternoon', beanName: 'Max', count: 4 });
+    order.push('block');
+    endChoreCelebrationExpected('max', 'afternoon');
+    land();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(claim).not.toHaveBeenCalled(); // behind the block celebration now
+    await vi.advanceTimersByTimeAsync(CHORE_CELEBRATION_BEATS.done);
+    expect(await played).toBe('shown-after-wait');
+    expect(order).toEqual(['block', 'claim']);
     expect(rewardBannerFor('max')).not.toBeNull();
-    // A finishing tick 3 s in: the block celebration starts at once and the banner goes.
+  });
+
+  it('a block celebration starting while the banner is up changes nothing about the banner (the accepted overlap)', async () => {
+    await celebrateReward(req());
+    const shown = rewardBannerFor('max')!;
+    await vi.advanceTimersByTimeAsync(3000);
     expect(celebrateChore({ memberId: 'max', block: 'afternoon', beanName: 'Max', count: 4 })).toBe(
       'max:afternoon'
     );
-    expect(rewardBannerFor('max')).toBeNull();
-    const cuts = logEvent.mock.calls.filter(
-      ([e]) => (e as { context?: { action?: string } }).context?.action === 'reward-banner-cut'
-    );
-    expect(cuts).toHaveLength(1);
-    expect(cuts[0]![0]).toMatchObject({
-      surface: 'chore-celebration',
-      context: { action: 'reward-banner-cut', slot: 'afternoon', stage: 'resume' },
-    });
-    // Nothing comes back under the block celebration.
-    await vi.advanceTimersByTimeAsync(CHORE_CELEBRATION_BEATS.done - 1);
-    expect(rewardBannerFor('max')).toBeNull();
-    playSound.mockClear();
-    // It ends: the reward plays again IN FULL (a new banner, a fresh burst clock, its sound).
+    expect(rewardBannerFor('max')).toBe(shown);
+    await vi.advanceTimersByTimeAsync(REWARD_BANNER_MS - 3000 - 1);
+    expect(rewardBannerFor('max')).toBe(shown);
     await vi.advanceTimersByTimeAsync(1);
-    const again = rewardBannerFor('max')!;
-    expect(again).not.toBeNull();
-    expect(again.id).not.toBe(first.id);
-    expect(again.startedAt).toBeGreaterThan(first.startedAt);
-    expect(playSound).toHaveBeenCalledTimes(1);
-    expect(onShow.mock.calls.map(([a]) => a)).toEqual(['shown', 'resumed-after-cut']);
-    await vi.advanceTimersByTimeAsync(REWARD_BANNER_MS - 1);
-    expect(rewardBannerFor('max')).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(rewardBannerFor('max')).toBeNull();
-    // Exactly once: nothing further replays, and the claim was made once.
-    await vi.advanceTimersByTimeAsync(REWARD_BANNER_MS * 2);
-    expect(rewardBannerFor('max')).toBeNull();
-    expect(onShow).toHaveBeenCalledTimes(2);
-    expect(claim).toHaveBeenCalledTimes(1);
-  });
-
-  it('a second cut (after the resume) ends it: no further resume, reported as cut', async () => {
-    const onShow = vi.fn();
-    await celebrateReward(req({ onShow }));
-    celebrateChore({ memberId: 'max', block: 'morning', beanName: 'Max', count: 2 });
-    await vi.advanceTimersByTimeAsync(CHORE_CELEBRATION_BEATS.done);
-    expect(rewardBannerFor('max')).not.toBeNull(); // resumed
-    logEvent.mockClear();
-    celebrateChore({ memberId: 'max', block: 'afternoon', beanName: 'Max', count: 3 });
-    expect(rewardBannerFor('max')).toBeNull();
-    expect(logEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        context: { action: 'reward-banner-cut', slot: 'afternoon', stage: 'final' },
-      })
-    );
-    await vi.advanceTimersByTimeAsync(REWARD_BANNER_MS * 3);
-    expect(rewardBannerFor('max')).toBeNull();
-    expect(onShow.mock.calls.map(([a]) => a)).toEqual(['shown', 'resumed-after-cut', 'cut']);
-  });
-
-  it('a resume with no host left by then shows nothing (skipped-no-host)', async () => {
-    let hosted = true;
-    const onShow = vi.fn();
-    await celebrateReward(req({ hasHost: () => hosted, onShow }));
-    celebrateChore({ memberId: 'max', block: 'morning', beanName: 'Max', count: 2 });
-    hosted = false; // the grown-up leaves the child's day under the block celebration
-    playSound.mockClear();
-    await vi.advanceTimersByTimeAsync(CHORE_CELEBRATION_BEATS.done + REWARD_BANNER_MS);
-    expect(rewardBannerFor('max')).toBeNull();
-    expect(playSound).not.toHaveBeenCalled();
-    expect(onShow.mock.calls.map(([a]) => a)).toEqual(['shown', 'skipped-no-host']);
-  });
-
-  it('clearing the child’s banner state (a reset) ends a pending resume: nothing stale shows later', async () => {
-    const onShow = vi.fn();
-    await celebrateReward(req({ onShow }));
-    celebrateChore({ memberId: 'max', block: 'morning', beanName: 'Max', count: 2 });
-    dismissRewardBanner('max');
-    await vi.advanceTimersByTimeAsync(0);
-    expect(onShow.mock.calls.map(([a]) => a)).toEqual(['shown', 'cut']);
-    await vi.advanceTimersByTimeAsync(CHORE_CELEBRATION_BEATS.done + REWARD_BANNER_MS);
-    expect(rewardBannerFor('max')).toBeNull();
-    expect(onShow).toHaveBeenCalledTimes(2);
-  });
-
-  it('a host unmounted before the showing: nothing shown or heard, skipped-no-host, and the mark IS written', async () => {
-    let hosted = true;
-    let finishMark!: (yes: boolean) => void;
-    const claim = vi.fn(() => new Promise<boolean>((resolve) => (finishMark = resolve)));
-    const onShow = vi.fn();
-    const played = celebrateReward(req({ claim, hasHost: () => hosted, onShow }));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(claim).toHaveBeenCalledTimes(1); // the mark is being written
-    hosted = false; // the grown-up navigates away from the child's day meanwhile
-    finishMark(true);
-    expect(await played).toBe('skipped-no-host');
-    expect(rewardBannerFor('max')).toBeNull();
-    expect(playSound).not.toHaveBeenCalled();
-    expect(onShow.mock.calls.map(([a]) => a)).toEqual(['skipped-no-host']);
-    // Nothing pending: a later block celebration of that child resumes nothing.
-    celebrateChore({ memberId: 'max', block: 'morning', beanName: 'Max', count: 2 });
-    await vi.advanceTimersByTimeAsync(CHORE_CELEBRATION_BEATS.done + REWARD_BANNER_MS);
-    expect(rewardBannerFor('max')).toBeNull();
-    expect(onShow).toHaveBeenCalledTimes(1);
-  });
-
-  it('the host is asked AFTER the wait behind a block celebration a tick started during the mark write', async () => {
-    let hosted = true;
-    let finishMark!: (yes: boolean) => void;
-    const claim = vi.fn(() => new Promise<boolean>((resolve) => (finishMark = resolve)));
-    const played = celebrateReward(req({ claim, hasHost: () => hosted }));
-    await vi.advanceTimersByTimeAsync(0);
-    celebrateChore({ memberId: 'max', block: 'evening', beanName: 'Max', count: 2 });
-    finishMark(true);
-    await vi.advanceTimersByTimeAsync(0);
-    hosted = false; // left under the block celebration
-    await vi.advanceTimersByTimeAsync(CHORE_CELEBRATION_BEATS.done);
-    expect(await played).toBe('skipped-no-host');
     expect(rewardBannerFor('max')).toBeNull();
   });
 
@@ -400,7 +348,7 @@ describe('celebrateReward', () => {
   it('the wait is bounded even if a block celebration never ended', async () => {
     celebrateChore({ memberId: 'max', block: 'morning', beanName: 'Max', count: 3 });
     const played = celebrateReward(req());
-    vi.advanceTimersByTime(REWARD_BANNER_WAIT_MAX_MS);
+    await vi.advanceTimersByTimeAsync(REWARD_BANNER_WAIT_MAX_MS);
     expect(await played).toBe('shown-after-wait');
   });
 });
