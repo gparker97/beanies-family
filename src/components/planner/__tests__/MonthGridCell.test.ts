@@ -126,15 +126,23 @@ describe('MonthGridCell root', () => {
 });
 
 describe('MonthGridCell today', () => {
-  it('marks today with the pill and aria-current, and no orange border or today wash', () => {
+  it('marks the whole of today: pill, wash, ring and aria-current', () => {
     const w = mountCell(cell({ isToday: true }));
     expect(w.attributes('aria-current')).toBe('date');
     expect(w.attributes('aria-label')).toBe('Tue, 19 May, planner.today');
     const numeral = w.get('[data-testid="month-cell-numeral"]');
     for (const cls of CALENDAR_TODAY.pill.split(' ')) expect(numeral.classes()).toContain(cls);
-    for (const cls of CALENDAR_TODAY.outline.split(' ')) expect(w.classes()).not.toContain(cls);
-    expect(w.classes()).not.toContain(CALENDAR_TODAY.wash);
+    for (const cls of CALENDAR_TODAY.ring.split(' ')) expect(w.classes()).toContain(cls);
+    expect(w.classes()).toContain(CALENDAR_TODAY.wash);
+    // An inset ring, never a border: the cell's size does not change.
     expect(w.classes()).not.toContain('border-2');
+    expect(mountCell(cell()).classes()).not.toContain('ring-2');
+  });
+
+  it('today wins over a holiday tint, and the holiday keeps its name', () => {
+    const w = mountCell(cell({ isToday: true }), { tint: 'holiday' });
+    expect(w.classes()).toContain(CALENDAR_TODAY.wash);
+    expect(w.classes()).not.toContain('bg-[var(--holiday-clay-tint)]');
   });
 
   it('another day has no pill, and the in-month and out-of-month numerals differ in ink', () => {
@@ -235,10 +243,10 @@ describe('MonthGridCell tint', () => {
     expect(outOfMonth.classes()).toContain('hover:bg-[var(--tint-slate-10)]');
   });
 
-  it('no tint leaves the hover wash, and today does not paint the today wash', () => {
+  it('no tint leaves the hover wash, and today paints the today wash under it', () => {
     const w = mountCell(cell({ isToday: true }));
     expect(w.classes()).toContain('hover:bg-[var(--tint-slate-10)]');
-    expect(w.classes()).not.toContain(CALENDAR_TODAY.wash);
+    expect(w.classes()).toContain(CALENDAR_TODAY.wash);
   });
 
   it('the phone variant hovers like desktop', () => {
@@ -408,6 +416,19 @@ describe('MonthGridCell phone', () => {
     expect(w.attributes('aria-expanded')).toBe('false');
     expect(w.attributes('aria-label')).toContain('Tue, 19 May');
     expect(mountPhone(cell(), { selected: true }).attributes('aria-expanded')).toBe('true');
+  });
+
+  it('the tapped day rings in slate, so an orange ring only ever means today', () => {
+    const tapped = mountPhone(cell(), { selected: true }).classes();
+    expect(tapped).toEqual(expect.arrayContaining(['ring-2', 'ring-inset', 'ring-secondary-500']));
+    expect(tapped).not.toContain('ring-primary-500');
+    const today = mountPhone(cell({ isToday: true })).classes();
+    expect(today).toContain('ring-primary-500');
+    // Tapped today: the slate ring shows the tap; the wash and the pill still say today.
+    const both = mountPhone(cell({ isToday: true }), { selected: true }).classes();
+    expect(both).toContain('ring-secondary-500');
+    expect(both).not.toContain('ring-primary-500');
+    expect(both).toContain(CALENDAR_TODAY.wash);
   });
 
   it('aria-controls names the day row only while selected', () => {

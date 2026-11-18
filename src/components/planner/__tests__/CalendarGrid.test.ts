@@ -303,7 +303,7 @@ describe('CalendarGrid all-day lane', () => {
 });
 
 describe('CalendarGrid today marker', () => {
-  it('marks exactly the current day, with the numeral pill and no border', () => {
+  it('marks exactly the current day, with the pill and the ring', () => {
     // System time is pinned to 2026-04-15 in beforeEach; the mocked useToday
     // re-reads new Date() at mount, so "today" resolves to 2026-04-15.
     const wrapper = mount(CalendarGrid, { props: { ...GRID_PROPS, referenceDate: new Date() } });
@@ -314,12 +314,13 @@ describe('CalendarGrid today marker', () => {
 
     expect(marked.length).toBe(1);
     expect(marked[0]!.attributes('data-date')).toBe('2026-04-15');
-    // The pill is the marker; the grid never draws an orange cell border.
+    // One pill, one ringed cell, never a border (the cell's size must not change).
     expect(wrapper.findAll('.bg-gradient-to-br')).toHaveLength(1);
     expect(marked[0]!.get('[data-testid="month-cell-numeral"]').classes().join(' ')).toContain(
       'bg-gradient-to-br'
     );
     expect(marked[0]!.classes()).not.toContain('border-primary-500');
+    expect(marked[0]!.classes()).toContain('ring-primary-500');
   });
 });
 

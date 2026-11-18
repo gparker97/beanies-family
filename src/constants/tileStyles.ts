@@ -26,7 +26,9 @@ export const FOCUS_RING =
 
 /**
  * The calendar "today" marker, shared by the month cell (both breakpoints) and the week
- * header/column. Same outline recipe as `MAGIC_TILE_SELECTED`. The text token is Deep Slate in
+ * header/column: the whole day carries the wash and an outline, never the numeral alone (greg,
+ * 2026-11-18: a holiday's wash made a pill-only today the hardest day to find). Same outline
+ * recipe as `MAGIC_TILE_SELECTED`. The text token is Deep Slate in
  * light because orange text on white is 3.3:1 (fails AA); on dark it takes the `-lift` partner.
  */
 export const CALENDAR_TODAY = {
@@ -34,6 +36,8 @@ export const CALENDAR_TODAY = {
   wash: 'bg-[var(--tint-orange-8)]',
   columnWash: 'bg-[var(--tint-orange-4)]',
   text: 'text-secondary-500 dark:text-accent-lift',
+  /** The month cell's outline: an inset ring, so a bordered grid cell never shifts or grows. */
+  ring: 'ring-primary-500 dark:ring-accent-lift ring-2 ring-inset rounded-lg',
   pill: 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]',
 } as const;
 

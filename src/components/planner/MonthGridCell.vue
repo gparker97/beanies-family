@@ -109,7 +109,8 @@ const rootLabel = computed(() => {
 });
 
 /**
- * The month grid marks today by its numeral only, so the today wash is off. The hover wash
+ * Today paints the today wash over any tint (a holiday that falls today still reads as today)
+ * and carries the today ring (`rootClass`). The hover wash
  * sits on EVERY cell, tinted ones included (greg, 2026-11-04: a weekend or holiday square
  * must light up like any other, on phones as on desktop). `hover:` outranks the plain tint
  * class, and the slate-10 step is the tile convention (`tileStyles.ts`), visible on both the
@@ -120,17 +121,23 @@ const HOVER_WASH = 'hover:bg-[var(--tint-slate-10)] dark:hover:bg-surface-hover 
 const backgroundClass = computed(() =>
   props.isDropTarget
     ? DROP_TARGET_RING
-    : `${calendarDayBackground(props.tint, false, '')} ${HOVER_WASH}`
+    : `${props.cell.isToday ? CALENDAR_TODAY.wash : calendarDayBackground(props.tint, false, '')} ${HOVER_WASH}`
 );
+
+/**
+ * The cell's one ring, first match wins: none under the drop ring (it brings its own), the
+ * phone's tapped day in slate (orange is today's alone, so the two never look alike), then
+ * today's outline.
+ */
+const ringClass = computed(() => {
+  if (props.isDropTarget) return '';
+  if (isPhone.value && props.selected) return 'ring-secondary-500 dark:ring-ink ring-2 ring-inset';
+  return props.cell.isToday ? CALENDAR_TODAY.ring : '';
+});
 
 const rootClass = computed(() =>
   isPhone.value
-    ? [
-        'px-0.5 text-left',
-        props.selected && !props.isDropTarget
-          ? 'ring-primary-500 dark:ring-accent-lift ring-2 ring-inset'
-          : '',
-      ]
+    ? 'px-0.5 text-left'
     : 'cursor-pointer border-r border-b border-[var(--color-border)] px-1 last:border-r-0 dark:border-line'
 );
 
@@ -241,7 +248,7 @@ function forwardViewActivity(id: string, date: string): void {
     v-bind="dayDropAttrs(cell.date)"
     :style="cssVars"
     class="relative flex min-w-0 flex-col overflow-hidden pt-[var(--mg-pad-t)] pb-[var(--mg-pad-b)]"
-    :class="[rootClass, backgroundClass]"
+    :class="[rootClass, backgroundClass, ringClass]"
     @click="onRootClick"
   >
     <!-- Numeral row: holiday name (desktop), cake, numeral. No gap below it. -->
