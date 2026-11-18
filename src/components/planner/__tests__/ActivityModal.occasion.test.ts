@@ -222,7 +222,8 @@ describe('ActivityModal: occasions', () => {
     await input.setValue('Birthday party');
     await input.trigger('change');
     await flush();
-    expect(vm.category).toBe('');
+    // The category guess (#152) files it as the party, never as the occasion.
+    expect(vm.category).toBe('birthday');
 
     await input.setValue("Uncle Bob's birthday");
     await input.trigger('change');

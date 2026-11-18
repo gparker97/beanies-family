@@ -933,7 +933,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Track income, expenses, and transfers between accounts with categories and recurring schedules.',
     icon: '\u{1F4B8}',
     readTime: 3,
-    updatedDate: '2026-09-25',
+    updatedDate: '2026-11-18',
     sections: [
       {
         type: 'heading',
@@ -1005,6 +1005,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Transactions are organised into categories (Housing, Food, Transport, etc.) for budgeting and reporting. Each category has a colour and icon for easy visual identification.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When you add a new income or expense, beanies picks a category from the description as you type and shows it under the field, with the word it picked from. Tap <strong>Change</strong> to choose another: a category you pick yourself always wins, and editing a saved transaction never changes its category. The category list has a search box at the top, so you can find a category by its name or by any related word.',
       },
     ],
   },
@@ -1929,7 +1934,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
     icon: '\u{1F4C5}',
     readTime: 5,
-    updatedDate: '2026-11-05',
+    updatedDate: '2026-11-18',
     sections: [
       {
         type: 'heading',
@@ -1952,6 +1957,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Click <strong>+ Add Activity</strong> to open the activity form. Give it a title, pick a category from the grouped list (appointments, lessons, sports, school, food, fun, occasions, parties, pets, work and more), and set a date. You can assign the activity to a specific family member and add a start/end time.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'As you type the title of a new activity, beanies picks the category for you (<strong>Softball practice</strong> lands on Softball) and shows it under the title, with the word it picked from. Tap <strong>Change</strong> to choose another: a category you pick yourself always wins, and editing a saved activity never changes its category. To find a category quickly, type any related word into the search at the top of the list, such as <strong>ball</strong> for Softball and Baseball.',
       },
       {
         type: 'paragraph',

@@ -17,63 +17,16 @@ import type { ExtractionResult } from '@/services/ai/types';
 import type { ActivityCategory, CreateFamilyActivityInput, ISODateString } from '@/types/models';
 import { getActivityCategoryById } from '@/constants/activityCategories';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { matchOccasionCategory } from '@/utils/occasions';
+import { suggestActivityCategory } from '@/utils/categorySuggest';
 
 /**
- * Keyword → activity-category inference. The extraction model returns at most a short
- * free-text `categoryHint` (e.g. "birthday party"); we map that — or, failing that, the
- * title + description — onto one of our ActivityCategory ids. Conservative by design: no
- * confident match → undefined, so the user picks rather than us guessing wrong.
- *
- * First-match-wins, so more specific patterns come first. Each pattern is word-bounded with
- * grouped alternation (every term in a group is anchored, not just the first) + the `i` flag.
- * Typed as ActivityCategory so a misspelt id fails the type-check; a unit test additionally
- * asserts every id is a real ACTIVITY_CATEGORIES entry, so the table can't drift out of sync.
+ * Keyword fallback: the category the text names, through the same guess the activity form uses
+ * (`suggestActivityCategory`: the occasion matcher first, then every category's own keywords).
+ * Conservative by design: no confident match gives undefined, so the user picks rather than us
+ * guessing wrong.
  */
-export const CATEGORY_KEYWORDS: ReadonlyArray<readonly [RegExp, ActivityCategory]> = [
-  [/\bbirthday\b/i, 'birthday'],
-  [/\bwedding\b/i, 'wedding'],
-  [/\b(bar|bat) mitzvah\b/i, 'bar_mitzvah'],
-  [/\b(recital|graduation|ceremony|presentation)\b/i, 'school_recital'],
-  [/\bconcert\b/i, 'concert'],
-  [/\b(show|musical|theatre|theater|play)\b/i, 'show'],
-  [/\b(movie|cinema|film)\b/i, 'movie'],
-  [/\b(festival|fair|carnival)\b/i, 'festival'],
-  [/\b(museum|exhibit)\b/i, 'museum'],
-  [/\b(theme|amusement) park\b/i, 'theme_park'],
-  [/\b(game|match|tournament)\b/i, 'sporting_event'],
-  [/\b(soccer|football)\b/i, 'soccer'],
-  [/\bsoftball\b/i, 'softball'],
-  [/\btennis\b/i, 'tennis'],
-  [/\bswim\w*\b/i, 'swimming'],
-  [/\bgymnastics\b/i, 'gymnastics'],
-  [/\b(dentist|dental)\b/i, 'dentist'],
-  [/\b(doctor|clinic|pediatric|appointment)\b/i, 'doctor'],
-  [/\b(eye exam|optometr\w*|optician)\b/i, 'eye_exam'],
-  [/\b(haircut|salon|barber)\b/i, 'haircut'],
-  [/\b(dinner|dining|restaurant|lunch)\b/i, 'dining_out'],
-  [/\bbrunch\b/i, 'brunch'],
-  [/\b(coffee|café|cafe)\b/i, 'coffee'],
-  [/\b(drinks|cocktail|happy hour)\b/i, 'drinks'],
-  [/\bpicnic\b/i, 'picnic'],
-  // School (the motivating gap — esp. "learning journey", the SG term for a field trip).
-  [/\b(field trip|excursion|learning journey|school outing|school visit)\b/i, 'field_trip'],
-  [/\bafter[- ]school\b/i, 'after_school'],
-  // A couple of unambiguous, collision-free extras. Broad Educational/Lessons/Sports keyword
-  // coverage is deliberately NOT added — the model's list-pick (result.category) is the primary
-  // path now, so this table stays a shallow, low-collision backstop (see plan).
-  [/\bspelling bee\b/i, 'spelling_bee'],
-  [/\bcubing\b/i, 'cubing'],
-];
-
-function matchCategory(text: string): ActivityCategory | undefined {
-  // Occasion keywords first: "Anniversary dinner" is an anniversary, not dining out.
-  const occasion = matchOccasionCategory(text);
-  if (occasion) return occasion;
-  for (const [pattern, id] of CATEGORY_KEYWORDS) {
-    if (pattern.test(text)) return id;
-  }
-  return undefined;
+function keywordCategory(text: string | undefined): ActivityCategory | undefined {
+  return text ? suggestActivityCategory(text)?.value : undefined;
 }
 
 /**
@@ -100,15 +53,18 @@ function validatedModelCategory(result: ExtractionResult): ActivityCategory | un
 
 /**
  * Infer an activity category from an extraction result. Precedence: (1) the model's directly
- * picked, validated category id; (2) keyword match on the model's free-text hint; (3) keyword
- * match on title + description. undefined when nothing matches. Works for every tier — when no
- * model id/hint is present (older proxy, BYOK, on-device) it relies on the title/description pass.
+ * picked, validated category id; (2) keyword match on the model's free-text hint; (3) on the
+ * title; (4) on the description. Each text is matched on its own, so a long description's
+ * peripheral words can never outvote the title. undefined when nothing matches. Works for every
+ * tier: when no model id/hint is present (older proxy, BYOK, on-device) it relies on the
+ * title/description passes.
  */
 export function inferActivityCategory(result: ExtractionResult): ActivityCategory | undefined {
   const category =
     validatedModelCategory(result) ??
-    matchCategory(result.categoryHint ?? '') ??
-    matchCategory(`${result.title} ${result.description}`);
+    keywordCategory(result.categoryHint) ??
+    keywordCategory(result.title) ??
+    keywordCategory(result.description);
   // An imported invitation is almost always a party, never a yearly "remember this" entry.
   return category === 'occasion_birthday' ? 'birthday' : category;
 }

@@ -8,8 +8,10 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
+import CategoryGuessHint from '@/components/ui/CategoryGuessHint.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { useTransactionCategoryGuess } from '@/composables/useTransactionCategoryGuess';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
@@ -43,10 +45,11 @@ const { isSubmitting } = useFormModal(
   {
     onEdit: () => {},
     onNew: () => {
+      // First: it also empties the category, before the direction is set (#152).
+      categoryGuess.reset();
       direction.value = 'expense';
       description.value = '';
       amount.value = undefined;
-      category.value = '';
       date.value = toDateInputValue(new Date());
       // Default to first active account
       const active = accountsStore.activeAccounts;
@@ -54,6 +57,18 @@ const { isSubmitting } = useFormModal(
     },
   }
 );
+
+// The category the description names (#152), kept inside the table for the direction. Quick
+// add only ever creates, so the guess is always on.
+const categoryGroupRef = ref<{ $el?: HTMLElement } | null>(null);
+const categoryGuess = useTransactionCategoryGuess({
+  kind: 'quick-add',
+  description,
+  category,
+  type: () => direction.value,
+  enabled: () => true,
+  pickerEl: () => categoryGroupRef.value?.$el,
+});
 
 const currSymbol = computed(() => getCurrencyInfo(settingsStore.baseCurrency)?.symbol ?? '$');
 
@@ -75,6 +90,7 @@ const canSave = computed(() => {
 
 function handleSave() {
   if (!canSave.value) return;
+  categoryGuess.logOutcome();
 
   const selectedAccount = accountsStore.getAccountById(accountId.value);
 
@@ -113,14 +129,19 @@ function handleSave() {
       <AmountInput v-model="amount" :currency-symbol="currSymbol" font-size="2rem" />
     </FormFieldGroup>
 
-    <!-- Category -->
-    <FormFieldGroup :label="t('budget.quickAdd.category')" required>
-      <CategoryChipPicker v-model="category" :type="direction" />
-    </FormFieldGroup>
-
-    <!-- Description -->
+    <!-- Description, above Category so the category can be guessed from it (#152) -->
     <FormFieldGroup :label="t('budget.quickAdd.description')">
       <BaseInput v-model="description" :placeholder="t('budget.quickAdd.description')" />
+      <CategoryGuessHint v-bind="categoryGuess.hint.value" @change="categoryGuess.revealPicker()" />
+    </FormFieldGroup>
+
+    <!-- Category -->
+    <FormFieldGroup ref="categoryGroupRef" :label="t('budget.quickAdd.category')" required>
+      <CategoryChipPicker
+        :model-value="category"
+        :type="direction"
+        @update:model-value="categoryGuess.pick"
+      />
     </FormFieldGroup>
 
     <!-- Date + Account row -->

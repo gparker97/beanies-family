@@ -99,9 +99,17 @@ const STRING_DEFS = {
     beanie: 'showing {visible} of {total} — keep typing to narrow',
   },
 
+  // Category guess (#152): the category picked from the words typed, shown under the field
+  'categoryGuess.pickedFrom': { en: 'Picked from "{word}"', beanie: 'picked from "{word}"' },
+
   // Modal shared labels
   'modal.selectCategory': { en: 'Select a category', beanie: 'select a category' },
   'modal.selectSubcategory': { en: 'Select a type', beanie: 'select a type' },
+  'modal.searchCategories': { en: 'Search categories', beanie: 'search categories' },
+  'modal.noCategoryMatch': {
+    en: 'No category matches "{query}". Try another word, or clear the search to see them all.',
+    beanie: 'no category matches "{query}". try another word, or clear the search to see them all.',
+  },
   'modal.selectTime': { en: 'Select a time', beanie: 'select a time' },
   'modal.schedule': { en: 'Schedule', beanie: 'schedule' },
   'modal.recurring': { en: 'Recurring', beanie: 'recurring' },

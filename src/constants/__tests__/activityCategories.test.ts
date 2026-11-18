@@ -53,7 +53,7 @@ function extractMappingKeys(): Set<string> {
 }
 
 describe('activity category sources stay in sync', () => {
-  const runtimeIds = new Set(ACTIVITY_CATEGORIES.map((c) => c.id));
+  const runtimeIds = new Set<string>(ACTIVITY_CATEGORIES.map((c) => c.id));
   const typeIds = extractActivityCategoryUnion();
   const mappingIds = extractMappingKeys();
 

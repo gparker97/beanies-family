@@ -11,6 +11,7 @@ import { isRuleComplete } from '@/services/recurrence/recurrenceEngine';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import type { RecurrenceRule } from '@/types/recurrence';
 import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
+import CategoryGuessHint from '@/components/ui/CategoryGuessHint.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ActivityLinkDropdown from '@/components/ui/ActivityLinkDropdown.vue';
@@ -35,6 +36,7 @@ import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useFormModal } from '@/composables/useFormModal';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
 import { useFormValidation } from '@/composables/useFormValidation';
+import { useTransactionCategoryGuess } from '@/composables/useTransactionCategoryGuess';
 
 import type {
   Transaction,
@@ -218,6 +220,9 @@ const { isEditing, isSubmitting, formDiff } = useFormModal<
   () => props.open,
   {
     onEdit: (entity) => {
+      // First: a create session's category guess never leaks into an edit, and the category is
+      // emptied before the direction is set, so the fill cannot clear its own (#152).
+      categoryGuess.reset();
       if (props.recurringItem) {
         // Editing a recurring item (never a transfer)
         const item = props.recurringItem;
@@ -302,6 +307,8 @@ const { isEditing, isSubmitting, formDiff } = useFormModal<
       linkPromptDismissed.value = false;
     },
     onNew: () => {
+      // First, as in `onEdit` (#152).
+      categoryGuess.reset();
       const iv = props.initialValues;
       isTransfer.value = iv?.type === 'transfer';
       toAccountId.value = iv?.toAccountId;
@@ -343,6 +350,20 @@ const accountGroups = computed<AccountOptionGroup[]>(() =>
 );
 
 const effectiveCategoryType = computed(() => (direction.value === 'in' ? 'income' : 'expense'));
+
+// ── Category guess (#152) ──────────────────────────────────────────────────
+// The category the description names, picked as it is typed in a NEW income or expense (never
+// an edit, never a transfer), kept inside the table for the direction. Declared after
+// `useFormModal`: the guess watcher reads `isEditing` as it is created.
+const categoryGroupRef = ref<{ $el?: HTMLElement } | null>(null);
+const categoryGuess = useTransactionCategoryGuess({
+  kind: 'transaction',
+  description,
+  category,
+  type: () => effectiveCategoryType.value,
+  enabled: () => !isEditing.value && !isTransfer.value,
+  pickerEl: () => categoryGroupRef.value?.$el,
+});
 
 // #70: read-only recurrence summary for a locked (activity/loan fee-linked) item.
 const { describe } = useRecurrenceLabel();
@@ -537,6 +558,8 @@ watch([loanId, activityId], () => {
       const suggestedCategory = activityCategoryToExpenseCategory(activity.category);
       if (suggestedCategory) {
         category.value = suggestedCategory;
+        // The link may map to the very category already guessed; it must stick all the same.
+        categoryGuess.markPicked();
       }
       // Also set amount from activity fee
       if (activity.feeAmount) {
@@ -577,6 +600,8 @@ function buildEffectiveRule(startYmd: string): RecurrenceRule {
 
 function handleSave() {
   isSubmitting.value = true;
+  // Once per submit, covering `save` and `save-recurring`; a no-op on an edit or a transfer.
+  categoryGuess.logOutcome();
 
   try {
     // Transfer: a one-time move between two accounts (no category / goal / loan /
@@ -955,6 +980,7 @@ function dismissLinkPrompt() {
           :placeholder="t('form.description')"
         />
       </div>
+      <CategoryGuessHint v-bind="categoryGuess.hint.value" @change="categoryGuess.revealPicker()" />
     </FormFieldGroup>
 
     <!-- 4. Amount + Currency (inline row) -->
@@ -991,8 +1017,12 @@ function dismissLinkPrompt() {
     </FormFieldGroup>
 
     <!-- 5. Category chips (two-level drill-down; not applicable to transfers) -->
-    <FormFieldGroup v-if="!isTransfer" :label="t('form.category')" required>
-      <CategoryChipPicker v-model="category" :type="effectiveCategoryType" />
+    <FormFieldGroup v-if="!isTransfer" ref="categoryGroupRef" :label="t('form.category')" required>
+      <CategoryChipPicker
+        :model-value="category"
+        :type="effectiveCategoryType"
+        @update:model-value="categoryGuess.pick"
+      />
     </FormFieldGroup>
 
     <!-- 7. Recurring details -->

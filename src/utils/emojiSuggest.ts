@@ -1,49 +1,20 @@
 /**
- * The ONE "picture from the words in a name" matcher, shared by the chore suggester
+ * The "picture from the words in a name" suggester, shared by the chore suggester
  * (`suggestChoreEmoji`, `constants/choreBlocks.ts`) and the reward suggester
- * (`suggestRewardEmoji`, `constants/choreStars.ts`). Each passes its own keyword table; the
- * algorithm lives only here. Pure.
- *
- * English words match whole words (an optional plural `s` / `es` allowed), so "cat" never fires
- * inside "education"; Chinese words match anywhere in the name. `weak` marks a generic word
- * ("feed", "trip"): any other word beats it. Within a tier the longest keyword wins, then the
- * earlier table entry.
+ * (`suggestRewardEmoji`, `constants/choreStars.ts`). Each passes its own keyword table. The
+ * matching rules themselves live in `keywordSuggest.ts` (shared with the category guess and the
+ * pickers' search); `emojiSuggester` is a thin adapter over it. Pure.
  *
  * The rename rule both follow (`pictureAfterRename`) lives here too, so chores and rewards
  * re-pick a picture for exactly the same reasons.
  */
+import { keywordSuggester } from '@/utils/keywordSuggest';
 
 /** One keyword entry: never shown, only matched. */
 export interface EmojiKeywordEntry {
   emoji: string;
   words: readonly string[];
   weak?: boolean;
-}
-
-interface Matcher {
-  emoji: string;
-  weak: boolean;
-  order: number;
-  size: number;
-  test: (text: string) => boolean;
-}
-
-const isLatinLetter = (ch: string) => ch >= 'a' && ch <= 'z';
-
-function hasWholeWord(text: string, form: string): boolean {
-  for (let at = text.indexOf(form); at !== -1; at = text.indexOf(form, at + 1)) {
-    const before = at === 0 ? '' : text.charAt(at - 1);
-    const after = text.charAt(at + form.length);
-    if (!isLatinLetter(before) && !isLatinLetter(after)) return true;
-  }
-  return false;
-}
-
-function matcherFor(word: string): (text: string) => boolean {
-  if (!/[a-z]/.test(word)) return (text) => text.includes(word);
-  // Whole word, with an optional plural. Plain string search: no pattern is built from data.
-  const forms = [word, `${word}s`, `${word}es`];
-  return (text) => forms.some((form) => hasWholeWord(text, form));
 }
 
 /** A suggester over one keyword table (`emojiSuggester`). */
@@ -99,35 +70,14 @@ export function isEditOfName(oldName: string, newName: string): boolean {
   return false;
 }
 
-/** A suggester over `table`. Each keyword is compiled once, here. */
+/** A suggester over `table` (the shared matcher, `keywordSuggester`, carrying emoji). */
 export function emojiSuggester(table: readonly EmojiKeywordEntry[]): EmojiSuggester {
-  const matchers: Matcher[] = table.flatMap((entry, order) =>
-    entry.words.map((word) => ({
-      emoji: entry.emoji,
-      weak: !!entry.weak,
-      order,
-      size: word.length,
-      test: matcherFor(word),
-    }))
+  const inner = keywordSuggester(
+    table.map(({ emoji, words, weak }) => ({ value: emoji, words, weak }))
   );
-  const hits = (name: string): Matcher[] => {
-    const text = name.trim().toLocaleLowerCase();
-    if (!text) return [];
-    const all = matchers.filter((m) => m.test(text));
-    // The strongest tier present: a weak word counts only when no strong word matched.
-    return all.some((m) => !m.weak) ? all.filter((m) => !m.weak) : all;
-  };
   return {
-    suggest: (name) => {
-      let best: Matcher | undefined;
-      for (const m of hits(name)) {
-        if (!best || m.size > best.size || (m.size === best.size && m.order < best.order)) {
-          best = m;
-        }
-      }
-      return best?.emoji;
-    },
-    matches: (name) => new Set(hits(name).map((m) => m.emoji)),
+    suggest: (name) => inner.suggest(name)?.value,
+    matches: inner.matches,
   };
 }
 

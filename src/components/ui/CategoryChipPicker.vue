@@ -2,7 +2,12 @@
 import { computed } from 'vue';
 import GroupedChipPicker from '@/components/ui/GroupedChipPicker.vue';
 import type { ChipGroup } from '@/components/ui/GroupedChipPicker.vue';
-import { getCategoriesGrouped, GROUP_EMOJI_MAP, CATEGORY_EMOJI_MAP } from '@/constants/categories';
+import {
+  getCategoriesGrouped,
+  GROUP_EMOJI_MAP,
+  categoryEmoji,
+  FALLBACK_CATEGORY_EMOJI,
+} from '@/constants/categories';
 import { useCategoryLabel } from '@/composables/useCategoryLabel';
 
 const props = defineProps<{
@@ -19,11 +24,13 @@ const { categoryLabel, groupLabel } = useCategoryLabel();
 const groups = computed<ChipGroup[]>(() =>
   getCategoriesGrouped(props.type).map((g) => ({
     name: groupLabel(g.name),
-    icon: GROUP_EMOJI_MAP[g.name] || '📦',
+    icon: GROUP_EMOJI_MAP[g.name] || FALLBACK_CATEGORY_EMOJI,
     items: g.categories.map((cat) => ({
       value: cat.id,
       label: categoryLabel(cat.id),
-      icon: CATEGORY_EMOJI_MAP[cat.id] || '📦',
+      icon: categoryEmoji(cat.id),
+      // The words the search matches besides the name: the guess's own, strong and weak.
+      keywords: [...cat.keywords, ...(cat.weakKeywords ?? [])],
     })),
   }))
 );
@@ -33,6 +40,7 @@ const groups = computed<ChipGroup[]>(() =>
   <GroupedChipPicker
     :model-value="modelValue"
     :groups="groups"
+    searchable
     @update:model-value="emit('update:modelValue', $event)"
   />
 </template>

@@ -65,9 +65,14 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   // BaseCombobox shared
   'combobox.showingHint': '显示 {visible}/{total} 项，继续输入可缩小范围',
 
+  // Category guess (#152)
+  'categoryGuess.pickedFrom': '根据“{word}”选择',
+
   // Modal shared labels
   'modal.selectCategory': '选择类别',
   'modal.selectSubcategory': '选择类型',
+  'modal.searchCategories': '搜索类别',
+  'modal.noCategoryMatch': '没有与“{query}”匹配的类别。换个词试试，或清除搜索查看全部类别。',
   'modal.selectTime': '选择时间',
   'modal.schedule': '时间安排',
   'modal.recurring': '重复',

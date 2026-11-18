@@ -6,6 +6,9 @@ import TransactionModal from './TransactionModal.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import { showToast } from '@/composables/useToast';
+import { logEvent } from '@/services/telemetry/logEvent';
+import CategoryGuessHint from '@/components/ui/CategoryGuessHint.vue';
+import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type {
@@ -20,6 +23,15 @@ vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/composables/useToast', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/composables/useToast')>()),
   showToast: vi.fn(),
+}));
+
+// The category guess (#152) with a fake matcher, so these tests pin the form's wiring and never
+// move when a keyword list changes. "rent" names a different category per direction.
+vi.mock('@/utils/categorySuggest', () => ({
+  suggestTransactionCategory: (text: string, type: 'income' | 'expense') =>
+    /\brent\b/i.test(text)
+      ? { value: type === 'income' ? 'rental' : 'rent', word: 'rent' }
+      : undefined,
 }));
 
 // Mock repositories
@@ -691,6 +703,239 @@ describe('TransactionModal — Save Flow', () => {
       await tapSave(wrapper);
 
       expectBlocked(wrapper, 'form.amount');
+    });
+  });
+
+  describe('Category guess (#152)', () => {
+    // A pick from the real picker, so the template wiring (`categoryGuess.pick`) is pinned.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pick = (wrapper: any, id: string) =>
+      wrapper.findComponent(CategoryChipPicker).vm.$emit('update:modelValue', id);
+
+    const outcomes = () =>
+      vi
+        .mocked(logEvent)
+        .mock.calls.map((c) => c[0])
+        .filter((e) => e.surface === 'category-guess' && e.message === 'submitted')
+        .map((e) => e.context);
+
+    it('the description picks the category, from the table for the direction', async () => {
+      const wrapper = mountModal();
+      wrapper.vm.description = 'Rent';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('rent');
+      expect(wrapper.findComponent(CategoryGuessHint).props('word')).toBe('rent');
+
+      wrapper.vm.direction = 'in';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('rental');
+
+      wrapper.vm.description = 'Paycheck';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('');
+    });
+
+    it('a hand pick survives further typing, even a tap on the guessed chip', async () => {
+      const wrapper = mountModal();
+      wrapper.vm.description = 'Rent';
+      await nextTick();
+      pick(wrapper, 'rent');
+      wrapper.vm.description = 'Paycheck';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('rent');
+      expect(wrapper.findComponent(CategoryGuessHint).props('label')).toBeUndefined();
+    });
+
+    it('a flip clears a hand pick from the other table, and re-guesses from the new one', async () => {
+      const wrapper = mountModal();
+      pick(wrapper, 'groceries');
+      await nextTick();
+      wrapper.vm.direction = 'in';
+      await nextTick();
+      // Groceries is no income category: it never saves on an income.
+      expect(wrapper.vm.category).toBe('');
+      wrapper.vm.description = 'Rent';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('rental');
+    });
+
+    it('with words typed, a flip that clears a pick guesses from the new table at once', async () => {
+      const wrapper = mountModal();
+      wrapper.vm.description = 'Rent';
+      await nextTick();
+      pick(wrapper, 'groceries');
+      await nextTick();
+      wrapper.vm.direction = 'in';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('rental');
+      expect(wrapper.findComponent(CategoryGuessHint).props('word')).toBe('rent');
+    });
+
+    it('a flip and back brings a hand pick back, and an id the table does not know', async () => {
+      const wrapper = mountModal();
+      pick(wrapper, 'groceries');
+      await nextTick();
+      wrapper.vm.direction = 'in';
+      await nextTick();
+      wrapper.vm.direction = 'out';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('groceries');
+
+      const legacy = mountModal();
+      legacy.vm.category = 'food';
+      legacy.vm.direction = 'in';
+      await nextTick();
+      expect(legacy.vm.category).toBe('');
+      legacy.vm.direction = 'out';
+      await nextTick();
+      expect(legacy.vm.category).toBe('food');
+    });
+
+    it('opening an income for edit never clears its own category', async () => {
+      const wrapper = await mountAndOpen({
+        initialValues: { type: 'income' as const, category: 'salary', description: 'Pay' },
+      });
+      expect(wrapper.vm.category).toBe('salary');
+      await wrapper.setProps({ open: false });
+      await nextTick();
+      await wrapper.setProps({
+        open: true,
+        initialValues: null,
+        transaction: {
+          id: 'tx-10',
+          accountId: 'account-1',
+          type: 'income',
+          amount: 5,
+          currency: 'USD',
+          category: 'salary',
+          date: '2026-03-01',
+          description: 'Pay',
+          isReconciled: false,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        } as Transaction,
+      });
+      await nextTick();
+      expect(wrapper.vm.direction).toBe('in');
+      expect(wrapper.vm.category).toBe('salary');
+    });
+
+    it('a reopen with the same prefilled description shows the guess again', async () => {
+      const initialValues = { description: 'Rent' };
+      const wrapper = await mountAndOpen({ initialValues });
+      expect(wrapper.vm.category).toBe('rent');
+      await wrapper.setProps({ open: false });
+      await nextTick();
+      await wrapper.setProps({ open: true, initialValues: { ...initialValues } });
+      await nextTick();
+      expect(wrapper.vm.category).toBe('rent');
+      expect(wrapper.findComponent(CategoryGuessHint).props('word')).toBe('rent');
+    });
+
+    it('an income saved with an expense category keeps it when flipped to Money Out', async () => {
+      const wrapper = await mountAndOpen({
+        transaction: {
+          id: 'tx-12',
+          accountId: 'account-1',
+          type: 'income',
+          amount: 5,
+          currency: 'USD',
+          category: 'groceries',
+          date: '2026-03-01',
+          description: 'Weekly shop',
+          isReconciled: false,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        } as Transaction,
+      });
+      expect(wrapper.vm.category).toBe('groceries');
+      wrapper.vm.direction = 'out';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('groceries');
+    });
+
+    it('a mistaken flip and back on an edit restores the saved category', async () => {
+      const wrapper = await mountAndOpen({
+        transaction: {
+          id: 'tx-11',
+          accountId: 'account-1',
+          type: 'expense',
+          amount: 5,
+          currency: 'USD',
+          category: 'groceries',
+          date: '2026-03-01',
+          description: 'Weekly shop',
+          isReconciled: false,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        } as Transaction,
+      });
+      wrapper.vm.direction = 'in';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('');
+      wrapper.vm.direction = 'out';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('groceries');
+    });
+
+    it('never guesses on an edit', async () => {
+      const wrapper = await mountAndOpen({
+        transaction: {
+          id: 'tx-9',
+          accountId: 'account-1',
+          type: 'expense',
+          amount: 5,
+          currency: 'USD',
+          category: 'food',
+          date: '2026-03-01',
+          description: 'Lunch',
+          isReconciled: false,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        } as Transaction,
+      });
+      wrapper.vm.description = 'Rent';
+      await nextTick();
+      expect(wrapper.vm.category).toBe('food');
+      wrapper.vm.handleSave();
+      expect(outcomes()).toEqual([]);
+    });
+
+    it('Change reaches the category picker', async () => {
+      Element.prototype.scrollIntoView = vi.fn();
+      const wrapper = mountModal();
+      wrapper.vm.description = 'Rent';
+      await nextTick();
+      wrapper.findComponent(CategoryGuessHint).vm.$emit('change');
+      await nextTick();
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+      expect(vi.mocked(logEvent).mock.calls.some((c) => c[0].message === 'picker not found')).toBe(
+        false
+      );
+    });
+
+    it('logs one outcome per new save, kept or changed', async () => {
+      const kept = mountModal();
+      fillRequiredFields(kept);
+      kept.vm.category = '';
+      kept.vm.description = 'Rent';
+      kept.vm.recurrenceMode = 'one-time';
+      await nextTick();
+      kept.vm.handleSave();
+      expect(outcomes()).toEqual([{ kind: 'transaction', action: 'kept' }]);
+
+      vi.mocked(logEvent).mockClear();
+      const changed = mountModal();
+      changed.vm.description = 'Rent';
+      await nextTick();
+      pick(changed, 'food');
+      fillRequiredFields(changed);
+      changed.vm.category = 'utilities';
+      // The outcome is read against the final words, so they must still name a category.
+      changed.vm.description = 'Rent';
+      await nextTick();
+      changed.vm.handleSave();
+      expect(outcomes()).toEqual([{ kind: 'transaction', action: 'changed' }]);
     });
   });
 });

@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-11-18.1';
+export const PROMPT_VERSION = '2026-11-18.2';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -51,7 +51,7 @@ export const EXTRACTION_JSON_SHAPE = {
     'string — a short lowercase label classifying the event type, e.g. "birthday", "soccer game", "dentist", "school recital", or "" if unclear',
   category:
     'string — the single best-matching category id chosen from the category list provided below, or "" if none fits well. Use ONLY an id from that list; prefer an "other_*" id within the correct group over a wrong specific id',
-  link: 'string: the single most useful https web address for this event (a sign-up, ticket or information page), exactly as written in the source, or "" if there is none',
+  link: 'string: the single most useful https web address for this event (a sign-up, ticket or information page, or for an online event the video-call join link: Zoom, Google Meet, Teams, etc.), exactly as written in the source, or "" if there is none',
   confidence: 'object — a 0..1 number for each of: title, date, startTime, endTime, location',
 };
 

@@ -13,6 +13,7 @@ import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ActivityCategoryPicker from '@/components/ui/ActivityCategoryPicker.vue';
+import CategoryGuessHint from '@/components/ui/CategoryGuessHint.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import LocationField from '@/components/ui/LocationField.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
@@ -41,7 +42,11 @@ import { useFormValidation } from '@/composables/useFormValidation';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
 import { useOccasionForm, type OccasionAutoField } from '@/composables/useOccasionForm';
+import { useCategoryGuess } from '@/composables/useCategoryGuess';
+import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/activityCategories';
+import { suggestActivityCategory } from '@/utils/categorySuggest';
+import { isOccasionCategory } from '@/utils/occasions';
 import {
   addHourToTime,
   endFollowsStart,
@@ -455,6 +460,8 @@ const { isEditing, isSubmitting } = useFormModal(
       occasionYear.value = activity.occasionYear;
       // A create session's occasion defaults, notes and date caption never leak into an edit.
       occasion.reset();
+      // Nor its category guess (#152): the drawer is reused for new and edit.
+      categoryGuess.reset();
       wasPrefilled.value = false; // editing an existing activity is never a prefill
       // Usually null, but the AI "update existing" flow opens an existing activity in edit mode
       // WITH a source document to attach — stage it symmetrically with onNew so it binds to this
@@ -503,6 +510,7 @@ const { isEditing, isSubmitting } = useFormModal(
       // After the prefill, so the date the form opened on (a calendar click, an extracted
       // date) is never mistaken for a birth year.
       occasion.reset(date.value);
+      categoryGuess.reset();
       // Stage the source document; maybeAttachSourcePhoto() attaches it once the gate clears.
       // Show it as a local preview immediately so the user sees it on the fresh AI draft.
       pendingSourcePhoto.value = props.sourcePhoto ?? null;
@@ -513,7 +521,16 @@ const { isEditing, isSubmitting } = useFormModal(
 
 // When category changes, auto-set icon and color
 watch(category, (newCategory) => {
-  if (!newCategory) return;
+  if (!newCategory) {
+    // A guess that cleared (#152: "Softball" retyped to "Meeting") must not leave the softball
+    // icon and colour behind. Only script writes them in this form, so in a new activity they
+    // simply follow. An edit keeps a saved activity's stored icon when it has no category.
+    if (!isEditing.value) {
+      icon.value = '';
+      color.value = '';
+    }
+    return;
+  }
   icon.value = getActivityFallbackEmoji(newCategory);
   color.value = getActivityCategoryColor(newCategory);
 });
@@ -654,6 +671,7 @@ const allDayGroupRef = ref<FieldGroupRef>(null);
 const peopleGroupRef = ref<FieldGroupRef>(null);
 const reminderGroupRef = ref<FieldGroupRef>(null);
 const locationGroupRef = ref<FieldGroupRef>(null);
+const categoryGroupRef = ref<FieldGroupRef>(null);
 const OCCASION_FIELD_REFS: Record<OccasionAutoField, typeof scheduleGroupRef> = {
   schedule: scheduleGroupRef,
   allDay: allDayGroupRef,
@@ -689,6 +707,37 @@ const {
   bigOneNote,
   dateMovedCaption,
 } = occasion;
+
+// --- Category guess (#152) ---
+// The category the title names, picked as it is typed in a new activity. An occasion is shown
+// but not written until the title is committed (`onTitleCommit`), so occasion mode never starts
+// mid-word. Declared after `useFormModal`: the guess watcher reads `isEditing` as it is created.
+const { categoryLabel: activityCategoryLabel } = useActivityCategoryLabel();
+const categoryGuess = useCategoryGuess({
+  kind: 'activity',
+  text: title,
+  // The guess writes plain ids it took from the activity table, so the narrowing is safe.
+  category: computed({
+    get: () => category.value,
+    set: (id: string) => (category.value = id as ActivityCategory),
+  }),
+  suggest: suggestActivityCategory,
+  enabled: () => !isEditing.value,
+  defer: isOccasionCategory,
+  pickerEl: () => categoryGroupRef.value?.$el,
+  describe: (id) => ({ icon: getActivityFallbackEmoji(id), label: activityCategoryLabel(id) }),
+  // A pick goes through the occasion-aware writer, so picking an occasion applies its defaults.
+  write: (id) => void onCategoryPicked(id),
+});
+
+/**
+ * Leaving the title commits the occasion it names, unless Change already declined that guess:
+ * a declined occasion must not come back as the very next press blurs the title.
+ */
+function onTitleChange(): void {
+  if (categoryGuess.declined.value) return;
+  void onTitleCommit();
+}
 
 /** Logistics already on the form (an edit, an AI prefill): never hidden behind the toggle. */
 const hasLogisticsData = computed(
@@ -1047,6 +1096,9 @@ function onSaveClick() {
 function handleSave() {
   const payload = buildPayload();
   const existingId = eager.entityId.value;
+  // Gated on create mode inside (`enabled`), not on the emit branch below: an eagerly created
+  // new activity emits as an update.
+  categoryGuess.logOutcome();
 
   if (existingId) {
     // Edit-mode OR we eager-created the activity to attach a photo.
@@ -1216,13 +1268,17 @@ function handleSave() {
             type="text"
             class="font-outfit dark:text-ink w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30"
             :placeholder="t('modal.whatsTheActivity')"
-            @change="onTitleCommit"
+            @change="onTitleChange"
           />
         </div>
         <!-- Heritage Orange (never Alert Red) review hint for a low-confidence extracted value -->
         <p v-if="titleLowConfidence" class="font-outfit text-primary-500 mt-1.5 text-xs">
           {{ t('ai.lowConfidence.hint') }}
         </p>
+        <CategoryGuessHint
+          v-bind="categoryGuess.hint.value"
+          @change="categoryGuess.revealPicker()"
+        />
       </FormFieldGroup>
 
       <!-- 3. Schedule — the one shared recurrence control (#70). Same look and
@@ -1394,8 +1450,8 @@ function handleSave() {
 
       <!-- 7. Category picker. Picking an occasion applies its defaults (a user-intent path,
            never the category watch, which also fires when an edit populates the form). -->
-      <FormFieldGroup :label="t('modal.selectCategory')">
-        <ActivityCategoryPicker :model-value="category" @update:model-value="onCategoryPicked" />
+      <FormFieldGroup ref="categoryGroupRef" :label="t('modal.selectCategory')">
+        <ActivityCategoryPicker :model-value="category" @update:model-value="categoryGuess.pick" />
       </FormFieldGroup>
 
       <!-- 8-9. Logistics. An empty occasion keeps them behind "Add more details" (#137); a

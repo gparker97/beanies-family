@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-  extractionToActivityPrefill,
-  inferActivityCategory,
-  CATEGORY_KEYWORDS,
-} from '../extractionToActivity';
+import { extractionToActivityPrefill, inferActivityCategory } from '../extractionToActivity';
 import type { ExtractionResult } from '@/services/ai/types';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { ACTIVITY_CATEGORIES } from '@/constants/activityCategories';
 
 function result(overrides: Partial<ExtractionResult> = {}): ExtractionResult {
   return {
@@ -140,12 +135,98 @@ describe('inferActivityCategory', () => {
   });
 });
 
-describe('CATEGORY_KEYWORDS integrity', () => {
-  it('every mapped id is a real ACTIVITY_CATEGORIES entry', () => {
-    const valid = new Set(ACTIVITY_CATEGORIES.map((c) => c.id));
-    for (const [, id] of CATEGORY_KEYWORDS) {
-      expect(valid.has(id)).toBe(true);
-    }
+/**
+ * The keyword table AI capture used to keep (`CATEGORY_KEYWORDS`, 29 regexes) now lives on each
+ * category's own definition and is read through `suggestActivityCategory`. One phrase per old
+ * row, so nothing the capture path recognised is lost. Its regex prefixes (`swim\w*`,
+ * `optometr\w*`, `after[- ]school`) became explicit forms, each pinned here.
+ */
+describe('inferActivityCategory: the ported keyword table', () => {
+  it.each([
+    ['Birthday party', 'birthday'],
+    ['Wedding', 'wedding'],
+    ['Bar Mitzvah', 'bar_mitzvah'],
+    ['Bat Mitzvah', 'bar_mitzvah'],
+    ['Piano recital', 'school_recital'],
+    ['Award ceremony', 'school_recital'],
+    ['Class presentation', 'school_recital'],
+    ['Concert', 'concert'],
+    ['The play', 'show'],
+    ['Show', 'show'],
+    ['Musical', 'show'],
+    ['Theatre', 'show'],
+    ['Theater', 'show'],
+    ['Movie', 'movie'],
+    ['Cinema', 'movie'],
+    ['Film screening', 'movie'],
+    ['Festival', 'festival'],
+    ['Carnival', 'festival'],
+    ['County fair', 'festival'],
+    ['Museum', 'museum'],
+    ['Art exhibit', 'museum'],
+    ['Theme park', 'theme_park'],
+    ['Amusement park', 'theme_park'],
+    ['Game', 'sporting_event'],
+    ['Match', 'sporting_event'],
+    ['Tournament', 'sporting_event'],
+    ['Soccer', 'soccer'],
+    ['Softball', 'softball'],
+    ['Tennis', 'tennis'],
+    ['Swim', 'swimming'],
+    ['Swimming', 'swimming'],
+    ['Swimmer meet-up', 'swimming'],
+    ['Gymnastics', 'gymnastics'],
+    ['Dentist', 'dentist'],
+    ['Dental cleaning', 'dentist'],
+    ['Doctor', 'doctor'],
+    ['Clinic', 'doctor'],
+    ['Pediatric visit', 'doctor'],
+    ['Appointment', 'doctor'],
+    ['Eye exam', 'eye_exam'],
+    ['Optometrist', 'eye_exam'],
+    ['Optometry', 'eye_exam'],
+    ['Optician', 'eye_exam'],
+    ['Haircut', 'haircut'],
+    ['Salon', 'haircut'],
+    ['Barber', 'haircut'],
+    ['Dinner', 'dining_out'],
+    ['Dining', 'dining_out'],
+    ['Restaurant', 'dining_out'],
+    ['Lunch', 'dining_out'],
+    ['Brunch', 'brunch'],
+    ['Coffee', 'coffee'],
+    ['Café', 'coffee'],
+    ['Cafe', 'coffee'],
+    ['Drinks', 'drinks'],
+    ['Cocktail', 'drinks'],
+    ['Happy hour', 'drinks'],
+    ['Picnic', 'picnic'],
+    ['Field trip', 'field_trip'],
+    ['Excursion', 'field_trip'],
+    ['Learning journey', 'field_trip'],
+    ['School outing', 'field_trip'],
+    ['School visit', 'field_trip'],
+    ['After school club', 'after_school'],
+    ['After-school club', 'after_school'],
+    ['Afterschool club', 'after_school'],
+    ['Spelling bee', 'spelling_bee'],
+    ['Cubing', 'cubing'],
+  ])('%s -> %s', (title, want) => {
+    expect(inferActivityCategory(result({ title }))).toBe(want);
+  });
+
+  it('a specific word beats a generic one (the old first-match order put "game" first)', () => {
+    expect(inferActivityCategory(result({ title: 'Soccer game' }))).toBe('soccer');
+    expect(inferActivityCategory(result({ title: 'Dinner show' }))).toBe('dining_out');
+  });
+
+  it('matches the title before the description, each on its own', () => {
+    expect(
+      inferActivityCategory(result({ title: 'Tennis', description: 'Lunch provided after' }))
+    ).toBe('tennis');
+    expect(inferActivityCategory(result({ title: 'Saturday', description: 'Tennis' }))).toBe(
+      'tennis'
+    );
   });
 });
 
