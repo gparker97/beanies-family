@@ -322,6 +322,23 @@ describe('privacy', () => {
     expect(h.logEvent.mock.calls.length).toBeGreaterThanOrEqual(8);
   });
 
+  it('a pick is noted with closed words only: whether it kept detail and stored a title', () => {
+    const store = usePlaceSearchStore();
+    store.notePick('activity', true, true);
+    expect(h.logEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        message: 'place_pick',
+        context: { action: 'pick', kind: 'activity', detail: 'with-detail', format: 'titled' },
+      })
+    );
+    store.notePick('stay', false);
+    expect(h.logEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        context: { action: 'pick', kind: 'stay', detail: 'no-detail', format: 'address' },
+      })
+    );
+  });
+
   it('a superseded pick is noted with its field kind and a closed detail only', () => {
     usePlaceSearchStore().notePickSuperseded('stay');
     expect(h.logEvent).toHaveBeenLastCalledWith(

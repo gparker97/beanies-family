@@ -5,7 +5,7 @@
  * the small beanies shapes the client understands:
  *
  *   suggestPlaces  POST places.googleapis.com/v1/places:autocomplete  (Places API (New))
- *                  → { suggestions: [{ placeId, main, secondary }] }
+ *                  → { suggestions: [{ placeId, main, secondary, kind }] }
  *   resolvePlace   GET  maps.googleapis.com/maps/api/geocode/json?place_id=…  (Geocoding)
  *                  → { address }   (`formatted_address`, storable under Geocoding terms 6.3.2)
  *
@@ -32,7 +32,20 @@ export const AUTOCOMPLETE_FIELD_MASK = [
   'suggestions.placePrediction.placeId',
   'suggestions.placePrediction.structuredFormat.mainText.text',
   'suggestions.placePrediction.structuredFormat.secondaryText.text',
+  'suggestions.placePrediction.types',
 ].join(',');
+
+/**
+ * Prediction `types` that make a suggestion a named place (a business or landmark) rather than
+ * an address. The client stores a named place's main text as its title (owner's decision of
+ * 2026-11-18, ADR-049 addendum). The types themselves never leave this module.
+ */
+const PLACE_TYPES = new Set(['establishment', 'point_of_interest']);
+
+/** `'place'` when the prediction's types name a business or landmark, else `'address'`. */
+export function kindOf(types) {
+  return Array.isArray(types) && types.some((t) => PLACE_TYPES.has(t)) ? 'place' : 'address';
+}
 
 /** The locationBias circle radius (Google's maximum for a circle bias). */
 export const BIAS_RADIUS_M = 50000;
@@ -166,7 +179,7 @@ const textOf = (node) => (typeof node?.text === 'string' ? node.text : undefined
  * @param {string} args.apiKey
  * @param {typeof fetch} [args.fetchImpl]
  * @param {AbortSignal} [args.signal]
- * @returns {Promise<{ suggestions: Array<{ placeId: string, main: string, secondary: string }> }>}
+ * @returns {Promise<{ suggestions: Array<{ placeId: string, main: string, secondary: string, kind: 'place' | 'address' }> }>}
  */
 export async function suggestPlaces({ q, lang, bias, apiKey, fetchImpl = fetch, signal }) {
   const combined = deadline(signal);
@@ -218,6 +231,7 @@ export async function suggestPlaces({ q, lang, bias, apiKey, fetchImpl = fetch, 
       placeId: p.placeId,
       main,
       secondary: textOf(p.structuredFormat?.secondaryText) ?? '',
+      kind: kindOf(p.types),
     });
   }
   return { suggestions };

@@ -3,10 +3,12 @@ import {
   ADDRESS_ABBREVIATIONS,
   PLACE_FIELDS,
   SUB_PREMISE_KEYWORDS,
+  addressCarriesTitle,
   composePlaceText,
   detailOf,
   makePlaceRef,
   mapsHref,
+  placeLead,
   placePatch,
   splitKeptDetail,
   validPlace,
@@ -16,6 +18,20 @@ import { MERGE_FIELDS } from '@/services/automerge/worker/reconcile';
 import { isWordBoundedScript, wordTokenList } from '@/utils/textSimilarity';
 
 const PLACE = { placeId: 'ChIJabc_123-x', name: '127 S Bridge Rd, Singapore 058285' };
+const TITLED = {
+  placeId: 'ChIJhungarian_1',
+  name: '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769',
+  title: 'The Hungarian Touch',
+};
+const TITLED_LEAD = `${TITLED.title}, ${TITLED.name}`;
+
+describe('placeLead', () => {
+  it('is the address alone without a title, and title + address with one', () => {
+    expect(placeLead(PLACE)).toBe(PLACE.name);
+    expect(placeLead(TITLED)).toBe(TITLED_LEAD);
+    expect(placeLead({ name: 'x', title: '' })).toBe('x');
+  });
+});
 
 describe('validPlace', () => {
   const cases: Array<[string, string | undefined, unknown, boolean]> = [
@@ -52,6 +68,27 @@ describe('validPlace', () => {
     ['a string as place', 'x', 'x', false],
     ['undefined text', undefined, PLACE, false],
     ['whitespace-only detail still starts with name + ", "', `${PLACE.name},   `, PLACE, false],
+    ['titled: exactly the lead', TITLED_LEAD, TITLED, true],
+    ['titled: lead + detail', `${TITLED_LEAD}, back room`, TITLED, true],
+    ['titled: the address alone is not the lead', TITLED.name, TITLED, false],
+    ['titled: the address + detail is not the lead', `${TITLED.name}, back room`, TITLED, false],
+    ['titled: the title alone is not the lead', TITLED.title, TITLED, false],
+    ['titled: an empty title is invalid', TITLED.name, { ...TITLED, title: '' }, false],
+    [
+      'titled: a whitespace title is invalid',
+      `  , ${TITLED.name}`,
+      { ...TITLED, title: '  ' },
+      false,
+    ],
+    [
+      'titled: a title with edge whitespace is invalid',
+      ` The Hungarian Touch, ${TITLED.name}`,
+      { ...TITLED, title: ' The Hungarian Touch' },
+      false,
+    ],
+    ['titled: a non-string title is invalid', TITLED.name, { ...TITLED, title: 7 }, false],
+    ['titled: a null title is invalid', TITLED.name, { ...TITLED, title: null }, false],
+    ['an undefined title is no title', PLACE.name, { ...PLACE, title: undefined }, true],
   ];
   it.each(cases)('%s', (_label, text, place, ok) => {
     expect(Boolean(validPlace(text, place))).toBe(ok);
@@ -72,23 +109,37 @@ describe('detailOf', () => {
     expect(detailOf('Elsewhere, room 2', PLACE)).toBe('');
     expect(detailOf('Elsewhere, room 2', undefined)).toBe('');
   });
+  it('with a title, returns the rest after the lead (title, address)', () => {
+    expect(detailOf(`${TITLED_LEAD}, back room `, TITLED)).toBe('back room');
+    expect(detailOf(TITLED_LEAD, TITLED)).toBe('');
+    // The address part is never read as detail, and a string without the title is inert.
+    expect(detailOf(`${TITLED.name}, back room`, TITLED)).toBe('');
+  });
 });
 
 describe('composePlaceText', () => {
+  const MAIN_ST = { name: '12 Main St' };
   it('joins name and detail with ", "', () => {
-    expect(composePlaceText('12 Main St', 'room 3')).toBe('12 Main St, room 3');
+    expect(composePlaceText(MAIN_ST, 'room 3')).toBe('12 Main St, room 3');
   });
   it('trims the detail and strips its edge separators', () => {
-    expect(composePlaceText('12 Main St', ' , room 3; ')).toBe('12 Main St, room 3');
+    expect(composePlaceText(MAIN_ST, ' , room 3; ')).toBe('12 Main St, room 3');
   });
   it('is the name alone for an empty or separator-only detail', () => {
-    expect(composePlaceText('12 Main St', '')).toBe('12 Main St');
-    expect(composePlaceText('12 Main St', ' ,; ')).toBe('12 Main St');
+    expect(composePlaceText(MAIN_ST, '')).toBe('12 Main St');
+    expect(composePlaceText(MAIN_ST, ' ,; ')).toBe('12 Main St');
   });
   it('round-trips through detailOf and validPlace', () => {
-    const text = composePlaceText(PLACE.name, 'block 48');
+    const text = composePlaceText(PLACE, 'block 48');
     expect(validPlace(text, PLACE)).toBe(PLACE);
     expect(detailOf(text, PLACE)).toBe('block 48');
+  });
+  it('with a title, leads with the title then the address', () => {
+    expect(composePlaceText(TITLED, 'back room')).toBe(`${TITLED_LEAD}, back room`);
+    expect(composePlaceText(TITLED, '')).toBe(TITLED_LEAD);
+    const text = composePlaceText(TITLED, ' back room; ');
+    expect(validPlace(text, TITLED)).toBe(TITLED);
+    expect(detailOf(text, TITLED)).toBe('back room');
   });
 });
 
@@ -97,6 +148,16 @@ describe('makePlaceRef', () => {
     const ref = makePlaceRef({ name: 'n', extra: 1, placeId: 'p' } as never);
     expect(Object.keys(ref)).toEqual(['placeId', 'name']);
     expect(JSON.stringify(ref)).toBe('{"placeId":"p","name":"n"}');
+  });
+  it('keeps a title last, and omits a blank one', () => {
+    const ref = makePlaceRef({ title: 't', name: 'n', placeId: 'p' });
+    expect(JSON.stringify(ref)).toBe('{"placeId":"p","name":"n","title":"t"}');
+    for (const title of ['', '   ', undefined]) {
+      expect(Object.keys(makePlaceRef({ placeId: 'p', name: 'n', title }))).toEqual([
+        'placeId',
+        'name',
+      ]);
+    }
   });
 });
 
@@ -173,11 +234,36 @@ describe('mapsHref', () => {
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(PLACE.name)}&query_place_id=${PLACE.placeId}`
     );
   });
+
+  it('with a title, searches for the lead (title, address) and never the detail', () => {
+    expect(mapsHref(`${TITLED_LEAD}, back room`, TITLED)).toBe(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(TITLED_LEAD)}&query_place_id=${TITLED.placeId}`
+    );
+    // Without the title in front, the place is inert: the plain text search.
+    expect(mapsHref(TITLED.name, TITLED)).toBe(legacy(TITLED.name));
+  });
+});
+
+describe('addressCarriesTitle', () => {
+  it.each([
+    ['1 Raffles Place', '1 Raffles Pl, Singapore 048616', true],
+    ['127 South Bridge Road', '127 S Bridge Rd, Singapore 058285', true],
+    ['Roxy Square', '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769', true],
+    ['The Hungarian Touch', '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769', false],
+    ['Marina Bay Sands Singapore', '10 Bayfront Ave, Singapore 018956', false],
+    ['Raffles Place 1', '1 Raffles Pl, Singapore 048616', false],
+    ['東京タワー', '日本、〒105-0011 東京都港区芝公園４丁目２−８ 東京タワー', true],
+    ['東京タワー', '日本、〒105-0011 東京都港区芝公園４丁目２−８', false],
+  ])('"%s" in "%s" is %s', (title, address, carried) => {
+    expect(addressCarriesTitle(title, address)).toBe(carried);
+  });
 });
 
 describe('splitKeptDetail', () => {
   it.each(SPLIT_FIXTURES.map((f) => [f.note ?? f.typed, f] as const))('%s', (_label, f) => {
-    expect(splitKeptDetail(f.typed, { carried: f.carried, main: f.main })).toBe(f.detail);
+    expect(splitKeptDetail(f.typed, { carried: f.carried, main: f.main, title: f.title })).toBe(
+      f.detail
+    );
   });
 
   // ── An independent statement of the contract, deliberately looser than the function ──
@@ -212,30 +298,48 @@ describe('splitKeptDetail', () => {
    * whole and whose every word appears in order in the address (and the address has enough of
    * each word for the head and the tail together), OR (head, no tail) it is a fragment: a word
    * of two or more letters that is a strict prefix of a word of the main text, OR it is a
-   * keyword or wordless chunk directly before a dropped chunk.
+   * keyword or wordless chunk directly before a dropped chunk. With a TITLE, a leading run of
+   * dropped chunks may also be explained by the title (their words, together, appear in order
+   * in it: the saved string leads with the title), and the rules above apply to what follows,
+   * with the title's words counting as main text for fragments.
    */
-  function assertNothingLost(typed: string, carried: string, main = '') {
-    const detail = splitKeptDetail(typed, { carried, main });
+  function assertNothingLost(typed: string, carried: string, main = '', title = '') {
+    const detail = splitKeptDetail(typed, { carried, main, ...(title ? { title } : {}) });
     const out = detail.split(/\s+/).filter(Boolean);
-    const chunks = typed.trim().split(/\s+/).filter(Boolean);
-    const tail = chunks.findIndex(
-      (c, i) => (isKeyword(c) || c.startsWith('#')) && chunks.slice(0, i).some((p) => !isKeyword(p))
-    );
-    const headEnd = tail < 0 ? chunks.length : tail;
+    const all = typed.trim().split(/\s+/).filter(Boolean);
 
     // Which typed chunks the detail kept: it is made of typed chunks, in typed order.
-    const kept = chunks.map(() => false);
+    const keptAll = all.map(() => false);
     let o = 0;
-    chunks.forEach((c, i) => {
+    all.forEach((c, i) => {
       if (o < out.length && (out[o] === c || out[o] === edges(c))) {
-        kept[i] = true;
+        keptAll[i] = true;
         o++;
       }
     });
     expect(o, `"${detail}" is not made of the chunks of "${typed}"`).toBe(out.length);
 
+    // The title's run: leading dropped chunks whose words, together, are in order in the title.
+    const titleWords = words(title);
+    let start = 0;
+    const run: string[] = [];
+    for (let i = 0; title && i < all.length && !keptAll[i]; i++) {
+      const w = words(all[i]!);
+      if (!w.length) continue;
+      if (!inOrder([...run, ...w], titleWords)) break;
+      run.push(...w);
+      start = i + 1;
+    }
+    const chunks = all.slice(start);
+    const kept = keptAll.slice(start);
+    if (!chunks.length) return;
+    const tail = chunks.findIndex(
+      (c, i) => (isKeyword(c) || c.startsWith('#')) && chunks.slice(0, i).some((p) => !isKeyword(p))
+    );
+    const headEnd = tail < 0 ? chunks.length : tail;
+
     const address = words(carried);
-    const mainWords = wordTokenList(main);
+    const mainWords = wordTokenList(`${main} ${title}`);
     const isFragment = (c: string) =>
       wordTokenList(c).some(
         (w) => w.length >= 2 && mainWords.some((m) => m.length > w.length && m.startsWith(w))
@@ -268,7 +372,8 @@ describe('splitKeptDetail', () => {
 
   it('property: nothing typed is lost (fixture table)', () => {
     for (const f of SPLIT_FIXTURES) {
-      if (f.typed && isWordBoundedScript(f.typed)) assertNothingLost(f.typed, f.carried, f.main);
+      if (f.typed && isWordBoundedScript(f.typed))
+        assertNothingLost(f.typed, f.carried, f.main, f.title);
     }
   });
 
@@ -311,6 +416,60 @@ describe('splitKeptDetail', () => {
       const city = cities[rand(cities.length)]!;
       const main = rand(2) ? `Marina Bay Sands ${street}` : street;
       assertNothingLost(typed, `${stored},${city}`, main);
+    }
+  });
+
+  it('property: nothing typed is lost (generated named-place picks)', () => {
+    const places: Array<[string, string]> = [
+      ['The Hungarian Touch', '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769'],
+      ['Starbucks VivoCity', '1 HarbourFront Walk, #01-167 VivoCity, Singapore 098585'],
+      ['Marina Bay Sands Singapore', '10 Bayfront Ave, Singapore 018956'],
+      ['Lido Pool', '12 Main St, Springfield, IL 62701, USA'],
+    ];
+    const extras = [
+      'back room',
+      'level 3',
+      'unit 01-138',
+      '#05-12',
+      'near the escalator',
+      'east coast road',
+      'touch',
+      'the',
+      'singapore',
+      'pool',
+      '-',
+      'main st',
+    ];
+    for (let i = 0; i < 1500; i++) {
+      const [title, carried] = places[rand(places.length)]!;
+      const titleWords = title.toLowerCase().split(' ');
+      const from = rand(2);
+      const to = from + rand(titleWords.length - from + 1);
+      const parts = titleWords.slice(from, to);
+      // Sometimes the next title word, half typed.
+      const next = titleWords[to];
+      if (next && rand(3) === 0) parts.push(next.slice(0, 2 + rand(Math.max(1, next.length - 2))));
+      const extra = rand(3);
+      for (let k = 0; k < extra; k++) {
+        const e = extras[rand(extras.length)]!;
+        if (rand(3)) parts.push(e);
+        else parts.unshift(e);
+      }
+      const typed = parts.join(rand(2) ? ' ' : ', ');
+      if (!typed.trim()) continue;
+      assertNothingLost(typed, carried, title, title);
+    }
+  });
+
+  it('with no title, or a blank one, the result is exactly the untitled one', () => {
+    for (const f of SPLIT_FIXTURES) {
+      const untitled = splitKeptDetail(f.typed, { carried: f.carried, main: f.main });
+      expect(splitKeptDetail(f.typed, { carried: f.carried, main: f.main, title: '' })).toBe(
+        untitled
+      );
+      expect(splitKeptDetail(f.typed, { carried: f.carried, main: f.main, title: '  ' })).toBe(
+        untitled
+      );
     }
   });
 

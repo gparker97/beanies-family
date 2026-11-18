@@ -5,6 +5,7 @@ import {
   AUTOCOMPLETE_FIELD_MASK,
   AUTOCOMPLETE_URL,
   GEOCODE_URL,
+  kindOf,
   PROVIDER_ERROR_CODES,
   PROVIDER_REASONS,
   ProviderError,
@@ -52,6 +53,17 @@ const GOOGLE_OK = {
           mainText: { text: '127 South Bridge Road' },
           secondaryText: { text: 'Singapore' },
         },
+        types: ['street_address', 'geocode'],
+      },
+    },
+    {
+      placePrediction: {
+        placeId: 'ChIJHungarianTouch',
+        structuredFormat: {
+          mainText: { text: 'The Hungarian Touch' },
+          secondaryText: { text: 'East Coast Road, Singapore' },
+        },
+        types: ['restaurant', 'food', 'point_of_interest', 'establishment'],
       },
     },
     { queryPrediction: { text: { text: 'ignored' } } },
@@ -80,7 +92,8 @@ describe('suggestPlaces: the fixed request', () => {
       'X-Goog-FieldMask':
         'suggestions.placePrediction.placeId,' +
         'suggestions.placePrediction.structuredFormat.mainText.text,' +
-        'suggestions.placePrediction.structuredFormat.secondaryText.text',
+        'suggestions.placePrediction.structuredFormat.secondaryText.text,' +
+        'suggestions.placePrediction.types',
     });
     assert.equal(init.headers['X-Goog-FieldMask'], AUTOCOMPLETE_FIELD_MASK);
     assert.ok(init.signal instanceof AbortSignal);
@@ -130,10 +143,31 @@ describe('suggestPlaces: the fixed request', () => {
     const out = await suggestPlaces({ q: 'abc', lang: 'en', apiKey: KEY, fetchImpl });
     assert.deepEqual(out, {
       suggestions: [
-        { placeId: 'ChIJ127SouthBridge', main: '127 South Bridge Road', secondary: 'Singapore' },
-        { placeId: 'ChIJnoSecondary', main: 'X', secondary: '' },
+        {
+          placeId: 'ChIJ127SouthBridge',
+          main: '127 South Bridge Road',
+          secondary: 'Singapore',
+          kind: 'address',
+        },
+        {
+          placeId: 'ChIJHungarianTouch',
+          main: 'The Hungarian Touch',
+          secondary: 'East Coast Road, Singapore',
+          kind: 'place',
+        },
+        { placeId: 'ChIJnoSecondary', main: 'X', secondary: '', kind: 'address' },
       ],
     });
+  });
+
+  test('kind: a place only when the types name an establishment or point of interest', () => {
+    assert.equal(kindOf(['establishment']), 'place');
+    assert.equal(kindOf(['point_of_interest', 'park']), 'place');
+    assert.equal(kindOf(['street_address', 'geocode']), 'address');
+    assert.equal(kindOf(['premise']), 'address');
+    assert.equal(kindOf([]), 'address');
+    assert.equal(kindOf(undefined), 'address');
+    assert.equal(kindOf('establishment'), 'address', 'a string is not a types list');
   });
 
   test('an answer with no suggestions key is an empty list (proto3 omits empty fields)', async () => {

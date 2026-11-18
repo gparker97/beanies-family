@@ -42,6 +42,12 @@ const T: Record<string, string> = {
 const t = (key: string) => T[key] ?? key;
 
 const PLACE: PlaceRef = { placeId: 'ChIJ127', name: '127 S Bridge Rd, Singapore 058285' };
+const TITLED: PlaceRef = {
+  placeId: 'ChIJht',
+  name: '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769',
+  title: 'The Hungarian Touch',
+};
+const TITLED_LEAD = `${TITLED.title}, ${TITLED.name}`;
 
 beforeEach(() => {
   flags.on = false;
@@ -63,6 +69,20 @@ describe('flag off: every surface kind renders today', () => {
     expect(formatLocationOneLine(view.oneLine, t, false)).toBe(text);
     // Wall: the stored text, nothing under it.
     expect(wallLocation(text, PLACE, t)).toEqual({ main: text, subs: [] });
+  });
+
+  it('a titled place changes nothing with the flag off, even on its own saved string', () => {
+    for (const text of [...FLAG_OFF_TEXTS, TITLED_LEAD, `${TITLED_LEAD}, back room`]) {
+      const view = describeLocation(text, TITLED);
+      expect(view).toEqual({
+        plain: text,
+        mapHref: legacy(text),
+        links: [],
+        oneLine: [{ kind: 'place', text }],
+      });
+      expect(wallLocation(text, TITLED, t)).toEqual({ main: text, subs: [] });
+      expect(reminder({ location: text, locationPlace: TITLED }).who).toEqual(['Mia', text]);
+    }
   });
 
   it('the reminder context carries the stored location string, as today', () => {
@@ -94,6 +114,30 @@ describe('flag on: single-line, reminder and wall shapes', () => {
     expect(who).toEqual(['Mia', 'Room 3', 'Zoom']);
     expect(JSON.stringify(who)).not.toMatch(/https?:|secret/);
     expect(reminder({ location: url }).who).toEqual(['Mia', 'Zoom']);
+  });
+
+  it('a named place: the wall shows the title, then the address, then the detail', () => {
+    expect(wallLocation(`${TITLED_LEAD}, back room`, TITLED, t)).toEqual({
+      main: 'The Hungarian Touch',
+      subs: [TITLED.name, 'back room'],
+    });
+    expect(wallLocation(TITLED_LEAD, TITLED, t)).toEqual({
+      main: 'The Hungarian Touch',
+      subs: [TITLED.name],
+    });
+    const withCall = wallLocation(`${TITLED_LEAD}, back room https://zoom.us/j/1`, TITLED, t)!;
+    expect(withCall).toEqual({
+      main: 'The Hungarian Touch',
+      subs: [TITLED.name, 'back room', 'Zoom call', 'Join from your phone'],
+    });
+  });
+
+  it('a named place: one line and the reminder read the whole saved place text', () => {
+    const text = `${TITLED_LEAD}, back room`;
+    expect(formatLocationOneLine(describeLocation(text, TITLED).oneLine, t, true)).toBe(
+      `📍 ${text}`
+    );
+    expect(reminder({ location: text, locationPlace: TITLED }).who).toEqual(['Mia', text]);
   });
 
   it('the wall shows the place with its detail under it, and a call by service name, no link', () => {

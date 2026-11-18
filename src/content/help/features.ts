@@ -182,7 +182,7 @@ const ADDRESS_SUGGESTIONS_ARTICLE: HelpArticle = {
     {
       type: 'paragraph',
       content:
-        'The map link now opens that exact place in Google Maps, and your unit or room detail shows beside the address everywhere the location is shown. Nothing you typed is thrown away.',
+        'The map link now opens that exact place in Google Maps, and your unit or room detail shows beside the address everywhere the location is shown. If you pick a business or another named place, like a restaurant, its name is kept above the address. Nothing you typed is thrown away.',
     },
     { type: 'heading', content: 'Keeping exactly what you typed', level: 2, id: 'keep-typed' },
     {

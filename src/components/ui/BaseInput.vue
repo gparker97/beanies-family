@@ -43,6 +43,8 @@ const emit = defineEmits<{
  */
 const slots = useSlots();
 const hasLeading = () => !!slots.leading;
+/** Optional `trailing` slot: the same, at the right edge (`LocationField`'s searching mark). */
+const hasTrailing = () => !!slots.trailing;
 
 const inputId = computed(() => props.id || `input-${Math.random().toString(36).slice(2, 9)}`);
 
@@ -53,7 +55,7 @@ const inputClasses = computed(() => {
   // force-quit clears). Pinning 1rem keeps every BaseInput above that threshold;
   // it's rem-based so Large reading mode still scales it.
   const base =
-    'block w-full rounded-xl border pr-3 py-2 text-base text-gray-900 dark:text-ink bg-white dark:bg-surface-raised placeholder-gray-400 dark:placeholder-ink-faint focus:outline-none focus:ring-2 transition-colors';
+    'block w-full rounded-xl border py-2 text-base text-gray-900 dark:text-ink bg-white dark:bg-surface-raised placeholder-gray-400 dark:placeholder-ink-faint focus:outline-none focus:ring-2 transition-colors';
 
   const states = props.error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
@@ -99,11 +101,18 @@ function handleInput(event: Event) {
         :placeholder="placeholder"
         :disabled="disabled"
         :required="required"
-        :class="[inputClasses, hasLeading() ? 'pl-10' : 'pl-3']"
+        :class="[inputClasses, hasLeading() ? 'pl-10' : 'pl-3', hasTrailing() ? 'pr-10' : 'pr-3']"
         v-bind="$attrs"
         @input="handleInput"
         @blur="emit('blur', $event)"
       />
+      <span
+        v-if="hasTrailing()"
+        class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"
+        aria-hidden="true"
+      >
+        <slot name="trailing" />
+      </span>
     </div>
 
     <p v-if="error" class="dark:text-danger-lift text-sm text-red-600">

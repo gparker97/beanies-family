@@ -14,7 +14,8 @@
  *
  * No vendor field is named here: the adapter returns beanies shapes and throws
  * `ProviderError { code, httpStatus?, reason? }`. The answer caps (5 suggestions, 200 characters
- * a string, the place-id shape) are applied HERE so they hold for any adapter.
+ * a string, the place-id shape, `kind` one of `place` / `address`) are applied HERE so they hold
+ * for any adapter.
  */
 
 import { BUDGET_EXHAUSTED_PREFIX, RATE_STORE_UNAVAILABLE_PREFIX, takeToken } from './store.mjs';
@@ -159,6 +160,9 @@ export function clip(text) {
   return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
 }
 
+/** The only suggestion kinds the client is told; anything else from an adapter is an address. */
+const SUGGESTION_KINDS = new Set(['place', 'address']);
+
 /** The adapter's suggestions → at most 5 well-formed, clipped rows. */
 function capSuggestions(list) {
   const out = [];
@@ -170,6 +174,7 @@ function capSuggestions(list) {
       placeId: s.placeId,
       main: clip(s.main),
       secondary: typeof s.secondary === 'string' ? clip(s.secondary) : '',
+      kind: SUGGESTION_KINDS.has(s.kind) ? s.kind : 'address',
     });
   }
   return out;

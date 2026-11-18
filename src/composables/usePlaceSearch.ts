@@ -6,6 +6,7 @@ import type { PlaceFieldKind, PlaceSearchErrorCode, PlaceSuggestion } from '@/ty
 import { parseLocation } from '@/utils/location/locationLinks';
 import {
   SUB_PREMISE_KEYWORDS,
+  addressCarriesTitle,
   composePlaceText,
   makePlaceRef,
   splitKeptDetail,
@@ -35,6 +36,17 @@ export const PLACE_SEARCH_DEBOUNCE_MS = 400;
 export const PLACE_SEARCH_MIN_CHARS = 3;
 /** Thrift only (the Lambda's daily cap is the spend bound): requests per field session. */
 export const PLACE_SEARCH_SESSION_CAP = 6;
+/** How long a provider request runs before the field shows its searching mark, so a fast
+ *  answer never flickers it. */
+export const PLACE_SEARCH_SLOW_MS = 150;
+
+/**
+ * What the last completed lookup found: `results` (one or more suggestions), `none` (it
+ * completed and found nothing, after the trimmed retry when one ran), or `idle` (anything
+ * else: nothing asked yet, a keystroke since, a cancel, a failure, a refusal, a cap). Only
+ * `none` is shown to the member, so every silent case stays `idle`.
+ */
+export type PlaceLookupState = 'idle' | 'results' | 'none';
 
 /** The words before the first sub-premise keyword (or `#…`) after the first word, else the
  *  first five words; '' when that is the query itself (no retry to make). */
@@ -56,6 +68,28 @@ const QUERY_LINE_BREAK = /[\r\n\u0085\u2028\u2029]/;
 const QUERY_EMAIL_HOST = /@[^\s@]+\.[^\s@]+/;
 /** The Lambda's `MAX_QUERY_CHARS`. */
 export const PLACE_SEARCH_MAX_CHARS = 200;
+/** The Lambda's `MAX_TEXT_CHARS`: the longest suggestion text, and so the longest stored title. */
+export const PLACE_TITLE_MAX_CHARS = 200;
+
+/**
+ * The title a pick stores (ADR-049 addendum of 2026-11-18): a named place's main text (`kind:
+ * 'place'`), trimmed and capped. None for an address, and none when the address already carries
+ * every word of it (the "place" is just its address: "1 Raffles Place" against "1 Raffles Pl,
+ * Singapore 048616"), so the saved string never repeats itself.
+ */
+export function pickTitle(suggestion: PlaceSuggestion, address: string): string | undefined {
+  if (suggestion.kind !== 'place') return undefined;
+  const title = clipTitle(suggestion.main.trim());
+  if (!title || addressCarriesTitle(title, address)) return undefined;
+  return title;
+}
+
+/** Cap at `PLACE_TITLE_MAX_CHARS` without leaving half a surrogate pair (the Lambda's `clip`). */
+function clipTitle(text: string): string {
+  if (text.length <= PLACE_TITLE_MAX_CHARS) return text;
+  const cut = text.slice(0, PLACE_TITLE_MAX_CHARS);
+  return (/[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut).trim();
+}
 
 /**
  * Whether the `place-search` Lambda would accept this text as a query. The client refuses the
@@ -87,6 +121,43 @@ export function usePlaceSearch(options: { fieldKind: PlaceFieldKind }) {
 
   const suggestions = ref<PlaceSuggestion[]>([]);
   const available = computed(() => store.available);
+  const state = ref<PlaceLookupState>('idle');
+
+  /**
+   * A provider request is in flight: true from the moment the first request of a lookup is
+   * sent (never during the debounce, never for a cached answer) until the lookup's answer
+   * lands or it is aborted (a superseding keystroke, blur, Escape, Keep what I typed, a
+   * reset). The trimmed retry runs inside the same span, so there is no gap between the two.
+   */
+  const requesting = ref(false);
+  const slowRaw = ref(false);
+  /** `requesting` once it has lasted `PLACE_SEARCH_SLOW_MS`, while the store is available:
+   *  what the field shows its searching mark for. */
+  const slowLookup = computed(() => slowRaw.value && store.available);
+  /** The signal of the lookup `requesting` describes, so a superseded one cannot clear it. */
+  let requestSignal: AbortSignal | null = null;
+  let slowTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function endRequesting(signal: AbortSignal | null): void {
+    if (signal === null || requestSignal !== signal) return;
+    requestSignal = null;
+    if (slowTimer) clearTimeout(slowTimer);
+    slowTimer = null;
+    requesting.value = false;
+    slowRaw.value = false;
+  }
+
+  function beginRequesting(signal: AbortSignal): void {
+    if (requestSignal === signal || signal.aborted) return;
+    endRequesting(requestSignal);
+    requestSignal = signal;
+    requesting.value = true;
+    slowTimer = setTimeout(() => {
+      slowTimer = null;
+      slowRaw.value = true;
+    }, PLACE_SEARCH_SLOW_MS);
+    signal.addEventListener('abort', () => endRequesting(signal), { once: true });
+  }
 
   const cache = new Map<string, PlaceSuggestion[]>();
   let requests = 0;
@@ -107,6 +178,8 @@ export function usePlaceSearch(options: { fieldKind: PlaceFieldKind }) {
   /** The member typed (or pasted, or dictated) into this field's typing input. */
   function onInput(raw: string): void {
     const text = raw ?? '';
+    // Any keystroke clears the last lookup's "nothing found"; the next answer sets it afresh.
+    state.value = 'idle';
     if (!text.trim()) resetSession();
     // A quiet period ends by the clock, not only by its timer (a sleeping device never fires
     // it), so it is settled before `available` is read.
@@ -128,6 +201,7 @@ export function usePlaceSearch(options: { fieldKind: PlaceFieldKind }) {
     if (cached) return { ok: true, suggestions: cached, fromCache: true };
     if (requests >= PLACE_SEARCH_SESSION_CAP) return { ok: false, code: 'session_cap' };
     requests++;
+    beginRequesting(signal);
     const result = await store.requestSuggestions(q, { signal, fieldKind, attempt });
     if (result.ok) cache.set(normalize(q), result.suggestions);
     return result;
@@ -153,17 +227,25 @@ export function usePlaceSearch(options: { fieldKind: PlaceFieldKind }) {
     return second;
   }
 
-  const { searching, cancel } = useDebouncedSearch<Answer>({
+  const { searching, cancel: cancelSearch } = useDebouncedSearch<Answer>({
     query: searchable,
     minChars: PLACE_SEARCH_MIN_CHARS,
     delayMs: PLACE_SEARCH_DEBOUNCE_MS,
-    run,
+    run: async (q, signal) => {
+      try {
+        return await run(q, signal);
+      } finally {
+        endRequesting(signal);
+      }
+    },
     onAnswer: (_q, result) => {
       if (result.ok) {
         suggestions.value = result.suggestions;
+        state.value = result.suggestions.length > 0 ? 'results' : 'none';
         return;
       }
       suggestions.value = [];
+      state.value = 'idle';
       if (result.code === 'session_cap' && !capNoted) {
         capNoted = true;
         store.noteQuiet('session-cap', fieldKind);
@@ -171,8 +253,15 @@ export function usePlaceSearch(options: { fieldKind: PlaceFieldKind }) {
     },
     onIdle: () => {
       suggestions.value = [];
+      state.value = 'idle';
     },
   });
+
+  /** Drop the lookup waiting or in flight; its "nothing found" no longer applies either. */
+  function cancel(): void {
+    cancelSearch();
+    state.value = 'idle';
+  }
 
   function resetSession(): void {
     cache.clear();
@@ -193,7 +282,8 @@ export function usePlaceSearch(options: { fieldKind: PlaceFieldKind }) {
 
   /**
    * Turn a tapped suggestion into the field's pair: Google's formatted address as the place
-   * line (one address fetch), the typed text it does not carry kept as the detail. On failure
+   * line (one address fetch), headed by the place's name for a named place (`pickTitle`), and
+   * the typed text neither carries kept as the detail. On failure
    * nothing changes and the field shows `location.pickFailed`; tapping again retries.
    *
    * `stillCurrent` is asked once the address arrives (up to 10 s later): when the member has
@@ -220,23 +310,31 @@ export function usePlaceSearch(options: { fieldKind: PlaceFieldKind }) {
     }
     if (!answer.ok) return answer;
     const name = answer.address.trim();
-    // Worked out against what is stored (the formatted address); the suggestion's main text
-    // only recognises a half-typed word.
-    const detail = splitKeptDetail(typed, { carried: name, main: suggestion.main });
-    const place = makePlaceRef({ placeId: suggestion.placeId, name });
-    const text = composePlaceText(name, detail);
+    const title = pickTitle(suggestion, name);
+    // Worked out against what is stored (the title, then the formatted address); the
+    // suggestion's main text otherwise only recognises a half-typed word.
+    const detail = splitKeptDetail(typed, { carried: name, main: suggestion.main, title });
+    const place = makePlaceRef({ placeId: suggestion.placeId, name, title });
+    const text = composePlaceText(place, detail);
     // By construction this holds; a provider address that breaks the rule is not stored.
     if (!validPlace(text, place)) return { ok: false, code: 'parse' };
-    store.notePick(fieldKind, detail !== '');
+    store.notePick(fieldKind, detail !== '', place.title !== undefined);
     reset();
     return { ok: true, place, text, detail };
   }
 
-  onScopeDispose(() => pickController?.abort());
+  onScopeDispose(() => {
+    pickController?.abort();
+    endRequesting(requestSignal);
+  });
 
   return {
     suggestions,
+    /** From the keystroke until the answer lands (the debounce included). */
     searching,
+    requesting,
+    slowLookup,
+    state,
     available,
     onInput,
     pick,

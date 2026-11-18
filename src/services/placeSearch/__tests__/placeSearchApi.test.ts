@@ -54,7 +54,7 @@ describe('suggestPlaces', () => {
       lang: 'en',
       bias: { lat: 1.29, lon: 103.85, countryCode: 'SG' },
     });
-    expect(rows).toEqual([ROW]);
+    expect(rows).toEqual([{ ...ROW, kind: 'address' }]);
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe(`${BASE}/suggest`);
     expect(init.method).toBe('POST');
@@ -74,7 +74,29 @@ describe('suggestPlaces', () => {
 
   it('drops any extra field a row carries', async () => {
     fetchMock.mockResolvedValue(respond(200, { suggestions: [{ ...ROW, extra: 'x' }] }));
-    expect(await suggestPlaces({ q: 'abc', lang: 'en' })).toEqual([ROW]);
+    expect(await suggestPlaces({ q: 'abc', lang: 'en' })).toEqual([{ ...ROW, kind: 'address' }]);
+  });
+
+  it('reads kind: place only when the Lambda says place; missing or unknown is an address', async () => {
+    fetchMock.mockResolvedValue(
+      respond(200, {
+        suggestions: [
+          { ...ROW, placeId: 'p1', kind: 'place' },
+          { ...ROW, placeId: 'p2', kind: 'address' },
+          { ...ROW, placeId: 'p3' },
+          { ...ROW, placeId: 'p4', kind: 'establishment' },
+          { ...ROW, placeId: 'p5', kind: 1 },
+        ],
+      })
+    );
+    const rows = await suggestPlaces({ q: 'abc', lang: 'en' });
+    expect(rows.map((r) => [r.placeId, r.kind])).toEqual([
+      ['p1', 'place'],
+      ['p2', 'address'],
+      ['p3', 'address'],
+      ['p4', 'address'],
+      ['p5', 'address'],
+    ]);
   });
 
   it.each([

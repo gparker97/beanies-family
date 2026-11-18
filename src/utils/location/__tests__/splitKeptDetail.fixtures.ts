@@ -14,6 +14,8 @@ export interface SplitFixture {
   carried: string;
   /** The picked suggestion's main text (the only suggestion text `splitKeptDetail` reads). */
   main?: string;
+  /** A named place's stored title (a `kind: 'place'` pick; the main text, ADR-049 addendum). */
+  title?: string;
   /** The suggestion's secondary text: recorded for the reader, never read by the function. */
   secondary?: string;
   /** The kept detail. */
@@ -26,6 +28,11 @@ const SB_MAIN = '127 South Bridge Road';
 const MBS = '10 Bayfront Ave, Singapore 018956';
 const MBS_MAIN = 'Marina Bay Sands Singapore';
 const MBS_SECONDARY = 'Bayfront Avenue, Singapore';
+const HT = 'The Hungarian Touch';
+const HT_STORED = '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769';
+const HT_SECONDARY = 'East Coast Road, Singapore';
+const SBUX = 'Starbucks VivoCity';
+const SBUX_STORED = '1 HarbourFront Walk, #01-167 VivoCity, Singapore 098585';
 
 export const SPLIT_FIXTURES: readonly SplitFixture[] = [
   // ── The spike rows (carried = Google's formatted address) ──
@@ -403,4 +410,86 @@ export const SPLIT_FIXTURES: readonly SplitFixture[] = [
     note: 'CJK, only the suggestion text matches: kept (the stored address does not carry it)',
   },
   { typed: '', carried: '12 Main Street', detail: '' },
+
+  // ── Named places: the title is stored ahead of the address (owner's decision 2026-11-18) ──
+  {
+    typed: 'hungarian touch',
+    main: HT,
+    title: HT,
+    secondary: HT_SECONDARY,
+    carried: HT_STORED,
+    detail: '',
+    note: 'titled: the typed words are the title, which the saved string leads with',
+  },
+  {
+    typed: 'hungarian touch back room',
+    main: HT,
+    title: HT,
+    secondary: HT_SECONDARY,
+    carried: HT_STORED,
+    detail: 'back room',
+    note: 'titled: the title words go, what neither the title nor the address carries stays',
+  },
+  {
+    typed: 'hungar',
+    main: HT,
+    title: HT,
+    secondary: HT_SECONDARY,
+    carried: HT_STORED,
+    detail: '',
+    note: 'titled: one half-typed word of a later title word is the search text, not a detail',
+  },
+  {
+    typed: 'hungarian touch B',
+    main: HT,
+    title: HT,
+    secondary: HT_SECONDARY,
+    carried: HT_STORED,
+    detail: 'B',
+    note: 'titled: a one-letter unit after the name is kept',
+  },
+  {
+    typed: 'hungarian tou',
+    main: HT,
+    title: HT,
+    secondary: HT_SECONDARY,
+    carried: HT_STORED,
+    detail: '',
+    note: 'titled, picked mid-word: the fragment rule reads the title words after the match',
+  },
+  {
+    typed: 'the hungarian touch 50 east coast road',
+    main: HT,
+    title: HT,
+    secondary: HT_SECONDARY,
+    carried: HT_STORED,
+    detail: '',
+    note: 'titled: the title, then the street, which the address carries (east/e, road/rd)',
+  },
+  {
+    typed: 'near the hungarian touch',
+    main: HT,
+    title: HT,
+    secondary: HT_SECONDARY,
+    carried: HT_STORED,
+    detail: 'near the hungarian touch',
+    note: 'titled: a first word the title does not carry stops the title step (keeps more)',
+  },
+  {
+    typed: 'Marina Bay Sands level 3',
+    main: MBS_MAIN,
+    title: MBS_MAIN,
+    secondary: MBS_SECONDARY,
+    carried: MBS,
+    detail: 'level 3',
+    note: 'titled: the words only the title carries go now, because the title is stored',
+  },
+  {
+    typed: 'starbucks vivocity near the escalator',
+    main: SBUX,
+    title: SBUX,
+    secondary: 'HarbourFront Walk, Singapore',
+    carried: SBUX_STORED,
+    detail: 'near the escalator',
+  },
 ];

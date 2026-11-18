@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { effectScope, nextTick, reactive } from 'vue';
+import { effectScope, nextTick, reactive, watch } from 'vue';
 import type { PlaceSuggestion } from '@/types/placeSearch';
 
 const store = reactive({
@@ -24,12 +24,15 @@ import {
   PLACE_SEARCH_MAX_CHARS,
   PLACE_SEARCH_MIN_CHARS,
   PLACE_SEARCH_SESSION_CAP,
+  PLACE_SEARCH_SLOW_MS,
+  PLACE_TITLE_MAX_CHARS,
   isSendablePlaceQuery,
   trimmedRetryQuery,
   usePlaceSearch,
 } from '@/composables/usePlaceSearch';
 import {
   MAX_QUERY_CHARS,
+  MAX_TEXT_CHARS,
   MIN_QUERY_CHARS,
   normaliseQuery,
   // @ts-expect-error: plain JS Lambda source, deliberately imported for parity rather than copied.
@@ -305,7 +308,8 @@ describe('usePlaceSearch', () => {
         detail: 'block 48 unit 04-19 function room',
         text: '127 S Bridge Rd, Singapore 058285, block 48 unit 04-19 function room',
       });
-      expect(store.notePick).toHaveBeenCalledWith('activity', true);
+      expect(store.notePick).toHaveBeenCalledWith('activity', true, false);
+      expect(result.ok && 'title' in result.place).toBe(false);
     });
 
     it('picking mid-word keeps no half-typed fragment as the detail', async () => {
@@ -343,6 +347,95 @@ describe('usePlaceSearch', () => {
         ok: true,
         detail: 'marina bay',
         text: '10 Bayfront Ave, Singapore 018956, marina bay',
+      });
+    });
+
+    describe('a named place (kind: place)', () => {
+      const HT_ADDRESS = '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769';
+      const HT: PlaceSuggestion = {
+        placeId: 'ChIJht',
+        main: 'The Hungarian Touch',
+        secondary: 'East Coast Road, Singapore',
+        kind: 'place',
+      };
+      beforeEach(() => {
+        store.requestAddress.mockResolvedValue({ ok: true, address: HT_ADDRESS });
+      });
+
+      it("stores the business name as the title, ahead of Google's address", async () => {
+        const f = mountField();
+        const result = await f.pick(HT, 'hungarian touch');
+        expect(result).toEqual({
+          ok: true,
+          place: { placeId: 'ChIJht', name: HT_ADDRESS, title: 'The Hungarian Touch' },
+          detail: '',
+          text: `The Hungarian Touch, ${HT_ADDRESS}`,
+        });
+        expect(result.ok && Object.keys(result.place)).toEqual(['placeId', 'name', 'title']);
+        expect(store.notePick).toHaveBeenCalledWith('activity', false, true);
+      });
+
+      it('keeps what neither the title nor the address carries as the detail', async () => {
+        const f = mountField();
+        expect(await f.pick(HT, 'hungarian touch back room')).toMatchObject({
+          ok: true,
+          detail: 'back room',
+          text: `The Hungarian Touch, ${HT_ADDRESS}, back room`,
+        });
+        expect(await f.pick(HT, 'hungarian tou')).toMatchObject({ ok: true, detail: '' });
+      });
+
+      it('the same suggestion as an address (kind: address) behaves exactly as before', async () => {
+        const f = mountField();
+        const result = await f.pick({ ...HT, kind: 'address' }, 'hungarian touch');
+        expect(result).toEqual({
+          ok: true,
+          place: { placeId: 'ChIJht', name: HT_ADDRESS },
+          detail: 'hungarian touch',
+          text: `${HT_ADDRESS}, hungarian touch`,
+        });
+      });
+
+      it('an older Lambda (no kind) is an address pick', async () => {
+        const f = mountField();
+        const { kind: _kind, ...older } = HT;
+        const result = await f.pick(older, 'hungarian touch');
+        expect(result).toMatchObject({ ok: true, place: { placeId: 'ChIJht', name: HT_ADDRESS } });
+        expect(result.ok && result.place.title).toBeUndefined();
+      });
+
+      it('stores no title when the address already carries it (the place is its address)', async () => {
+        store.requestAddress.mockResolvedValue({
+          ok: true,
+          address: '1 Raffles Pl, Singapore 048616',
+        });
+        const f = mountField();
+        const result = await f.pick(
+          { placeId: 'ChIJrp', main: '1 Raffles Place', secondary: 'Singapore', kind: 'place' },
+          '1 raffles place'
+        );
+        expect(result).toEqual({
+          ok: true,
+          place: { placeId: 'ChIJrp', name: '1 Raffles Pl, Singapore 048616' },
+          detail: '',
+          text: '1 Raffles Pl, Singapore 048616',
+        });
+        expect(store.notePick).toHaveBeenCalledWith('activity', false, false);
+      });
+
+      it("the title cap is the Lambda's text cap", () => {
+        expect(PLACE_TITLE_MAX_CHARS).toBe(MAX_TEXT_CHARS);
+      });
+
+      it('trims the title and caps it at the Lambda text cap', async () => {
+        const f = mountField();
+        const long = `${'Cafe '.repeat(50)}`;
+        const result = await f.pick({ ...HT, main: `  ${long}` }, 'cafe');
+        expect(result.ok).toBe(true);
+        const title = result.ok ? result.place.title! : '';
+        expect(title.length).toBeLessThanOrEqual(PLACE_TITLE_MAX_CHARS);
+        expect(title).toBe(title.trim());
+        expect(title.startsWith('Cafe Cafe')).toBe(true);
       });
     });
 
@@ -388,6 +481,228 @@ describe('usePlaceSearch', () => {
       await f.pick(ROW, 'query 5 here');
       await type(f, 'next session');
       expect(store.requestSuggestions).toHaveBeenCalledTimes(PLACE_SEARCH_SESSION_CAP + 1);
+    });
+  });
+
+  describe('searching signals (requesting, slowLookup)', () => {
+    type Outcome = { ok: true; suggestions: PlaceSuggestion[] } | { ok: false; code: string };
+    /** A provider request that answers only when the test says so (or when it is aborted). */
+    function holdRequests() {
+      const pending: Array<(o: Outcome) => void> = [];
+      store.requestSuggestions.mockImplementation(
+        (_q: string, opts: { signal?: AbortSignal }) =>
+          new Promise<Outcome>((resolve) => {
+            pending.push(resolve);
+            opts.signal?.addEventListener('abort', () => resolve({ ok: false, code: 'aborted' }));
+          })
+      );
+      return {
+        answer: async (o: Outcome = { ok: true, suggestions: [ROW] }) => {
+          pending.shift()!(o);
+          await vi.advanceTimersByTimeAsync(0);
+        },
+        count: () => pending.length,
+      };
+    }
+
+    it('is off during the debounce, on once a request is sent, slow only after 150 ms', async () => {
+      const held = holdRequests();
+      const f = mountField();
+      f.onInput('127 south');
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_DEBOUNCE_MS - 1);
+      expect([f.requesting.value, f.slowLookup.value]).toEqual([false, false]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect([f.requesting.value, f.slowLookup.value]).toEqual([true, false]);
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_SLOW_MS - 1);
+      expect(f.slowLookup.value).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(f.slowLookup.value).toBe(true);
+      await held.answer();
+      expect([f.requesting.value, f.slowLookup.value]).toEqual([false, false]);
+      expect(f.suggestions.value).toEqual([ROW]);
+    });
+
+    it('a request that answers in under 150 ms never turns slow', async () => {
+      const held = holdRequests();
+      const f = mountField();
+      const seen: boolean[] = [];
+      watch(f.slowLookup, (v) => seen.push(v), { flush: 'sync' });
+      await type(f, '127 south');
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_SLOW_MS - 10);
+      await held.answer();
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_SLOW_MS * 4);
+      expect(seen).toEqual([]);
+      expect(f.requesting.value).toBe(false);
+    });
+
+    it('a cached answer sends nothing and never shows as requesting', async () => {
+      const f = mountField();
+      await type(f, '127 south');
+      await type(f, '127 south b');
+      const seen: boolean[] = [];
+      watch(f.requesting, (v) => seen.push(v), { flush: 'sync' });
+      await type(f, '127 south');
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_SLOW_MS * 2);
+      expect(seen).toEqual([]);
+    });
+
+    it.each([
+      [
+        'cancel (blur, Escape, Keep what I typed)',
+        (f: ReturnType<typeof mountField>) => f.cancel(),
+      ],
+      ['reset', (f: ReturnType<typeof mountField>) => f.reset()],
+      [
+        'a superseding keystroke',
+        (f: ReturnType<typeof mountField>) => f.onInput('127 south bridge'),
+      ],
+    ])('ends the moment the lookup is dropped: %s', async (_label, drop) => {
+      holdRequests();
+      const f = mountField();
+      await type(f, '127 south');
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_SLOW_MS);
+      expect(f.slowLookup.value).toBe(true);
+      drop(f);
+      await nextTick();
+      expect([f.requesting.value, f.slowLookup.value]).toEqual([false, false]);
+    });
+
+    it('a superseded request cannot clear the newer one when it lands late', async () => {
+      // A request that ignores its abort signal and answers late.
+      const late: Array<(o: Outcome) => void> = [];
+      store.requestSuggestions.mockImplementation(
+        () => new Promise<Outcome>((resolve) => late.push(resolve))
+      );
+      const f = mountField();
+      await type(f, '127 south');
+      await type(f, '127 south bridge');
+      expect(late).toHaveLength(2);
+      late[0]!({ ok: true, suggestions: [ROW] });
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_SLOW_MS);
+      expect([f.requesting.value, f.slowLookup.value]).toEqual([true, true]);
+    });
+
+    it('stays on through the trimmed retry, with no gap between the two requests', async () => {
+      const held = holdRequests();
+      const f = mountField();
+      const seen: boolean[] = [];
+      watch(f.requesting, (v) => seen.push(v), { flush: 'sync' });
+      await type(f, '127 south bridge road block 48 unit 04-19 function room');
+      await vi.advanceTimersByTimeAsync(100);
+      await held.answer({ ok: true, suggestions: [] });
+      expect(held.count()).toBe(1);
+      expect(f.requesting.value).toBe(true);
+      // The 150 ms is counted from the first request, not restarted by the retry.
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_SLOW_MS - 100);
+      expect(f.slowLookup.value).toBe(true);
+      await held.answer();
+      expect(seen).toEqual([true, false]);
+      expect(f.slowLookup.value).toBe(false);
+    });
+
+    it('is not shown while the store is unavailable (offline mid-request)', async () => {
+      holdRequests();
+      const f = mountField();
+      await type(f, '127 south');
+      await vi.advanceTimersByTimeAsync(PLACE_SEARCH_SLOW_MS);
+      expect(f.slowLookup.value).toBe(true);
+      store.available = false;
+      expect(f.slowLookup.value).toBe(false);
+    });
+  });
+
+  describe('lookup state (idle / results / none)', () => {
+    it('is results for an answer with rows, none for a completed empty answer', async () => {
+      const f = mountField();
+      expect(f.state.value).toBe('idle');
+      await type(f, '127 south');
+      expect(f.state.value).toBe('results');
+      store.requestSuggestions.mockResolvedValueOnce({ ok: true, suggestions: [] });
+      await type(f, 'nowhere at all');
+      expect(f.state.value).toBe('none');
+    });
+
+    it('is none only once the trimmed retry has also found nothing', async () => {
+      store.requestSuggestions.mockResolvedValue({ ok: true, suggestions: [] });
+      const f = mountField();
+      const seen: string[] = [];
+      watch(f.state, (v) => seen.push(v), { flush: 'sync' });
+      await type(f, '127 south bridge road block 48 unit 04-19 function room');
+      expect(store.requestSuggestions).toHaveBeenCalledTimes(2);
+      expect(seen).toEqual(['none']);
+    });
+
+    it('a cached empty answer is none as well', async () => {
+      store.requestSuggestions.mockResolvedValue({ ok: true, suggestions: [] });
+      const f = mountField();
+      await type(f, 'nowhere at all');
+      await type(f, 'nowhere at al');
+      await type(f, 'nowhere at all');
+      expect(store.noteCachedSuggest).toHaveBeenCalledWith(0, 'activity');
+      expect(f.state.value).toBe('none');
+    });
+
+    it.each([
+      'upstream_timeout',
+      'budget_exhausted',
+      'rate_limited',
+      'network',
+      'not_configured',
+      'unavailable',
+      'dev_capped',
+    ])('stays idle when the lookup fails or is refused: %s', async (code) => {
+      store.requestSuggestions.mockResolvedValue({ ok: false, code });
+      const f = mountField();
+      await type(f, '127 south');
+      expect(f.state.value).toBe('idle');
+    });
+
+    it('a failed retry stays idle (it is not "nothing found")', async () => {
+      store.requestSuggestions
+        .mockResolvedValueOnce({ ok: true, suggestions: [] })
+        .mockResolvedValueOnce({ ok: false, code: 'budget_exhausted' });
+      const f = mountField();
+      await type(f, '127 south bridge road block 48 unit 04-19 function room');
+      expect(f.state.value).toBe('idle');
+    });
+
+    it('stays idle at the session cap', async () => {
+      store.requestSuggestions.mockResolvedValue({ ok: true, suggestions: [ROW] });
+      const f = mountField();
+      for (let i = 0; i < PLACE_SEARCH_SESSION_CAP; i++) await type(f, `query ${i} here`);
+      await type(f, 'one more query');
+      expect(store.noteQuiet).toHaveBeenCalledWith('session-cap', 'activity');
+      expect(f.state.value).toBe('idle');
+    });
+
+    it.each(['offline', 'switch-off', 'not-configured', 'quiet'])(
+      'stays idle while the store is unavailable (%s): nothing is asked',
+      async (reason) => {
+        store.available = false;
+        store.unavailableReason = reason;
+        const f = mountField();
+        await type(f, '127 south');
+        expect(store.requestSuggestions).not.toHaveBeenCalled();
+        expect(f.state.value).toBe('idle');
+      }
+    );
+
+    it('is cleared by the next keystroke, by cancel and by reset', async () => {
+      store.requestSuggestions.mockResolvedValue({ ok: true, suggestions: [] });
+      const f = mountField();
+      await type(f, 'nowhere at all');
+      expect(f.state.value).toBe('none');
+      f.onInput('nowhere at all ');
+      expect(f.state.value).toBe('idle');
+      await type(f, 'nowhere at al');
+      expect(f.state.value).toBe('none');
+      f.cancel();
+      expect(f.state.value).toBe('idle');
+      await type(f, 'nowhere at a');
+      expect(f.state.value).toBe('none');
+      f.reset();
+      expect(f.state.value).toBe('idle');
     });
   });
 

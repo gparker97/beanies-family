@@ -237,8 +237,13 @@ export interface OneLinePart {
 }
 
 export interface LocationView {
-  /** The valid picked place's name (the map row's link text). */
+  /** The valid picked place's name: its address line (the map row's link text when untitled). */
   placeName?: string;
+  /**
+   * The valid picked place's title, a named place's name ("The Hungarian Touch"): the headline
+   * and the map row's link text, with `placeName` the line under it. Only for a titled place.
+   */
+  placeTitle?: string;
   /** The kept detail under the place (never part of the map search). */
   detail?: string;
   /** The text to show when there is no picked place (links cut out when the flag is on). */
@@ -301,6 +306,7 @@ export function describeLocation(
 
   return {
     ...(valid ? { placeName: valid.name } : {}),
+    ...(valid?.title ? { placeTitle: valid.title } : {}),
     ...(detail ? { detail } : {}),
     plain: parsed.place,
     mapHref,

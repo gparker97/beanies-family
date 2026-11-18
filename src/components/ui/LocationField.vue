@@ -21,6 +21,13 @@
  * member action that moves on (a keystroke, Keep what I typed, Escape, Remove, another pick)
  * bumps `pickToken`, and the pick checks its own token and the typed text when it lands.
  *
+ * SEARCHING. A small spinner sits inside the typing input at its right edge (top right for a
+ * textarea) only while a provider request has been in flight for 150 ms (`slowLookup`), so the
+ * debounce and fast answers never show it; with `mapPin` it takes the 📍's place while it shows.
+ * A tapped suggestion shows the same spinner (and `aria-busy`) while its address is fetched,
+ * and the other suggestions dim and ignore taps. A lookup that completed and found nothing
+ * leaves one quiet line under the field; every failure, refusal and cap stays silent.
+ *
  * ARIA: single line = `BaseInput` with `role="combobox"` (the `HomeTownField` pattern).
  * Multi-line = `BaseTextarea`, which keeps its native textbox role: `aria-autocomplete`,
  * `aria-controls` and `aria-activedescendant` only (combobox is not a permitted role on a
@@ -32,6 +39,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useListboxNav } from '@/composables/useListboxNav';
 import { usePlaceSearch } from '@/composables/usePlaceSearch';
 import { useTranslation } from '@/composables/useTranslation';
@@ -99,8 +107,11 @@ const pickFailed = ref(false);
 let pickToken = 0;
 /** The token of the pick whose address is being fetched, while it is still the current one. */
 let pickInFlight: number | null = null;
+/** The suggestion whose address is being fetched, while that pick is still the current one. */
+const pickingId = ref<string | null>(null);
 const supersedePick = () => {
   pickToken++;
+  pickingId.value = null;
 };
 const fieldWrap = ref<HTMLElement | null>(null);
 
@@ -111,9 +122,14 @@ const pickedPlace = computed<PlaceRef | undefined>(() =>
 
 const search = usePlaceSearch({ fieldKind: props.fieldKind });
 
-/** The place line split for display: "127 S Bridge Rd" over "Singapore 058285". */
+/**
+ * The place line split for display: "127 S Bridge Rd" over "Singapore 058285", or for a named
+ * place its title over the whole address ("The Hungarian Touch" over "50 E Coast Rd, ...").
+ */
 const placeLines = computed(() => {
   const name = pickedPlace.value?.name ?? '';
+  const title = pickedPlace.value?.title;
+  if (title) return { main: title, secondary: name };
   const at = name.indexOf(', ');
   return at > 0
     ? { main: name.slice(0, at), secondary: name.slice(at + 2) }
@@ -126,7 +142,7 @@ watch(
   ([text]) => {
     const place = pickedPlace.value;
     if (place) {
-      if (composePlaceText(place.name, detailDraft.value) !== (text ?? '').trim()) {
+      if (composePlaceText(place, detailDraft.value) !== (text ?? '').trim()) {
         detailDraft.value = detailOf(text, place);
       }
     } else if (typed.value !== (text ?? '')) {
@@ -175,7 +191,7 @@ function onDetail(detail: string): void {
   if (!place) return;
   detailDraft.value = detail;
   // The same place object, so a diff writes the string only.
-  emitValue({ text: composePlaceText(place.name, detail), place: props.value.place });
+  emitValue({ text: composePlaceText(place, detail), place: props.value.place });
 }
 
 async function choose(index: number): Promise<void> {
@@ -190,10 +206,14 @@ async function choose(index: number): Promise<void> {
   supersedePick();
   const mine = pickToken;
   pickInFlight = mine;
+  pickingId.value = suggestion.placeId;
   const typedAtPick = typed.value;
   const stillCurrent = () => mine === pickToken && typed.value === typedAtPick;
   const result = await search.pick(suggestion, typedAtPick, stillCurrent);
-  if (pickInFlight === mine) pickInFlight = null;
+  if (pickInFlight === mine) {
+    pickInFlight = null;
+    pickingId.value = null;
+  }
   if (!result.ok) {
     if (result.code === 'aborted' || result.code === 'superseded') return;
     pickFailed.value = true;
@@ -243,7 +263,11 @@ async function removePlace(): Promise<void> {
 }
 
 function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') supersedePick();
+  // Escape moves on from both a pick and a lookup in flight (as Keep what I typed does).
+  if (e.key === 'Escape') {
+    supersedePick();
+    search.cancel();
+  }
   if (nav.onNavKey(e)) return;
   if (e.key !== 'Enter' || !listOpen.value) return;
   // Enter picks only a highlighted row; with nothing highlighted it is left alone (a newline
@@ -307,6 +331,36 @@ const legacyProps = computed(() => {
 });
 
 const statusMessage = computed(() => (pickFailed.value ? t('location.pickFailed') : ''));
+
+/** The in-input searching mark: a provider request slow enough to notice, in a usable field. */
+const showSearching = computed(
+  () =>
+    enabled &&
+    focused.value &&
+    !pickedPlace.value &&
+    !props.disabled &&
+    search.available.value &&
+    search.slowLookup.value
+);
+
+/** A lookup completed and found nothing. Never for a link (the understood-as line speaks). */
+const noMatches = computed(
+  () =>
+    enabled &&
+    focused.value &&
+    !pickedPlace.value &&
+    !props.disabled &&
+    !understood.value &&
+    search.available.value &&
+    search.state.value === 'none'
+);
+
+/** Read by the live region only (the spinner is decorative; the no-matches line is visible). */
+const announcement = computed(() => {
+  if (showSearching.value) return t('location.searching');
+  if (noMatches.value) return t('location.noMatches');
+  return '';
+});
 </script>
 
 <template>
@@ -352,17 +406,35 @@ const statusMessage = computed(() => (pickFailed.value ? t('location.pickFailed'
           size="sm"
           class="text-primary-500 dark:text-accent-lift shrink-0"
         />
-        <div class="min-w-0 flex-1">
-          <p class="font-outfit text-secondary-500 dark:text-ink truncate text-sm font-semibold">
-            {{ placeLines.main }}
-          </p>
-          <p
+        <!-- The place opens in Google Maps before the item is saved, so it can be checked. -->
+        <a
+          :href="pinHref"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="group/place focus-visible:ring-primary-500 min-w-0 flex-1 rounded-lg focus-visible:ring-2 focus-visible:outline-none"
+          :title="t('planner.openInMaps')"
+          data-testid="location-place-link"
+          @click.stop
+        >
+          <span class="flex min-w-0 items-center gap-1.5">
+            <span
+              class="font-outfit text-primary-700 dark:text-accent-lift truncate text-sm font-semibold underline decoration-transparent underline-offset-2 transition-colors group-hover/place:decoration-current"
+            >
+              {{ placeLines.main }}
+            </span>
+            <BeanieIcon
+              name="external-link"
+              size="xs"
+              class="text-primary-500 dark:text-accent-lift shrink-0"
+            />
+          </span>
+          <span
             v-if="placeLines.secondary"
-            class="text-secondary-400 dark:text-ink-soft truncate text-xs"
+            class="text-secondary-400 dark:text-ink-soft block truncate text-xs"
           >
             {{ placeLines.secondary }}
-          </p>
-        </div>
+          </span>
+        </a>
         <a
           v-if="mapPin"
           :href="pinHref"
@@ -421,7 +493,11 @@ const statusMessage = computed(() => (pickFailed.value ? t('location.pickFailed'
           @keydown="onKeydown"
           @focus="onFocus"
           @blur="onBlur"
-        />
+        >
+          <template v-if="showSearching" #trailing>
+            <BeanieSpinner size="sm" aria-hidden="true" data-testid="location-searching" />
+          </template>
+        </BaseTextarea>
         <BaseInput
           v-else
           :id="id"
@@ -449,9 +525,13 @@ const statusMessage = computed(() => (pickFailed.value ? t('location.pickFailed'
               class="text-primary-500 dark:text-accent-lift"
             />
           </template>
+          <template v-if="showSearching" #trailing>
+            <BeanieSpinner size="sm" aria-hidden="true" data-testid="location-searching" />
+          </template>
         </BaseInput>
+        <!-- The searching mark takes the pin's place while it shows, so the two never collide. -->
         <a
-          v-if="mapPin && typed"
+          v-if="mapPin && typed && !showSearching"
           :href="pinHref"
           target="_blank"
           rel="noopener noreferrer"
@@ -469,28 +549,46 @@ const statusMessage = computed(() => (pickFailed.value ? t('location.pickFailed'
         data-testid="location-suggestions"
       >
         <ul :id="nav.listboxId" role="listbox" :aria-label="t('location.suggestions')" class="p-1">
+          <!-- While a tapped row's address is fetched it shows the spinner and aria-busy; the
+               other suggestions recede to the faint ink and ignore taps (choose's guard). -->
           <li
             v-for="(s, i) in suggestions"
             :id="nav.optionId(i)"
             :key="s.placeId"
             role="option"
             :aria-selected="i === nav.active.value"
-            class="flex min-h-11 cursor-pointer items-start gap-2.5 rounded-xl px-3 py-2"
-            :class="
+            :aria-busy="pickingId === s.placeId ? 'true' : undefined"
+            :aria-disabled="pickingId !== null && pickingId !== s.placeId ? 'true' : undefined"
+            class="flex min-h-11 items-start gap-2.5 rounded-xl px-3 py-2"
+            :class="[
+              pickingId !== null ? 'cursor-default' : 'cursor-pointer',
               i === nav.active.value
                 ? 'dark:bg-surface-hover bg-[var(--tint-silk-20)]'
-                : 'dark:hover:bg-surface-hover hover:bg-[var(--tint-slate-5)]'
-            "
+                : pickingId === null
+                  ? 'dark:hover:bg-surface-hover hover:bg-[var(--tint-slate-5)]'
+                  : '',
+            ]"
+            data-testid="location-suggestion"
             @mousedown.prevent="choose(i)"
           >
             <BeanieIcon
               name="map-pin"
               size="sm"
-              class="text-primary-500 dark:text-accent-lift mt-0.5 shrink-0"
+              class="mt-0.5 shrink-0"
+              :class="
+                pickingId !== null && pickingId !== s.placeId
+                  ? 'text-secondary-400 dark:text-ink-faint'
+                  : 'text-primary-500 dark:text-accent-lift'
+              "
             />
             <span class="min-w-0">
               <span
-                class="font-outfit text-secondary-500 dark:text-ink block truncate text-sm font-semibold"
+                class="font-outfit block truncate text-sm font-semibold"
+                :class="
+                  pickingId !== null && pickingId !== s.placeId
+                    ? 'text-secondary-400 dark:text-ink-faint'
+                    : 'text-secondary-500 dark:text-ink'
+                "
                 >{{ s.main }}</span
               >
               <span
@@ -499,6 +597,13 @@ const statusMessage = computed(() => (pickFailed.value ? t('location.pickFailed'
                 >{{ s.secondary }}</span
               >
             </span>
+            <BeanieSpinner
+              v-if="pickingId === s.placeId"
+              size="sm"
+              class="ms-auto mt-0.5 shrink-0"
+              aria-hidden="true"
+              data-testid="location-pick-spinner"
+            />
           </li>
           <li
             :id="nav.optionId(keepIndex)"
@@ -548,17 +653,30 @@ const statusMessage = computed(() => (pickFailed.value ? t('location.pickFailed'
     >
       {{ understood.text }}
     </p>
+    <!-- The same slot as the understood-as line (the two never show together). -->
+    <p
+      v-else-if="noMatches"
+      class="text-secondary-400 dark:text-ink-faint mt-1.5 text-xs"
+      data-testid="location-no-matches"
+    >
+      {{ t('location.noMatches') }}
+    </p>
 
     <!-- Rendered unconditionally with only its text toggling: a live region inserted together
          with its content is not announced. Heritage Orange, never red: guidance, not a hard
-         validation error. -->
+         validation error. The searching and no-matches announcements ride in it visually
+         hidden, so the margin follows the visible message only. -->
     <p
-      class="text-primary-700 dark:text-accent-lift mt-1.5 text-xs font-semibold empty:mt-0"
+      class="text-primary-700 dark:text-accent-lift text-xs font-semibold"
+      :class="statusMessage ? 'mt-1.5' : ''"
       role="status"
       aria-live="polite"
       data-testid="location-message"
     >
-      {{ statusMessage }}
+      {{ statusMessage
+      }}<span v-if="announcement" class="sr-only" data-testid="location-announcement">{{
+        announcement
+      }}</span>
     </p>
   </div>
 </template>

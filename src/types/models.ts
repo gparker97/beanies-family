@@ -1566,11 +1566,19 @@ export interface DutyCompletion {
 }
 
 /** A place picked for a location string (#150). Honoured only while the sibling string is
- *  `name` or starts with `name + ', '` (see validPlace); otherwise inert. A VALUE object:
- *  always written whole, never per key. Older builds ignore it. */
+ *  its lead (`name`, or `title, name` when titled) or starts with lead + ', ' (see validPlace);
+ *  otherwise inert. A VALUE object: always written whole, never per key. Older builds ignore it
+ *  (and an older build reading a titled place sees an inert place, so it shows the plain text). */
 export interface PlaceRef {
   placeId: string; // provider place ID (storable indefinitely)
-  name: string; // the place line exactly as it begins the sibling string
+  /** The address line from Geocoding (`formatted_address`). */
+  name: string;
+  /**
+   * The place's name as shown in the picked suggestion (a business or landmark, "The Hungarian
+   * Touch"), present only for a named-place pick. Storing it is the owner's decision of
+   * 2026-11-18 (ADR-049 addendum).
+   */
+  title?: string;
 }
 
 export interface FamilyActivity {

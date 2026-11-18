@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * The one read row for a location (#150, ADR-049): renders `describeLocation(...)`. The map
- * row has the place as the link and the kept detail on its own line; each video call is a
+ * row has the place as the link and the kept detail on its own line (a named place: its title
+ * is the link, the address the line under it, then the detail); each video call is a
  * Join Call button (`openExternal`) with its host and path as a caption; a pasted map URL is a
  * Map Link row; every other web link is an Open Link row from `LinkList` (favicons off, so a
  * location is never sent to a favicon service).
@@ -42,15 +43,19 @@ const { t } = useTranslation();
 const view = computed(() =>
   describeLocation(props.text, props.place, { mapWhenOff: props.mapWhenOff })
 );
-/** The place line: the picked place's name, else the plain text. */
+/** The place text: the picked place's address, else the plain text. */
 const placeText = computed(() => view.value.placeName ?? view.value.plain);
+/** The headline (the link text): a named place's title, else the place text. */
+const headline = computed(() => view.value.placeTitle ?? placeText.value);
+/** The address under a titled headline; none without a title (the headline is the address). */
+const addressLine = computed(() => (view.value.placeTitle ? placeText.value : ''));
 const calls = computed(() => view.value.links.filter((l) => l.kind === 'call'));
 const mapLinks = computed(() => view.value.links.filter((l) => l.kind === 'map'));
 const webLinks = computed(() =>
   view.value.links.filter((l) => l.kind === 'web').map((l) => l.href)
 );
 const compactPlace = computed(() =>
-  view.value.detail ? `${placeText.value}, ${view.value.detail}` : placeText.value
+  [view.value.placeTitle, placeText.value, view.value.detail].filter(Boolean).join(', ')
 );
 
 const joinLabel = (service: string | undefined) =>
@@ -131,7 +136,13 @@ function join(href: string): void {
         <span class="grid min-w-0">
           <span
             class="text-primary-700 dark:text-accent-lift text-sm font-medium break-words whitespace-pre-line group-hover/loc:underline"
-            >{{ placeText }}</span
+            >{{ headline }}</span
+          >
+          <span
+            v-if="addressLine"
+            class="text-secondary-500 dark:text-ink-soft text-sm break-words"
+            data-testid="location-line-address"
+            >{{ addressLine }}</span
           >
           <span
             v-if="view.detail"
@@ -154,7 +165,13 @@ function join(href: string): void {
         <span class="grid min-w-0">
           <span
             class="text-secondary-500 dark:text-ink text-sm font-medium break-words whitespace-pre-line"
-            >{{ placeText }}</span
+            >{{ headline }}</span
+          >
+          <span
+            v-if="addressLine"
+            class="text-secondary-500 dark:text-ink-soft text-sm break-words"
+            data-testid="location-line-address"
+            >{{ addressLine }}</span
           >
           <span
             v-if="view.detail"

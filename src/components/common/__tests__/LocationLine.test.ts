@@ -15,6 +15,12 @@ import LocationLine from '../LocationLine.vue';
 import { joinCaption, locationLabelKey, describeLocation } from '@/utils/location/locationLinks';
 
 const PLACE = { placeId: 'ChIJ127', name: '127 S Bridge Rd, Singapore 058285' };
+const TITLED = {
+  placeId: 'ChIJht',
+  name: '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769',
+  title: 'The Hungarian Touch',
+};
+const TITLED_LEAD = `${TITLED.title}, ${TITLED.name}`;
 const legacy = (text: string) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
 
@@ -36,6 +42,32 @@ describe('LocationLine (row)', () => {
     expect(map.attributes('href')).toContain('query_place_id=ChIJ127');
     expect(map.attributes('href')).toContain(`query=${encodeURIComponent(PLACE.name)}&`);
     expect(w.get('[data-testid="location-line-detail"]').text()).toBe('block 48 unit 04-19');
+    // No title: no address line (the link text is the address itself).
+    expect(w.find('[data-testid="location-line-address"]').exists()).toBe(false);
+  });
+
+  it('a named place: the title is the link text, then the address, then the detail', () => {
+    const w = render({ text: `${TITLED_LEAD}, back room`, place: TITLED });
+    const map = w.get('[data-testid="location-line-map"]');
+    expect(map.element.tagName).toBe('A');
+    expect(map.attributes('href')).toContain('query_place_id=ChIJht');
+    expect(map.attributes('href')).toContain(`query=${encodeURIComponent(TITLED_LEAD)}&`);
+    const lines = map.findAll('.grid > span').map((s) => s.text());
+    expect(lines).toEqual([TITLED.title, TITLED.name, 'back room']);
+    expect(w.get('[data-testid="location-line-address"]').text()).toBe(TITLED.name);
+    expect(w.get('[data-testid="location-line-detail"]').text()).toBe('back room');
+  });
+
+  it('a named place with no detail shows two lines, and on the wall the same three-line order', () => {
+    const two = render({ text: TITLED_LEAD, place: TITLED });
+    expect(
+      two.findAll('[data-testid="location-line-map"] .grid > span').map((s) => s.text())
+    ).toEqual([TITLED.title, TITLED.name]);
+    const wall = render({ text: `${TITLED_LEAD}, back room`, place: TITLED, interactive: false });
+    expect(wall.find('a').exists()).toBe(false);
+    expect(
+      wall.findAll('[data-testid="location-line-map"] .grid > span').map((s) => s.text())
+    ).toEqual([TITLED.title, TITLED.name, 'back room']);
   });
 
   it('a call is a Join Call button through openExternal, captioned host + path only', async () => {
@@ -92,6 +124,13 @@ describe('LocationLine (compact)', () => {
     const place = w.get('[data-testid="location-line-place"]');
     expect(place.text()).toBe(`📍 ${PLACE.name}, room 2`);
     expect(place.get('a').attributes('href')).toContain('query_place_id=ChIJ127');
+  });
+
+  it('a named place reads title, address, detail on the one line', () => {
+    const w = render({ text: `${TITLED_LEAD}, back room`, place: TITLED, variant: 'compact' });
+    expect(w.get('[data-testid="location-line-place"]').text()).toBe(
+      `📍 ${TITLED_LEAD}, back room`
+    );
   });
 });
 

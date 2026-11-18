@@ -217,6 +217,21 @@ describe('describeLocation (flag on)', () => {
     expect(view.oneLine).toEqual([{ kind: 'place', text: `${PLACE.name}, block 48 unit 04-19` }]);
   });
 
+  it('a picked named place: the title, the address and the detail, the map searching the lead', () => {
+    const TITLED = { ...PLACE, title: 'The Hungarian Touch' };
+    const lead = `The Hungarian Touch, ${PLACE.name}`;
+    const view = describeLocation(`${lead}, back room`, TITLED);
+    expect(view.placeTitle).toBe('The Hungarian Touch');
+    expect(view.placeName).toBe(PLACE.name);
+    expect(view.detail).toBe('back room');
+    expect(view.mapHref).toBe(mapsHref(lead, TITLED));
+    expect(view.oneLine).toEqual([{ kind: 'place', text: `${lead}, back room` }]);
+    // No title: no placeTitle key at all.
+    expect('placeTitle' in describeLocation(PLACE.name, PLACE)).toBe(false);
+    // A titled place whose string lost its title is inert.
+    expect(describeLocation(`${PLACE.name}, back room`, TITLED).placeTitle).toBeUndefined();
+  });
+
   it('a link after the place is never part of the detail', () => {
     const view = describeLocation(`${PLACE.name}, hall https://zoom.us/j/1`, PLACE);
     expect(view.detail).toBe('hall');

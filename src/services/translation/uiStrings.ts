@@ -10339,6 +10339,11 @@ const STRING_DEFS = {
     en: "Couldn't load that place. Your text is kept as typed, and the map link still works.",
     beanie: "couldn't load that place. your text is kept as typed, and the map link still works.",
   },
+  'location.searching': { en: 'Searching for places', beanie: 'searching for places' },
+  'location.noMatches': {
+    en: 'No matching places. Your text is kept as typed.',
+    beanie: 'no matching places. your text is kept as typed.',
+  },
   'planner.noNotes': { en: 'No notes', beanie: 'no notes' },
   'planner.cost': { en: 'Cost', beanie: 'cost' },
   'planner.transport': { en: 'Transport', beanie: 'transport' },

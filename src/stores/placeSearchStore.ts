@@ -300,7 +300,8 @@ export const usePlaceSearchStore = defineStore('placeSearch', () => {
   }
 
   // ── Field outcomes (the field reports through usePlaceSearch; logged here only) ──
-  function notePick(fieldKind: PlaceFieldKind, withDetail: boolean): void {
+  /** `titled`: the pick stored a named place's title (closed words only, never the title). */
+  function notePick(fieldKind: PlaceFieldKind, withDetail: boolean, titled = false): void {
     logEvent({
       level: 'info',
       surface: SURFACE,
@@ -309,6 +310,7 @@ export const usePlaceSearchStore = defineStore('placeSearch', () => {
         action: 'pick',
         kind: fieldKind,
         detail: withDetail ? 'with-detail' : 'no-detail',
+        format: titled ? 'titled' : 'address',
       },
     });
   }

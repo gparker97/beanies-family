@@ -4554,6 +4554,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'location.understood.placeAndCall': '地点和{service}通话，两者都会显示在活动中。',
   'location.understood.placeAndLink': '地点和网页链接，两者都会显示在活动中。',
   'location.pickFailed': '无法载入该地点。你输入的文字已保留，地图链接仍可使用。',
+  'location.searching': '正在搜索地点',
+  'location.noMatches': '没有匹配的地点。你输入的文字已保留。',
   'planner.noNotes': '无备注',
   'planner.cost': '费用',
   'planner.transport': '接送',

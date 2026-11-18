@@ -6,7 +6,8 @@ import { describeLocation } from './locationLinks';
 type WallT = (key: UIStringKey) => string;
 
 /**
- * The wall sheet's location cell (#150): the place as the value with its kept detail under it.
+ * The wall sheet's location cell (#150): the place as the value with its kept detail under it
+ * (a named place: its title as the value, then the address, then the detail).
  * A call shows by its service name with "Join from your phone" under it. NOTHING on the wall is
  * a link, so no href is returned. With the feature off this is the stored text and nothing
  * else (`main` = the text, no sub lines).
@@ -21,6 +22,7 @@ export function wallLocation(
   const calls = view.links.filter((l) => l.kind === 'call');
   const placeText = view.placeName ?? view.plain;
   const subs: string[] = [];
+  if (view.placeTitle && placeText) subs.push(placeText);
   if (view.detail) subs.push(view.detail);
   // With no place text, the first part of the line is the value: a call as "Zoom call" (the
   // approved mockup, and the same wording as a second call below and the calendar block), a
@@ -32,7 +34,7 @@ export function wallLocation(
       : first?.kind === 'call'
         ? fillTemplate(t('location.callOf'), { service: first.text })
         : (first?.text ?? '');
-  const main = placeText || firstText || text;
+  const main = view.placeTitle || placeText || firstText || text;
   for (const call of calls.slice(placeText ? 0 : 1)) {
     subs.push(fillTemplate(t('location.callOf'), { service: call.service ?? call.host }));
   }

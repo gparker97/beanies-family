@@ -3,7 +3,7 @@
  * `POST <VITE_PLACE_SEARCH_URL>/suggest` with `{ q, lang, bias? }` and
  * `POST <VITE_PLACE_SEARCH_URL>/resolve` with `{ placeId, lang }`. No family id, no member id,
  * no token: the Lambda builds the Google request itself and the client never sees vendor
- * fields, only `{ placeId, main, secondary }` and `{ placeId, address }`.
+ * fields, only `{ placeId, main, secondary, kind? }` and `{ placeId, address }`.
  *
  * Pinia-free (the `flightStatusApi` pattern): only `placeSearchStore` calls this, and only the
  * store decides what an answer means, logs it, or goes quiet. There are no retries in here.
@@ -20,6 +20,7 @@ import {
   type PlaceSearchErrorCode,
   type PlaceSearchLambdaCode,
   type PlaceSuggestion,
+  type PlaceSuggestionKind,
 } from '@/types/placeSearch';
 import { isNetworkError } from '@/utils/transientFailure';
 import { timeoutSignal } from '@/utils/timing';
@@ -215,6 +216,14 @@ function isSuggestion(v: unknown): v is PlaceSuggestion {
 }
 
 /**
+ * A suggestion's kind: `'place'` only when the Lambda said exactly that. A missing kind (an
+ * older Lambda) or any other value is an address, never a refused answer.
+ */
+function kindOf(s: PlaceSuggestion): PlaceSuggestionKind {
+  return (s as { kind?: unknown }).kind === 'place' ? 'place' : 'address';
+}
+
+/**
  * Address suggestions for `q` (already trimmed; the Lambda refuses under 3 characters, links,
  * emails and line breaks). An empty list is a valid answer. Throws `PlaceSearchApiError`.
  */
@@ -240,6 +249,7 @@ export async function suggestPlaces(input: {
     placeId: s.placeId,
     main: s.main,
     secondary: s.secondary,
+    kind: kindOf(s),
   }));
 }
 

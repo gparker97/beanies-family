@@ -3,12 +3,20 @@
  * client only ever sees these beanies shapes, never the provider's.
  */
 
-/** One suggestion row. `main` + `secondary` are Google's text (shown, never stored). */
+/**
+ * One suggestion row. `main` + `secondary` are Google's text, shown in the list. `main` is
+ * stored only as a named place's title (`kind: 'place'`, ADR-049 addendum of 2026-11-18).
+ * `kind` absent = `'address'`, so an older Lambda still works.
+ */
 export interface PlaceSuggestion {
   placeId: string;
   main: string;
   secondary: string;
+  /** `'place'`: a business or landmark (Google's types name an establishment or POI). */
+  kind?: PlaceSuggestionKind;
 }
+
+export type PlaceSuggestionKind = 'place' | 'address';
 
 /** The ranking hint sent with a lookup: the family's home town, already rounded to 2 decimals. */
 export interface PlaceBias {

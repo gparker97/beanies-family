@@ -9,7 +9,7 @@
  * etc.) to the underlying `<textarea>` rather than the wrapper div —
  * matches BaseInput.
  */
-import { computed, ref } from 'vue';
+import { computed, ref, useSlots } from 'vue';
 
 defineOptions({ inheritAttrs: false });
 
@@ -39,6 +39,14 @@ const emit = defineEmits<{
   blur: [event: FocusEvent];
 }>();
 
+/**
+ * Optional `trailing` slot: a decorative mark at the field's top-right corner (`LocationField`'s
+ * searching mark), BaseInput's slot of the same name. Additive: the extra right padding applies
+ * only while the slot is filled. Read at render time (`useSlots()` is not reactive).
+ */
+const slots = useSlots();
+const hasTrailing = () => !!slots.trailing;
+
 const textareaId = computed(() => props.id || `textarea-${Math.random().toString(36).slice(2, 9)}`);
 
 const textareaClasses = computed(() => {
@@ -46,7 +54,7 @@ const textareaClasses = computed(() => {
   // <textarea> that computes < 16px triggers iOS's stuck-zoom-on-focus. rem-based
   // so Large reading mode still scales it.
   const base =
-    'block w-full rounded-xl border px-3 py-2 text-base text-gray-900 dark:text-ink bg-white dark:bg-surface-raised placeholder-gray-400 dark:placeholder-ink-faint focus:outline-none focus:ring-2 transition-colors';
+    'block w-full rounded-xl border pl-3 py-2 text-base text-gray-900 dark:text-ink bg-white dark:bg-surface-raised placeholder-gray-400 dark:placeholder-ink-faint focus:outline-none focus:ring-2 transition-colors';
   const states = props.error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
     : 'border-gray-300 dark:border-line-strong focus:border-primary-500 focus:ring-sky-silk-100 dark:focus:ring-primary-700';
@@ -88,19 +96,28 @@ defineExpose({ focus });
       <span v-if="required" class="text-primary-500">*</span>
     </label>
 
-    <textarea
-      :id="textareaId"
-      ref="field"
-      :value="modelValue"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      :required="required"
-      :rows="rows"
-      :class="textareaClasses"
-      v-bind="$attrs"
-      @input="handleInput"
-      @blur="emit('blur', $event)"
-    />
+    <div class="relative">
+      <textarea
+        :id="textareaId"
+        ref="field"
+        :value="modelValue"
+        :placeholder="placeholder"
+        :disabled="disabled"
+        :required="required"
+        :rows="rows"
+        :class="[textareaClasses, hasTrailing() ? 'pr-10' : 'pr-3']"
+        v-bind="$attrs"
+        @input="handleInput"
+        @blur="emit('blur', $event)"
+      />
+      <span
+        v-if="hasTrailing()"
+        class="pointer-events-none absolute top-3 right-3 flex"
+        aria-hidden="true"
+      >
+        <slot name="trailing" />
+      </span>
+    </div>
 
     <p v-if="error" class="dark:text-danger-lift text-sm text-red-600">
       {{ error }}

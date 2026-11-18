@@ -1,8 +1,8 @@
 /**
  * The logging promise, end to end: the REAL Google adapter behind the real handler, over a fake
  * fetch, on every path (success and every error). No console line of any level may contain the
- * provider key, the soft key, the query, a place id (sent or returned), an address, the source
- * IP, or any provider body text.
+ * provider key, the soft key, the query, a place id (sent or returned), an address, a place's
+ * name or types, the source IP, or any provider body text.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,10 +27,11 @@ const PLACE_ID = 'ChIJsentinelPlaceId';
 const RETURNED_ID = 'ChIJreturnedSentinel';
 const MAIN = 'ReturnedMainSentinel';
 const ADDRESS = 'SentinelAddress 9, Singapore';
+const TYPE = 'sentinel_type';
 const BODY = 'BODYSENTINEL';
 const IP = '203.0.113.77';
 
-const SECRETS = [PROVIDER_KEY, SOFT_KEY, Q, PLACE_ID, RETURNED_ID, MAIN, ADDRESS, BODY, IP];
+const SECRETS = [PROVIDER_KEY, SOFT_KEY, Q, PLACE_ID, RETURNED_ID, MAIN, ADDRESS, TYPE, BODY, IP];
 
 const logs = captureConsole();
 
@@ -57,6 +58,7 @@ const scenarios = [
             placePrediction: {
               placeId: RETURNED_ID,
               structuredFormat: { mainText: { text: MAIN }, secondaryText: { text: ADDRESS } },
+              types: [TYPE, 'establishment'],
             },
           },
         ],

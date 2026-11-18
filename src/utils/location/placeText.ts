@@ -4,13 +4,15 @@
  *
  * THE MODEL. The legacy string (`location` / `address` / `agencyAddress`) stays the source of
  * truth and keeps holding readable text. A picked place is an optional sibling `PlaceRef`
- * (`{ placeId, name }`) that only adds the exact map link and the two-line display. The kept
- * detail is not stored: it is the rest of the string after `name + ', '`.
+ * (`{ placeId, name, title? }`) that only adds the exact map link and the two- or three-line
+ * display. Its LEAD (`placeLead`) is how the string begins: `name`, or `title, name` for a
+ * named place (a business, ADR-049 addendum of 2026-11-18). The kept detail is not stored: it
+ * is the rest of the string after `lead + ', '`.
  *
  * THE VALIDITY RULE IS THE MERGE-SAFETY MECHANISM. The string and its place are two
  * independent last-writer-wins registers, so a merge can pair device B's string with device
  * A's place. `validPlace` is what makes that harmless: a place is honoured only while the
- * string still begins with its name, and is inert otherwise. Nothing else inspects a stored
+ * string still begins with its lead, and is inert otherwise. Nothing else inspects a stored
  * place.
  */
 import type { PlaceRef } from '@/types/models';
@@ -44,37 +46,52 @@ function isCleanString(v: unknown): v is string {
 }
 
 /**
- * The only constructor, with a fixed key order (`placeId`, `name`), so two equal places always
- * serialize the same and `diffPayload`'s `JSON.stringify` comparison sees no change. It also
- * unwraps a reactive proxy into a plain object the repository can clone.
+ * The only constructor, with a fixed key order (`placeId`, `name`, `title`), so two equal places
+ * always serialize the same and `diffPayload`'s `JSON.stringify` comparison sees no change. A
+ * blank title is omitted (the key is absent, never empty). It also unwraps a reactive proxy into
+ * a plain object the repository can clone.
  */
-export function makePlaceRef(place: { placeId: string; name: string }): PlaceRef {
-  return { placeId: place.placeId, name: place.name };
+export function makePlaceRef(place: { placeId: string; name: string; title?: string }): PlaceRef {
+  const ref: PlaceRef = { placeId: place.placeId, name: place.name };
+  if (typeof place.title === 'string' && place.title.trim() !== '') ref.title = place.title;
+  return ref;
+}
+
+/**
+ * How a place's string begins: the address alone, or `title, name` for a named place. The ONLY
+ * place the titled spelling is built; `composePlaceText`, `validPlace`, `detailOf` and `mapsHref`
+ * all read it, so a place without a title is byte for byte what it was before titles.
+ */
+export function placeLead(place: { name: string; title?: string }): string {
+  return place.title ? `${place.title}, ${place.name}` : place.name;
 }
 
 /**
  * The place when it may be honoured for `text`, else `undefined`. Holds when `place` is an
  * object whose `placeId` and `name` are non-empty strings with no leading or trailing
- * whitespace, `placeId` has the provider's ID shape, and the trimmed text is exactly `name` or
- * starts with `name + ', '`. Also the type guard for document data.
+ * whitespace, `placeId` has the provider's ID shape, `title` is absent or such a string too,
+ * and the trimmed text is exactly the lead (`placeLead`) or starts with lead + ', '. Also the
+ * type guard for document data.
  */
 export function validPlace(text: string | null | undefined, place: unknown): PlaceRef | undefined {
   if (typeof text !== 'string' || !place || typeof place !== 'object') return undefined;
-  const { placeId, name } = place as Record<string, unknown>;
+  const { placeId, name, title } = place as Record<string, unknown>;
   if (!isCleanString(placeId) || !isCleanString(name)) return undefined;
+  if (title !== undefined && !isCleanString(title)) return undefined;
   if (!PLACE_ID_SHAPE.test(placeId)) return undefined;
+  const lead = placeLead({ name, title: title as string | undefined });
   const t = text.trim();
-  if (t !== name && !t.startsWith(`${name}, `)) return undefined;
+  if (t !== lead && !t.startsWith(`${lead}, `)) return undefined;
   return place as PlaceRef;
 }
 
-/** The kept detail: what follows `name + ', '` in the string, or '' (also for an inert place). */
+/** The kept detail: what follows lead + ', ' in the string, or '' (also for an inert place). */
 export function detailOf(text: string | null | undefined, place: unknown): string {
   const valid = validPlace(text, place);
   if (!valid || typeof text !== 'string') return '';
   return text
     .trim()
-    .slice(valid.name.length + 2)
+    .slice(placeLead(valid).length + 2)
     .trim();
 }
 
@@ -83,10 +100,14 @@ function stripEdgeSeparators(s: string): string {
   return s.replace(/^[\s,;]+/, '').replace(/[\s,;]+$/, '');
 }
 
-/** The string a picked place and its detail are saved as: `name`, or `name, detail`. */
-export function composePlaceText(name: string, detail: string): string {
+/**
+ * The string a picked place and its detail are saved as: the lead (`name`, or `title, name`),
+ * then `, detail` when there is one.
+ */
+export function composePlaceText(place: { name: string; title?: string }, detail: string): string {
+  const lead = placeLead(place);
   const d = stripEdgeSeparators(detail ?? '');
-  return d ? `${name}, ${d}` : name;
+  return d ? `${lead}, ${d}` : lead;
 }
 
 /**
@@ -294,9 +315,29 @@ export interface KeptDetailSources {
   carried: string;
   /**
    * The picked suggestion's main text (the bold line). Used ONLY to recognise a half-typed
-   * last word; it is never stored, so a whole word only it carries is kept as detail.
+   * last word; for an address pick it is never stored, so a whole word only it carries is kept
+   * as detail.
    */
   main?: string;
+  /**
+   * The named place's stored title (`PlaceRef.title`), when the pick has one. The typed words it
+   * carries, at the head of the typed text, are dropped before the address is compared.
+   */
+  title?: string;
+}
+
+/**
+ * Whether `address` already carries every word of `title`, in order (abbreviations folded on its
+ * street line, as `splitKeptDetail` compares): a "named place" whose name is just its address
+ * ("1 Raffles Place" against "1 Raffles Pl, Singapore 048616"), which must not be stored as a
+ * title or the saved string would repeat itself. A title with no word breaks (CJK) is carried
+ * when the address contains it; a title with no word at all counts as carried.
+ */
+export function addressCarriesTitle(title: string, address: string): boolean {
+  const t = (title ?? '').trim();
+  if (!isWordBoundedScript(t)) return (address ?? '').includes(t);
+  const words = wordTokenList(t);
+  return align(words, addressWords((address ?? '').trim()), () => true).typed.size === words.length;
 }
 
 /**
@@ -326,12 +367,76 @@ export interface KeptDetailSources {
  * 5. A keyword or wordless head chunk is kept only if the chunk after it is kept, so
  *    "Blk 293 Yishun Street 22 #05-12" keeps "#05-12", not "Blk #05-12".
  *
+ *
+ * WITH A TITLE (a named place, whose saved string leads with the title), a step 0 runs first:
+ * the leading typed chunks whose words all align, in order, with the title's words (folded the
+ * same way) are dropped, a wordless chunk only between two of them. The rest of the typed text
+ * then runs steps 1 to 5 against `carried`, with the title's words after the last one matched
+ * standing in for the main text in the fragment rule: "hungarian touch back room" against "The
+ * Hungarian Touch" is "back room", and "hungarian tou" is ''. When no head chunk aligns, the
+ * title changes nothing. Text with no word breaks is dropped whole when the title contains it.
+ *
  * Text with no word breaks (CJK, see `isWordBoundedScript`) is not tokenized: when it sits
  * inside `carried` nothing is left over, when `carried` sits inside it that part is removed,
  * and otherwise the whole typed text is kept.
  */
 export function splitKeptDetail(typed: string, sources: KeptDetailSources): string {
-  const carried = (sources.carried ?? '').trim();
+  const source = (typed ?? '').trim();
+  if (!source) return '';
+  const title = (sources.title ?? '').trim();
+  if (!title) return splitAgainstAddress(source, sources.carried, sources.main);
+  if (!isWordBoundedScript(source)) {
+    return title.includes(source) ? '' : splitAgainstAddress(source, sources.carried, sources.main);
+  }
+
+  // 0. The head chunks the title carries whole, in order.
+  const chunks = source.split(/\s+/).filter(Boolean);
+  const chunkWords = chunks.map((c) => wordTokenList(c));
+  const titleWords: AddressWord[] = wordTokenList(title).map((word) => ({ word, folds: true }));
+  const fit = align(chunkWords.flat(), titleWords, () => true);
+  let dropped = 0; // chunks
+  let droppedWords = 0;
+  for (let i = 0, k = 0; i < chunks.length; i++) {
+    const n = chunkWords[i]!.length;
+    if (n === 0) continue; // a wordless chunk goes only with a carried chunk after it
+    let all = true;
+    for (let w = k; w < k + n; w++) if (!fit.typed.has(w)) all = false;
+    if (!all) break;
+    k += n;
+    dropped = i + 1;
+    droppedWords = k;
+  }
+  // The alignment is in order, so the dropped words are its first matches.
+  const lastTitleWord =
+    dropped === 0 ? -1 : [...fit.spent].sort((x, y) => x - y)[droppedWords - 1]!;
+  // A single half-typed word left over ("hungar" when the pick is "The Hungarian Touch") is the
+  // search text for the name, not a detail: dropped when it is a strict prefix of a later title
+  // word. Only ever the one last chunk, and never a one-letter word (a unit like "B").
+  const left = chunks.slice(dropped);
+  const lone = left.length === 1 ? wordTokenList(left[0]!) : [];
+  if (
+    lone.length === 1 &&
+    lone[0]!.length >= MIN_FRAGMENT_CHARS &&
+    titleWords
+      .slice(lastTitleWord + 1)
+      .some((w) => w.word.length > lone[0]!.length && w.word.startsWith(lone[0]!))
+  ) {
+    return '';
+  }
+  if (dropped === 0) return splitAgainstAddress(source, sources.carried, sources.main);
+  return splitAgainstAddress(
+    chunks.slice(dropped).join(' '),
+    sources.carried,
+    titleWords
+      .slice(lastTitleWord + 1)
+      .map((w) => w.word)
+      .join(' ')
+  );
+}
+
+/** Steps 1 to 5 of `splitKeptDetail` (and its no-word-break rule), against the address. */
+function splitAgainstAddress(typed: string, carriedRaw: string, main: string | undefined): string {
+  const carried = (carriedRaw ?? '').trim();
   const source = (typed ?? '').trim();
   if (!source) return '';
 
@@ -390,7 +495,7 @@ export function splitKeptDetail(typed: string, sources: KeptDetailSources): stri
     }
   } else {
     // 4. Fragments.
-    const half = fragmentPositions(headWords, wordTokenList(sources.main ?? ''));
+    const half = fragmentPositions(headWords, wordTokenList(main ?? ''));
     owner.forEach((i, k) => {
       if (half.has(k) && !carriedChunk[i]) kept[i] = false;
     });
@@ -415,11 +520,11 @@ const MAPS_SEARCH = 'https://www.google.com/maps/search/?api=1';
 
 /**
  * The Google Maps link for a location. With a valid place it opens that exact place
- * (`query` = the place name, never the detail; `query_place_id` = its ID). Without one it is
- * byte for byte the text search every surface built inline before #150.
+ * (`query` = the place's lead, `name` or `title, name`, never the detail; `query_place_id` = its
+ * ID). Without one it is byte for byte the text search every surface built inline before #150.
  */
 export function mapsHref(text: string, place?: PlaceRef | null): string {
   const valid = validPlace(text, place);
   if (!valid) return `${MAPS_SEARCH}&query=${encodeURIComponent(text)}`;
-  return `${MAPS_SEARCH}&query=${encodeURIComponent(valid.name)}&query_place_id=${encodeURIComponent(valid.placeId)}`;
+  return `${MAPS_SEARCH}&query=${encodeURIComponent(placeLead(valid))}&query_place_id=${encodeURIComponent(valid.placeId)}`;
 }

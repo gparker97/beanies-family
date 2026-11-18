@@ -105,7 +105,12 @@ describe('HTTP shape and dispatch', () => {
     assert.equal(res.statusCode, 200);
     assert.deepEqual(json(res), {
       suggestions: [
-        { placeId: 'ChIJplace1', main: '127 South Bridge Road', secondary: 'Singapore' },
+        {
+          placeId: 'ChIJplace1',
+          main: '127 South Bridge Road',
+          secondary: 'Singapore',
+          kind: 'address',
+        },
       ],
     });
     assert.equal(provider.calls.suggest.length, 1);
@@ -365,8 +370,28 @@ describe('answer caps', () => {
     assert.equal(suggestions[0].secondary.length, MAX_TEXT_CHARS);
     assert.equal(suggestions[1].secondary, '');
     assert.equal(suggestions[2].secondary, '');
-    for (const s of suggestions) assert.deepEqual(Object.keys(s), ['placeId', 'main', 'secondary']);
+    for (const s of suggestions) {
+      assert.deepEqual(Object.keys(s), ['placeId', 'main', 'secondary', 'kind']);
+    }
     assert.equal(requestLines(logs())[0].count, 5);
+  });
+
+  test('kind passes through only as place or address; anything else is an address', async () => {
+    const rows = [
+      { placeId: 'ChIJ1', main: 'one', secondary: '', kind: 'place' },
+      { placeId: 'ChIJ2', main: 'two', secondary: '', kind: 'address' },
+      { placeId: 'ChIJ3', main: 'three', secondary: '' },
+      { placeId: 'ChIJ4', main: 'four', secondary: '', kind: 'establishment' },
+      { placeId: 'ChIJ5', main: 'five', secondary: '', kind: ['place'] },
+    ];
+    const { handler } = make({
+      provider: fakeProvider({ suggest: () => ({ suggestions: rows }) }),
+    });
+    const { suggestions } = json(await handler(ev()));
+    assert.deepEqual(
+      suggestions.map((s) => s.kind),
+      ['place', 'address', 'address', 'address', 'address']
+    );
   });
 
   test('clipping never leaves half a surrogate pair', async () => {

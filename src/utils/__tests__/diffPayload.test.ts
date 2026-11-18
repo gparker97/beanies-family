@@ -158,6 +158,22 @@ describe('diffPayload with a PlaceRef (#150)', () => {
     expect(diffPayload(before, after)).toEqual({});
   });
 
+  it('a titled place in a different key order is unchanged too (placeId, name, title)', () => {
+    const text = 'The Hungarian Touch, 50 E Coast Rd, Singapore 428769, back room';
+    const before = placePatch('location', text, {
+      title: 'The Hungarian Touch',
+      name: '50 E Coast Rd, Singapore 428769',
+      placeId: 'p1',
+    } as never);
+    const after = placePatch('location', text, {
+      placeId: 'p1',
+      name: '50 E Coast Rd, Singapore 428769',
+      title: 'The Hungarian Touch',
+    });
+    expect(Object.keys(before.locationPlace!)).toEqual(['placeId', 'name', 'title']);
+    expect(diffPayload(before, after)).toEqual({});
+  });
+
   it('editing only the detail writes the string, never the place', () => {
     const place = { placeId: 'p1', name: '12 Main St' };
     const before = placePatch('location', '12 Main St, room 3', place);

@@ -14,6 +14,9 @@ vi.mock('@/composables/useTranslation', () => ({
 const search = {
   suggestions: ref<PlaceSuggestion[]>([]),
   searching: ref(false),
+  requesting: ref(false),
+  slowLookup: ref(false),
+  state: ref<'idle' | 'results' | 'none'>('idle'),
   available: ref(true),
   onInput: vi.fn(),
   pick: vi.fn(),
@@ -56,6 +59,9 @@ const emitted = (w: ReturnType<typeof render>) =>
 beforeEach(() => {
   flags.on = true;
   search.suggestions.value = [];
+  search.slowLookup.value = false;
+  search.state.value = 'idle';
+  search.available.value = true;
   vi.clearAllMocks();
   search.pick.mockResolvedValue({
     ok: true,
@@ -413,15 +419,316 @@ describe('LocationField', () => {
     expect(search.noteStale).toHaveBeenCalledTimes(1);
   });
 
+  describe('a named place (titled)', () => {
+    const TITLED = {
+      placeId: 'ChIJht',
+      name: '50 E Coast Rd, #01-138 Roxy Square, Singapore 428769',
+      title: 'The Hungarian Touch',
+    };
+    const LEAD = `${TITLED.title}, ${TITLED.name}`;
+
+    it('the chip shows the title over the whole address, and links to the exact place', () => {
+      const w = render({ value: { text: `${LEAD}, back room`, place: TITLED } });
+      const link = w.get('[data-testid="location-place-link"]');
+      const lines = link.findAll(':scope > span').map((s) => s.text());
+      expect(lines).toEqual([TITLED.title, TITLED.name]);
+      expect(link.attributes('href')).toBe(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(LEAD)}&query_place_id=ChIJht`
+      );
+      expect((w.get('[data-testid="location-detail"]').element as HTMLInputElement).value).toBe(
+        'back room'
+      );
+    });
+
+    it('editing the detail keeps the title and the address ahead of it', async () => {
+      const w = render({ value: { text: LEAD, place: TITLED } });
+      await w.get('[data-testid="location-detail"]').setValue('patio');
+      expect(emitted(w).at(-1)).toEqual({ text: `${LEAD}, patio`, place: TITLED });
+    });
+
+    it('without a title the chip splits the address as before', () => {
+      const w = render({ value: { text: PLACE.name, place: PLACE } });
+      const lines = w
+        .get('[data-testid="location-place-link"]')
+        .findAll(':scope > span')
+        .map((s) => s.text());
+      expect(lines).toEqual(['127 S Bridge Rd', 'Singapore 058285']);
+    });
+  });
+
   it('the map pin opens the exact place once one is picked', () => {
     const w = render({ value: { text: `${PLACE.name}, room 3`, place: PLACE }, mapPin: true });
     const pin = w.get('a[href*="query_place_id"]');
     expect(pin.attributes('href')).toContain('query_place_id=ChIJ127');
   });
 
+  describe('the searching mark', () => {
+    const spinner = (w: ReturnType<typeof render>) => w.find('[data-testid="location-searching"]');
+    const announced = (w: ReturnType<typeof render>) =>
+      w.find('[data-testid="location-announcement"]');
+
+    async function focusedField(props: Props = {}) {
+      const w = render(props);
+      await w.get('[data-testid="location-input"]').trigger('focus');
+      return w;
+    }
+
+    it('shows inside the input, at its right edge, only while the lookup is slow', async () => {
+      const w = await focusedField();
+      const input = () => w.get('[data-testid="location-input"]');
+      expect(spinner(w).exists()).toBe(false);
+      expect(input().classes()).toContain('pr-3');
+      search.slowLookup.value = true;
+      await flushPromises();
+      expect(spinner(w).exists()).toBe(true);
+      // In BaseInput's trailing slot, beside the input, and the input makes room for it.
+      expect(spinner(w).element.closest('span')!.getAttribute('aria-hidden')).toBe('true');
+      expect(spinner(w).attributes('aria-hidden')).toBe('true');
+      expect(input().classes()).toContain('pr-10');
+      expect(input().classes()).not.toContain('pr-3');
+      search.slowLookup.value = false;
+      await flushPromises();
+      expect(spinner(w).exists()).toBe(false);
+      expect(input().classes()).toContain('pr-3');
+    });
+
+    it('announces "Searching for places" once in the live region, and no visible text', async () => {
+      const w = await focusedField();
+      search.slowLookup.value = true;
+      await flushPromises();
+      const message = w.get('[data-testid="location-message"]');
+      expect(message.attributes('role')).toBe('status');
+      expect(announced(w).text()).toBe('location.searching');
+      expect(announced(w).classes()).toContain('sr-only');
+      // The hidden announcement does not push the line down.
+      expect(message.classes()).not.toContain('mt-1.5');
+      search.slowLookup.value = false;
+      await flushPromises();
+      expect(announced(w).exists()).toBe(false);
+    });
+
+    it('is gone on blur, and Escape cancels the lookup', async () => {
+      const w = await focusedField();
+      search.slowLookup.value = true;
+      await flushPromises();
+      await w.get('[data-testid="location-input"]').trigger('keydown', { key: 'Escape' });
+      expect(search.cancel).toHaveBeenCalledTimes(1);
+      await w.get('[data-testid="location-input"]').trigger('blur');
+      expect(search.cancel).toHaveBeenCalledTimes(2);
+      // Even before the composable's own signal drops, an unfocused field shows no mark.
+      expect(spinner(w).exists()).toBe(false);
+    });
+
+    it('is not shown for a disabled field or while place search is unavailable', async () => {
+      search.slowLookup.value = true;
+      const w = await focusedField();
+      expect(spinner(w).exists()).toBe(true);
+      await w.setProps({ disabled: true });
+      expect(spinner(w).exists()).toBe(false);
+      await w.setProps({ disabled: false });
+      expect(spinner(w).exists()).toBe(true);
+      search.available.value = false;
+      await flushPromises();
+      expect(spinner(w).exists()).toBe(false);
+    });
+
+    it('multiline: sits at the textarea top right, and the textarea makes room', async () => {
+      const w = await focusedField({ multiline: true });
+      search.slowLookup.value = true;
+      await flushPromises();
+      const holder = spinner(w).element.parentElement!;
+      expect(holder.className).toContain('top-3');
+      expect(holder.className).toContain('right-3');
+      expect(w.get('textarea').classes()).toContain('pr-10');
+    });
+
+    it("with the map pin, takes the pin's place while it shows", async () => {
+      const w = await focusedField({ value: { text: '127 south' }, mapPin: true });
+      expect(w.find('a[title="planner.openInMaps"]').exists()).toBe(true);
+      search.slowLookup.value = true;
+      await flushPromises();
+      expect(spinner(w).exists()).toBe(true);
+      expect(w.find('a[title="planner.openInMaps"]').exists()).toBe(false);
+      search.slowLookup.value = false;
+      await flushPromises();
+      expect(w.find('a[title="planner.openInMaps"]').exists()).toBe(true);
+    });
+  });
+
+  describe('a pick in flight', () => {
+    const OTHER: PlaceSuggestion = { placeId: 'ChIJother', main: '12 Main St', secondary: 'Town' };
+    let release: (r: unknown) => void = () => {};
+    beforeEach(() => {
+      search.pick.mockImplementation(
+        (_s: PlaceSuggestion, _typed: string, stillCurrent?: () => boolean) =>
+          new Promise((resolve) => {
+            release = (r) =>
+              resolve(stillCurrent && !stillCurrent() ? { ok: false, code: 'superseded' } : r);
+          })
+      );
+    });
+    const rows = (w: ReturnType<typeof render>) => w.findAll('[data-testid="location-suggestion"]');
+    async function startPick() {
+      const w = render();
+      await w.get('[data-testid="location-input"]').setValue(TYPED);
+      search.suggestions.value = [ROW, OTHER];
+      await flushPromises();
+      await rows(w)[0]!.trigger('mousedown');
+      await flushPromises();
+      return w;
+    }
+    const OK = {
+      ok: true,
+      place: PLACE,
+      text: `${PLACE.name}, block 48 unit 04-19 function room`,
+      detail: 'block 48 unit 04-19 function room',
+    };
+
+    it('the tapped row is busy with the spinner; the others dim and ignore taps', async () => {
+      const w = await startPick();
+      const [tapped, other] = rows(w);
+      expect(tapped!.attributes('aria-busy')).toBe('true');
+      expect(tapped!.find('[data-testid="location-pick-spinner"]').exists()).toBe(true);
+      expect(tapped!.find('[data-testid="location-pick-spinner"]').attributes('aria-hidden')).toBe(
+        'true'
+      );
+      expect(other!.attributes('aria-busy')).toBeUndefined();
+      expect(other!.attributes('aria-disabled')).toBe('true');
+      // Faint ink on the text, not an opacity modifier.
+      const main = other!.find('.font-outfit');
+      expect(main.classes()).toEqual(
+        expect.arrayContaining(['text-secondary-400', 'dark:text-ink-faint'])
+      );
+      expect(other!.html()).not.toMatch(/opacity-/);
+      await other!.trigger('mousedown');
+      expect(search.pick).toHaveBeenCalledTimes(1);
+      // Keep what I typed stays available as the way out.
+      expect(
+        w.get('[data-testid="location-keep-typed"]').attributes('aria-disabled')
+      ).toBeUndefined();
+    });
+
+    it('settles on success: the chip replaces the list', async () => {
+      const w = await startPick();
+      release(OK);
+      await flushPromises();
+      expect(w.find('[data-testid="location-pick-spinner"]').exists()).toBe(false);
+      expect(w.find('[data-testid="location-place"]').exists()).toBe(true);
+    });
+
+    it('settles on failure: no spinner, every row answers taps again', async () => {
+      const w = await startPick();
+      release({ ok: false, code: 'upstream_http' });
+      await flushPromises();
+      expect(w.find('[data-testid="location-pick-spinner"]').exists()).toBe(false);
+      expect(rows(w).every((r) => r.attributes('aria-busy') === undefined)).toBe(true);
+      expect(rows(w).every((r) => r.attributes('aria-disabled') === undefined)).toBe(true);
+      await rows(w)[1]!.trigger('mousedown');
+      expect(search.pick).toHaveBeenCalledTimes(2);
+      expect(search.pick).toHaveBeenLastCalledWith(OTHER, TYPED, expect.any(Function));
+    });
+
+    it('settles the moment it is superseded, before the address lands', async () => {
+      const w = await startPick();
+      await w.get('[data-testid="location-input"]').setValue(`${TYPED} x`);
+      await flushPromises();
+      expect(w.find('[data-testid="location-pick-spinner"]').exists()).toBe(false);
+      expect(rows(w).every((r) => r.attributes('aria-disabled') === undefined)).toBe(true);
+      // The late answer is still dropped by the stale-pick guard.
+      release(OK);
+      await flushPromises();
+      expect(w.find('[data-testid="location-place"]').exists()).toBe(false);
+      expect(emitted(w).some((v) => (v as { place?: unknown }).place)).toBe(false);
+    });
+
+    it('Keep what I typed settles it too', async () => {
+      const w = await startPick();
+      await w.get('[data-testid="location-keep-typed"]').trigger('mousedown');
+      await flushPromises();
+      expect(w.find('[data-testid="location-pick-spinner"]').exists()).toBe(false);
+    });
+  });
+
+  describe('the no-matches line', () => {
+    const line = (w: ReturnType<typeof render>) => w.find('[data-testid="location-no-matches"]');
+
+    it('shows under the field, in the helper style, once a lookup found nothing', async () => {
+      const w = render();
+      await w.get('[data-testid="location-input"]').setValue('nowhere at all');
+      search.state.value = 'none';
+      await flushPromises();
+      expect(line(w).text()).toBe('location.noMatches');
+      expect(line(w).classes()).toEqual(
+        expect.arrayContaining(['text-secondary-400', 'dark:text-ink-faint', 'text-xs', 'mt-1.5'])
+      );
+      expect(w.find('[role="listbox"]').exists()).toBe(false);
+      expect(w.get('[data-testid="location-announcement"]').text()).toBe('location.noMatches');
+    });
+
+    it('is cleared by the next keystroke (the composable drops the state) and by blur', async () => {
+      search.onInput.mockImplementation(() => {
+        search.state.value = 'idle';
+      });
+      const w = render();
+      const input = w.get('[data-testid="location-input"]');
+      await input.setValue('nowhere at all');
+      search.state.value = 'none';
+      await flushPromises();
+      expect(line(w).exists()).toBe(true);
+      await input.setValue('nowhere at all x');
+      expect(line(w).exists()).toBe(false);
+      search.state.value = 'none';
+      await flushPromises();
+      expect(line(w).exists()).toBe(true);
+      await input.trigger('blur');
+      expect(line(w).exists()).toBe(false);
+      expect(w.find('[data-testid="location-announcement"]').exists()).toBe(false);
+      search.onInput.mockReset();
+    });
+
+    it('gives way to the understood-as line when a link is typed', async () => {
+      const w = render({ mode: 'location-or-link', fieldKind: 'activity' });
+      await w.get('[data-testid="location-input"]').setValue('nowhere at all');
+      search.state.value = 'none';
+      await flushPromises();
+      expect(line(w).exists()).toBe(true);
+      await w.get('[data-testid="location-input"]').setValue('nowhere https://zoom.us/j/1');
+      expect(line(w).exists()).toBe(false);
+      expect(w.find('[data-testid="location-understood"]').exists()).toBe(true);
+    });
+
+    it('stays silent for every lookup that did not complete empty, and while unavailable', async () => {
+      const w = render();
+      await w.get('[data-testid="location-input"]').setValue('127 south');
+      for (const state of ['idle', 'results'] as const) {
+        search.state.value = state;
+        await flushPromises();
+        expect(line(w).exists()).toBe(false);
+      }
+      search.state.value = 'none';
+      search.available.value = false;
+      await flushPromises();
+      expect(line(w).exists()).toBe(false);
+    });
+  });
+
   describe('flag off', () => {
     beforeEach(() => {
       flags.on = false;
+    });
+
+    it('never shows the searching mark, the busy rows or the no-matches line', async () => {
+      search.slowLookup.value = true;
+      search.state.value = 'none';
+      const w = render({ value: { text: '127 south' }, mapPin: true });
+      const input = w.get('input');
+      await input.trigger('focus');
+      await input.setValue('127 south b');
+      expect(w.find('[data-testid="location-searching"]').exists()).toBe(false);
+      expect(w.find('[data-testid="location-no-matches"]').exists()).toBe(false);
+      expect(w.find('[role="status"]').exists()).toBe(false);
+      expect(input.classes()).toContain('pr-3');
+      expect(w.find('a[title="planner.openInMaps"]').exists()).toBe(true);
     });
 
     it('renders the legacy control: a plain input, no combobox, no list, no chip', async () => {
