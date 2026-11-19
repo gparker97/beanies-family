@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Address suggestions are now on for everyone: location and address fields suggest places from Google Maps, and a video call link in an activity's location shows as Join Call.
 
+### Changed
+
+- The privacy policy now names the two AI services magic beans can use (Tinfoil, and OpenAI with your own key) and states that Google account data is never sent to any AI model.
+
 ### Fixed
 
 - The dev-only feature flags card now shows the saved state after a reload.
