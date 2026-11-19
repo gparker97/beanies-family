@@ -206,7 +206,14 @@ useFullscreenOverlay(toRef(props, 'open'), close);
             </div>
 
             <!-- Body -->
-            <div class="flex-1" :class="flushBody ? '' : 'overflow-y-auto p-6'">
+            <!-- `flushBody`: the consumer owns the body's layout, so the body is a shrinkable
+                 column (`min-h-0`) and hands it the height the shell actually has. Without
+                 that, a child taller than the shell's max-height is not shrunk, it is cut
+                 off by the shell's `overflow-hidden`, footer included. -->
+            <div
+              class="flex-1"
+              :class="flushBody ? 'flex min-h-0 flex-col' : 'overflow-y-auto p-6'"
+            >
               <slot />
             </div>
 

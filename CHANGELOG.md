@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - The dev-only feature flags card now shows the saved state after a reload.
+- A tall photo opened on a tablet or laptop now fits the screen; it was cropped to its middle before.
 
 ## 2026-11-18
 

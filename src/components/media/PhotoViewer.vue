@@ -307,7 +307,7 @@ async function handleSaveDocument(): Promise<void> {
       hero; the chrome should not compete.
     -->
     <div
-      class="relative flex h-full min-h-[60vh] items-center justify-center"
+      class="relative flex min-h-[60vh] flex-1 flex-col items-center justify-center"
       style="background: rgb(20 15 15 / 96%)"
     >
       <!--
@@ -378,8 +378,7 @@ async function handleSaveDocument(): Promise<void> {
       <!--
         `absolute inset-0` (not h-full) so the stacked pages scroll WITHIN the
         body instead of growing the flex-1 body past the modal's max-height,
-        which would clip the footer (delete/download) off the bottom — the
-        height-constrained <img> branch below doesn't hit this, tall PDF pages do.
+        which would clip the footer (delete/download) off the bottom.
       -->
       <div
         v-else-if="isPdfDoc"
@@ -414,8 +413,15 @@ async function handleSaveDocument(): Promise<void> {
 
       <!--
         Image — fills the body container (edge-to-edge on mobile via
-        BaseModal's flush-body). `object-contain` preserves aspect ratio;
-        max-h/max-w-full keeps it within the frame without overflow.
+        BaseModal's flush-body). `object-contain` preserves aspect ratio.
+
+        HEIGHT IS FITTED BY FLEX SHRINK, NOT BY A PERCENTAGE. The windowed shell has a
+        max-height and no height, so `max-h-full` here resolved against nothing and a
+        photo taller than the screen was drawn at its natural height and cropped by the
+        shell (a portrait photo on a landscape tablet or a laptop showed only its
+        middle, and the footer was cut off with it). The frame is a column, so the
+        image's height is the main axis: `min-h-0` lets it shrink to the room the shell
+        really has, on every screen, and `max-w-full` still caps the width.
         The drop-shadow gives the photo a subtle float against the
         backdrop — same trick as a polaroid against a dark surface.
       -->
@@ -430,7 +436,7 @@ async function handleSaveDocument(): Promise<void> {
         v-else-if="fullUrl"
         :src="fullUrl"
         :alt="''"
-        class="max-h-full max-w-full object-contain"
+        class="min-h-0 max-w-full object-contain"
         style="filter: drop-shadow(0 25px 50px rgb(0 0 0 / 60%))"
         referrerpolicy="no-referrer"
         @load="handleImgLoaded"
