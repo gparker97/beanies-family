@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-20
+
+### Added
+
+- New beanstalk post: "what makes a great family choreboard for kids?", with a fresh animation of the wall choreboard that now ends on a child's stars and rewards.
+
 ## 2026-11-19
 
 ### Added
