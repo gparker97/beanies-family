@@ -18,7 +18,7 @@ draft: false
 
 What makes a great family choreboard? In my opinion, it’s any choreboard that _actually_ motivates your kids to do their chores!
 
-There’s pretty much all there is to say, though if I stop here my _claude-bot_ will probably scold me for not meeting the requisite weekly blog word count. Luckily, there’s _a lot_ to show.
+That’s pretty much all there is to say, though if I stop here my _claude-bot_ will probably scold me for not meeting the requisite weekly blog word count. Luckily, there’s _a lot_ to show.
 
 ![The choreboard on the beanie wall: a lane of chores for each of three kids, with sports, lessons, homework and chores like "Clean your room without complaining", and beanies parachuting in over Milo's lane with the banner "Afternoon, all done! Nice work, Milo."](/blog/choreboard-wall-showcase.webp 'wide')
 
@@ -28,7 +28,7 @@ In all seriousness, raising your kids to be better, more responsible human being
 
 Lots of apps have tried. There’s special lists, animations, points, rewards, and more, but if it’s not built in the right way, it simply doesn’t engage kids the way it should. Even beanies is not immune - I initially used lists as a substitute for a true choreboard. It technically worked, but it wasn’t as engaging as it could be. Chores are their own thing, and a properly done choreboard requires organization, structure, and a special something that’s hard to put your finger on (a flying bean, maybe?).
 
-Given that beanies.family already has the [beanie wall and digital calendar](https://beanies.family/blog/beanie-wall-for-your-whole-family?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=beanie-wall-post), it has a perfect place to add a kid’s choreboard. The beanie wall is already situated in a place your family (and kids) frequent, and the family looks at it every day. In my house, the beanie wall sits right outside the kitchen, and the kids pass it every day on their way out the door as they’re complaining about not wanting to leave the house (which is a wholly separate issue that I don’t have a solution for. Yet.).
+Given that beanies.family already has the [beanie wall and digital calendar](https://beanies.family/blog/beanie-wall-for-your-whole-family?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=beanie-wall-post), it has a perfect place to add a kids’ choreboard. The beanie wall is already situated in a place your family (and kids) frequent, and the family looks at it every day. In my house, the beanie wall sits right outside the kitchen, and the kids pass it every day on their way out the door as they’re complaining about not wanting to leave the house (which is a wholly separate issue that I don’t have a solution for. Yet.).
 
 Anyway, as I mentioned earlier, talk is cheap - what can the _beanie choreboard_ actually do?!
 
@@ -58,11 +58,11 @@ In our house, the weekly reward is their allowance, and special rewards are thin
 
 _there’s nothing better than motivating your child with raw, irrefutable data. it’s beautiful._
 
-With all of it’s features, the [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=homepage-choreboard) choreboard may be the most functional, engaging, and effective choreboard for kids out there today (bean-themed or otherwise). And along with the choreboard, you get all the other great features of [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=homepage-features) as well!
+With all of its features, the [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=homepage-choreboard) choreboard may be the most functional, engaging, and effective choreboard for kids out there today (bean-themed or otherwise). And along with the choreboard, you get all the other great features of [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=homepage-features) as well!
 
 So open up your beanpod (or <a href="https://app.beanies.family/create?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=create-pod" target="_blank" rel="noopener" data-cta="CTA: Create Pod" data-cta-loc="blog-choreboard">create one</a> if you haven’t already) and get your kids’ chore routine down pat. Your kids will love the cool graphics and animations, and you’ll love actually knowing whether they’ve earned their allowance or not.
 
-(Oh, and by the way, the animations are set to only trigger once per day. Because, if your kids are anything like mine, they’re gonna uncheck and re-check that final chore 50 times just to hear the celebration sounds and see the animation over and over. Yes - we thought of everything).
+(Oh, and by the way, the flying bean animations will only trigger once each day. Because if your kids are anything like mine, they’re gonna uncheck and re-check that final chore 50 times over just to play the celebration sounds and animations ad-nauseum. Yes - we thought of everything).
 
 Take a look, and [let me know what you think](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=discord). And if there’s anything we did actually miss, I’m all ears.
 
