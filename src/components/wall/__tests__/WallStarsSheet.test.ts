@@ -112,7 +112,8 @@ beforeEach(() => {
         ? {
             week: s.strip.week,
             path: { reached: s.strip.reached },
-            nearest: null,
+            // As the store answers: the nearest saved-up reward rides on the strip.
+            nearest: s.awards[0] ?? null,
             thisWeek: null,
           }
         : null,
@@ -308,6 +309,16 @@ describe('WallStarsSheet: a child with stars', () => {
       'h-3'
     );
     expect(w.get('[data-testid="wall-stars-gift-amount"]').classes()).toContain('text-xl');
+  });
+
+  it('the weekly card never repeats a special reward: the strip gets no saved-up line', () => {
+    s.awards = [{ award: award('a1'), progress: { fraction: 0.25, have: 30, need: 120 } }];
+    const w = mountSheet();
+    const strip = w.getComponent({ name: 'StarPathStrip' });
+    expect(strip.props('nearest')).toBeNull();
+    expect(strip.props('soFar')).toBe(true);
+    expect(strip.props('week')).toEqual(s.strip!.week);
+    expect(w.findAll('[data-testid="wall-stars-award"]')).toHaveLength(1);
   });
 
   it('no special rewards: This Week takes the full width', () => {

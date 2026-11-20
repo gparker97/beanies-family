@@ -17311,6 +17311,15 @@ const STRING_DEFS = {
   },
   'choreStars.strip.barPct': { en: 'Bar {pct}%', beanie: 'bar {pct}%' },
   'choreStars.strip.saved': { en: '{progress} to {reward}', beanie: '{progress} to {reward}' },
+  // The wall's line under "N more stars to X": where the child stands against the bar.
+  'choreStars.strip.soFar.one': {
+    en: '{total} of {bar} star so far',
+    beanie: '{total} of {bar} star so far',
+  },
+  'choreStars.strip.soFar.other': {
+    en: '{total} of {bar} stars so far',
+    beanie: '{total} of {bar} stars so far',
+  },
   'choreStars.strip.aria.bar': {
     en: '{total} of {bar} stars to {reward} this week',
     beanie: '{total} of {bar} stars to {reward} this week',

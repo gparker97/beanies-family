@@ -231,7 +231,8 @@ export interface WeekStars {
   openToday: number;
   /**
    * Stars due on the counted days AFTER today (0 for a closed week): with `openToday`, all the
-   * week can still earn, so the strip can say nothing when the bar is out of reach.
+   * week's chores can still earn. Never used to hide the weekly reward: a grown-up's bonus
+   * stars can always close the gap, so the strip names the reward until the week ends.
    */
   ahead: number;
   /** The day the weekly reward was reached, while the week is still at or above the bar. */
@@ -400,8 +401,6 @@ export interface StarPath {
   /** Stars still needed for the bar (0 when reached or there is no bar). */
   toBar: number;
   reached: boolean;
-  /** The bar can still be reached this week. False: the strip says nothing about it. */
-  reachable: boolean;
 }
 
 /**
@@ -418,8 +417,6 @@ export function pathSteps(
   const len = Math.max(week.full, awardStars, week.total);
   const reached = weeklyAchieved(week);
   const toBar = week.bar > 0 ? Math.max(0, week.bar - week.total) : 0;
-  const reachable =
-    week.bar > 0 && (reached || week.total + week.openToday + week.ahead >= week.bar);
   if (!(len > 0)) {
     return {
       stepSize: 1,
@@ -431,7 +428,6 @@ export function pathSteps(
       awardAt: null,
       toBar,
       reached,
-      reachable,
     };
   }
   const stepSize = Math.max(1, Math.ceil(len / MAX_PATH_STEPS));
@@ -449,7 +445,6 @@ export function pathSteps(
     awardAt: at(awardStars),
     toBar,
     reached,
-    reachable,
   };
 }
 

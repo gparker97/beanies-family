@@ -38,7 +38,6 @@ const SAMPLE_PATH: StarPath = {
   awardAt: null,
   toBar: 5,
   reached: false,
-  reachable: true,
 };
 
 /** The family's first child, for the strip's avatar (none: the strip draws without one). */

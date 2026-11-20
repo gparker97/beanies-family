@@ -185,7 +185,6 @@ describe('pathSteps', () => {
       awardAt: null,
       toBar: 4,
       reached: false,
-      reachable: true,
     });
   });
 
@@ -210,16 +209,16 @@ describe('pathSteps', () => {
     expect(weeks.awardAt).toBe(14);
   });
 
-  it('says the bar can no longer be reached when the rest of the week cannot get there', () => {
-    expect(pathSteps(week(MON, { stars: 2, bar: 10, openToday: 1, ahead: 6 })).reachable).toBe(
-      false
-    );
-    expect(pathSteps(week(MON, { stars: 2, bar: 10, openToday: 2, ahead: 6 })).reachable).toBe(
-      true
-    );
+  it('keeps the stars still needed when the rest of the week cannot get there', () => {
+    // The chores left add up to 7 of the 8 still needed; a bonus star can close the gap.
+    expect(pathSteps(week(MON, { stars: 2, bar: 10, openToday: 1, ahead: 6 }))).toMatchObject({
+      toBar: 8,
+      reached: false,
+      barAt: 9,
+    });
     expect(pathSteps(week(MON, { stars: 0, bar: 0, full: 0 }))).toMatchObject({
       steps: 0,
-      reachable: false,
+      toBar: 0,
       barAt: null,
     });
   });

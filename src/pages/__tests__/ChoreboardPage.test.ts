@@ -824,7 +824,6 @@ describe('stars and rewards', () => {
           awardAt: null,
           toBar: 7,
           reached: false,
-          reachable: true,
         },
         nearest: null,
         thisWeek: null,

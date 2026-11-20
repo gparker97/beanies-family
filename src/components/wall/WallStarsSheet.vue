@@ -16,7 +16,9 @@
  *  - `bare`: no weekly reward and no special reward for this child. Their stars this week, and
  *    where a grown-up adds a reward;
  *  - `stars`: the earned banner when the weekly reward is reached (every time it opens that
- *    week), the week's path (`StarPathStrip`), each special reward with its progress
+ *    week), the week's path (`StarPathStrip`, without its saved-up line: the special rewards
+ *    are listed in their own card, and the line read as part of the weekly reward), each
+ *    special reward with its progress
  *    (`AwardProgressCell`; a complete one gets the Earned badge and the orange tile), and the
  *    week's bonus and take-away entries (`starStore.weekGiftsFor`, drawn by `StarGiftRow`). A
  *    `null` from the getter is a normal state: only the week's net is known, shown alone under
@@ -257,13 +259,18 @@ const earnedBadge =
         data-testid="wall-stars-week"
       >
         <span :class="label">{{ t('date.thisWeek') }}</span>
+        <!-- Not `nearest`: the special rewards have their own card beside this one, so the
+             strip's saved-up line would say one of them twice, inside the weekly card. -->
         <StarPathStrip
-          v-bind="strip"
+          :week="strip.week"
+          :path="strip.path"
+          :this-week="strip.thisWeek"
           :reward-title="rewards.title"
           :reward-emoji="rewardEmoji"
           :bar-pct="rewards.barPct"
           :member="member"
           size="lg"
+          so-far
         />
       </section>
 

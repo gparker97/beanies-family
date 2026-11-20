@@ -14,6 +14,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - New beanstalk post: "what makes a great family choreboard for kids?", with a fresh animation of the wall choreboard that now ends on a child's stars and rewards.
 
+### Fixed
+
+- A child's weekly reward is now always named on their stars ("5 more stars to allowance"), even when the chores left cannot reach it; it used to drop to a plain star count.
+- The wall's This Week card no longer repeats a special reward inside the weekly reward; it shows the stars so far against the weekly goal instead.
+
 ## 2026-11-19
 
 ### Added

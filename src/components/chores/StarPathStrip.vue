@@ -8,10 +8,13 @@
  *    chores are the next steps, lit softly; steps past a full week are thin (bonus only);
  *  - a notch after the bar's step, with the weekly reward's emoji above it (lit once reached);
  *  - the child's avatar above the step reached, and a "This Week" award's marker above its step;
- *  - the words: "N more stars to Ice Cream", or "Achieved" with the day; when the bar can no
- *    longer be reached this week the strip says nothing about it (only the week's stars), and
- *    never "out of reach";
- *  - one quiet line for the nearest saved-up award (`awardProgressLabel`, the one wording).
+ *  - the words: "N more stars to Ice Cream", or "Achieved" with the day. A week with a weekly
+ *    reward ALWAYS names it (greg, 2026-11-20): the strip once fell back to the week's stars
+ *    when the remaining chores could not reach the bar, which read as the reward having
+ *    vanished, and bonus stars can reach it at any time. Never "out of reach";
+ *  - one quiet line for the nearest saved-up award (`awardProgressLabel`, the one wording);
+ *  - with `soFar` (the wall), "12 of 16 stars so far" right under "N more stars to X", so the
+ *    gap has its context. Only while the reward is still to be earned.
  *
  * The root is `role="img"` with one spoken summary, so a screen reader hears a sentence, not
  * twenty steps.
@@ -58,6 +61,8 @@ const props = withDefaults(
     member?: FamilyMember | null;
     /** `md`: the app's strip; `lg`: the wall's, read across a room. */
     size?: 'md' | 'lg';
+    /** Also say "12 of 16 stars so far" under the words, while the reward is still to be earned. */
+    soFar?: boolean;
   }>(),
   {
     nearest: null,
@@ -67,6 +72,7 @@ const props = withDefaults(
     barPct: 100,
     member: null,
     size: 'md',
+    soFar: false,
   }
 );
 
@@ -89,6 +95,7 @@ const SIZES = {
     pill: 'px-2 py-0.5 text-xs',
     small: 'text-xs',
     saved: 'text-xs',
+    soFar: '',
   },
   lg: {
     root: 'gap-3',
@@ -107,6 +114,8 @@ const SIZES = {
     pill: 'px-3 py-1 text-sm',
     small: 'text-sm',
     saved: 'text-base',
+    // Beside the caption, which `lg` draws first: equal order keeps the DOM order.
+    soFar: 'order-first',
   },
 } as const;
 const sz = computed(() => SIZES[props.size]);
@@ -170,11 +179,11 @@ const plainText = computed(() =>
   )
 );
 
-/** The caption's state: reached, still reachable, or nothing to say about the bar. */
+/** The caption's state: reached, stars still to go, or (no weekly reward) the week's stars. */
 const caption = computed<'achieved' | 'more' | 'plain'>(() => {
   if (!hasBar.value) return 'plain';
   if (props.path.reached) return 'achieved';
-  return props.path.reachable ? 'more' : 'plain';
+  return 'more';
 });
 
 const achievedOn = computed(() =>
@@ -193,6 +202,15 @@ const smallCaption = computed(() => {
   }
   return '';
 });
+
+const soFarLine = computed(() =>
+  props.soFar && caption.value === 'more'
+    ? fillTemplate(
+        t(props.week.bar === 1 ? 'choreStars.strip.soFar.one' : 'choreStars.strip.soFar.other'),
+        { total: props.week.total, bar: props.week.bar }
+      )
+    : ''
+);
 
 const savedLine = computed(() => {
   const n = props.nearest;
@@ -323,6 +341,17 @@ const spoken = computed(() => {
         >{{ smallCaption }}</small
       >
     </div>
+
+    <!-- Not spoken twice: the root's summary already says "12 of 16 stars to X this week". -->
+    <p
+      v-if="soFarLine"
+      class="font-outfit text-secondary-500 dark:text-ink-soft leading-snug font-semibold"
+      :class="[sz.saved, sz.soFar]"
+      aria-hidden="true"
+      data-testid="star-path-so-far"
+    >
+      {{ soFarLine }}
+    </p>
 
     <p
       v-if="savedLine && nearest"

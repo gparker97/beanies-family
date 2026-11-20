@@ -7610,6 +7610,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'choreStars.strip.stepSize': '每一格是 {count} 颗星',
   'choreStars.strip.barPct': '目标 {pct}%',
   'choreStars.strip.saved': '{reward}：{progress}',
+  'choreStars.strip.soFar.one': '目前 {total} / {bar} 颗星',
+  'choreStars.strip.soFar.other': '目前 {total} / {bar} 颗星',
   'choreStars.strip.aria.bar': '本周{reward}：{bar} 颗星中已得 {total} 颗',
   'choreStars.strip.aria.achieved': '本周已达成{reward}，共 {total} 颗星',
   'choreStars.strip.aria.plain': '本周 {total} 颗星',

@@ -3,7 +3,7 @@
  * so these pin what it draws from a given path: the steps (earned, next, ahead, thin), the notch
  * after the bar's step, the reward marker (lit once reached), the avatar, the "This Week" award
  * marker, the captions ("Each step is N stars", "Bar 80%"), the words ("N more stars to X",
- * Achieved with the day, nothing about the bar once it is out of reach), the saved-up line, and
+ * Achieved with the day; the reward stays named when the chores left cannot reach the bar), the saved-up line, and
  * the one spoken summary.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -122,13 +122,24 @@ describe('StarPathStrip', () => {
     expect(w.attributes('aria-label')).toBe('Ice cream achieved this week, with 17 stars');
   });
 
-  it('out of reach: says nothing about the bar (never "out of reach"), only the week\'s stars', () => {
-    // Friday night: 9 of a 16-star bar, nothing left to tick.
+  it('no chores left that could reach the bar: the reward is still named (never "out of reach")', () => {
+    // Friday night: 9 of a 16-star bar, nothing left to tick. Bonus stars can still get there.
     const w = mountStrip(week({ total: 9, openToday: 0, ahead: 0 }));
-    expect(w.find('[data-testid="star-path-more"]').exists()).toBe(false);
-    expect(w.get('[data-testid="star-path-plain"]').text()).toBe('9 stars this week');
+    expect(w.find('[data-testid="star-path-plain"]').exists()).toBe(false);
+    expect(w.get('[data-testid="star-path-more"]').text()).toBe('7 more stars to Ice cream');
     expect(w.text().toLowerCase()).not.toContain('reach');
-    expect(w.attributes('aria-label')).toBe('9 stars this week');
+    expect(w.attributes('aria-label')).toBe('9 of 16 stars to Ice cream this week');
+  });
+
+  it('soFar: "9 of 16 stars so far" while the reward is still to be earned, and only then', () => {
+    const w = mountStrip(week({ total: 9, openToday: 0, ahead: 0 }), { soFar: true });
+    expect(w.get('[data-testid="star-path-so-far"]').text()).toBe('9 of 16 stars so far');
+    const off = mountStrip(week({ total: 9 }));
+    expect(off.find('[data-testid="star-path-so-far"]').exists()).toBe(false);
+    const done = mountStrip(week({ total: 17, hitOn: '2026-11-21' }), { soFar: true });
+    expect(done.find('[data-testid="star-path-so-far"]').exists()).toBe(false);
+    const none = mountStrip(week({ total: 6, bar: 0 }), { soFar: true });
+    expect(none.find('[data-testid="star-path-so-far"]').exists()).toBe(false);
   });
 
   it("no weekly reward: no notch, no marker, the week's stars", () => {
