@@ -18,6 +18,7 @@ relatedPosts:
   - beanie-wall-for-your-whole-family
   - a-widget-for-your-fidget
   - daddy-come-look-at-my-bed
+  - choreboard
 tags:
   - family-organization
   - routines
