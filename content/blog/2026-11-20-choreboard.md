@@ -62,7 +62,7 @@ With all of its features, the [beanies.family](https://beanies.family/?utm_sourc
 
 So open up your beanpod (or <a href="https://app.beanies.family/create?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=create-pod" target="_blank" rel="noopener" data-cta="CTA: Create Pod" data-cta-loc="blog-choreboard">create one</a> if you haven’t already) and get your kids’ chore routine down pat. Your kids will love the cool graphics and animations, and you’ll love actually knowing whether they’ve earned their allowance or not.
 
-(Oh, and by the way, the flying bean animations will only trigger once each day. Because if your kids are anything like mine, they’re gonna uncheck and re-check that final chore 50 times over just to play the celebration sounds and animations ad-nauseum. Yes - we thought of everything).
+(Oh, and by the way, the flying bean animations will only trigger once each day. Because if your kids are anything like mine, they’re gonna uncheck and re-check that final chore 50 times over just to play the celebration sounds and animations ad nauseam. Yes - we thought of everything).
 
 Take a look, and [let me know what you think](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=choreboard&utm_content=discord). And if there’s anything we did actually miss, I’m all ears.
 
