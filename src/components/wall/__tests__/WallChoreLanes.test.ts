@@ -290,7 +290,7 @@ describe('WallChoreLanes', () => {
     const morning = pipMorning().blocks[0]!;
     // The rows are WallJobList's (stubbed here): its toggle is what the lane hears.
     w.findComponent(WallJobList).vm.$emit('toggle', morning.jobs[1]);
-    const [job, anchor] = w.emitted('toggle')![0]! as [
+    const [job, anchor] = w.emitted('toggle')![0]! as unknown as [
       { ownerId: string },
       Record<string, unknown>,
     ];
