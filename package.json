@@ -94,7 +94,7 @@
     "@aws-sdk/client-dynamodb": "^3.1152.0",
     "@aws-sdk/client-sesv2": "^3.1152.0",
     "@aws-sdk/util-dynamodb": "^3.996.9",
-    "@capacitor/assets": "^3.0.5",
+    "@capacitor/assets": "^4.0.0",
     "@capacitor/cli": "^8.5.3",
     "@eslint/js": "^9.39.2",
     "@heroicons/vue": "^2.2.0",
