@@ -2,12 +2,12 @@
   "meta": {
     "country": "TO",
     "name": "Tonga",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-11-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.35.0",
+    "source": "date-holidays@3.37.0",
     "primaryLanguage": "to",
     "types": [
       "public"
@@ -55,13 +55,8 @@
       "type": "public"
     },
     {
-      "date": "2025-11-04",
-      "name": "Constitutional Day",
-      "type": "public"
-    },
-    {
       "date": "2025-12-08",
-      "name": "Tupou I Day",
+      "name": "Anniversary of the Coronation of H.M. King George Tupou I",
       "type": "public"
     },
     {
@@ -105,18 +100,18 @@
       "type": "public"
     },
     {
-      "date": "2026-09-21",
+      "date": "2026-09-17",
       "name": "Birthday of His Royal Highness The Crown Prince Tupotoʻa-ʻUlukalala",
       "type": "public"
     },
     {
-      "date": "2026-11-04",
+      "date": "2026-11-02",
       "name": "Constitutional Day",
       "type": "public"
     },
     {
       "date": "2026-12-07",
-      "name": "Tupou I Day",
+      "name": "Anniversary of the Coronation of H.M. King George Tupou I",
       "type": "public"
     },
     {
@@ -160,7 +155,7 @@
       "type": "public"
     },
     {
-      "date": "2027-09-20",
+      "date": "2027-09-17",
       "name": "Birthday of His Royal Highness The Crown Prince Tupotoʻa-ʻUlukalala",
       "type": "public"
     },
@@ -171,7 +166,7 @@
     },
     {
       "date": "2027-12-06",
-      "name": "Tupou I Day",
+      "name": "Anniversary of the Coronation of H.M. King George Tupou I",
       "type": "public"
     },
     {
@@ -215,7 +210,7 @@
       "type": "public"
     },
     {
-      "date": "2028-09-18",
+      "date": "2028-09-17",
       "name": "Birthday of His Royal Highness The Crown Prince Tupotoʻa-ʻUlukalala",
       "type": "public"
     },
@@ -226,7 +221,7 @@
     },
     {
       "date": "2028-12-04",
-      "name": "Tupou I Day",
+      "name": "Anniversary of the Coronation of H.M. King George Tupou I",
       "type": "public"
     },
     {
@@ -281,12 +276,12 @@
     },
     {
       "date": "2029-12-03",
-      "name": "Tupou I Day",
+      "name": "Anniversary of the Coronation of H.M. King George Tupou I",
       "type": "public"
     },
     {
       "date": "2029-12-04",
-      "name": "Tupou I Day",
+      "name": "Anniversary of the Coronation of H.M. King George Tupou I",
       "type": "public"
     },
     {

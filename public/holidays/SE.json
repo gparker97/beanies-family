@@ -2,12 +2,12 @@
   "meta": {
     "country": "SE",
     "name": "Sweden",
-    "generatedAt": "2026-08-01",
+    "generatedAt": "2026-11-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.35.0",
+    "source": "date-holidays@3.37.0",
     "primaryLanguage": "sv",
     "types": [
       "public"
@@ -72,7 +72,7 @@
       "date": "2025-06-21",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2025-11-01",
@@ -150,7 +150,7 @@
       "date": "2026-06-20",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2026-10-31",
@@ -228,7 +228,7 @@
       "date": "2027-06-26",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2027-11-06",
@@ -306,7 +306,7 @@
       "date": "2028-06-24",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2028-11-04",
@@ -384,7 +384,7 @@
       "date": "2029-06-23",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2029-11-03",

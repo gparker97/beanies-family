@@ -1,0 +1,366 @@
+{
+  "meta": {
+    "country": "UZ",
+    "name": "Uzbekistan",
+    "generatedAt": "2026-11-01",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.37.0",
+    "primaryLanguage": "uz",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yangi yil bayrami"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Xalqaro xotin-qizlar kuni"
+    },
+    {
+      "date": "2025-03-10",
+      "name": "International Women's Day (substitute day)",
+      "type": "public",
+      "name_local": "Xalqaro xotin-qizlar kuni"
+    },
+    {
+      "date": "2025-03-21",
+      "name": "Nowruz",
+      "type": "public",
+      "name_local": "Navroʻz bayrami"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "Eid al-Fitr",
+      "type": "public",
+      "name_local": "Roʻza hayiti"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "Eid al-Fitr (substitute day)",
+      "type": "public",
+      "name_local": "Roʻza hayiti"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Day of Memory and Honour",
+      "type": "public",
+      "name_local": "Xotira va qadrlash kuni"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Qurbon hayiti"
+    },
+    {
+      "date": "2025-09-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Mustaqillik kuni"
+    },
+    {
+      "date": "2025-10-01",
+      "name": "Teachers and Mentors Day",
+      "type": "public",
+      "name_local": "Oʻqituvchi va murabbiylar kuni"
+    },
+    {
+      "date": "2025-12-08",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitutsiya kuni"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yangi yil bayrami"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Xalqaro xotin-qizlar kuni"
+    },
+    {
+      "date": "2026-03-09",
+      "name": "International Women's Day (substitute day)",
+      "type": "public",
+      "name_local": "Xalqaro xotin-qizlar kuni"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "Eid al-Fitr",
+      "type": "public",
+      "name_local": "Roʻza hayiti"
+    },
+    {
+      "date": "2026-03-21",
+      "name": "Nowruz",
+      "type": "public",
+      "name_local": "Navroʻz bayrami"
+    },
+    {
+      "date": "2026-03-23",
+      "name": "Nowruz (substitute day)",
+      "type": "public",
+      "name_local": "Navroʻz bayrami"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Day of Memory and Honour",
+      "type": "public",
+      "name_local": "Xotira va qadrlash kuni"
+    },
+    {
+      "date": "2026-05-11",
+      "name": "Day of Memory and Honour (substitute day)",
+      "type": "public",
+      "name_local": "Xotira va qadrlash kuni"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Qurbon hayiti"
+    },
+    {
+      "date": "2026-09-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Mustaqillik kuni"
+    },
+    {
+      "date": "2026-10-01",
+      "name": "Teachers and Mentors Day",
+      "type": "public",
+      "name_local": "Oʻqituvchi va murabbiylar kuni"
+    },
+    {
+      "date": "2026-12-08",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitutsiya kuni"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yangi yil bayrami"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Xalqaro xotin-qizlar kuni"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "Eid al-Fitr",
+      "type": "public",
+      "name_local": "Roʻza hayiti"
+    },
+    {
+      "date": "2027-03-21",
+      "name": "Nowruz",
+      "type": "public",
+      "name_local": "Navroʻz bayrami"
+    },
+    {
+      "date": "2027-03-22",
+      "name": "Nowruz (substitute day)",
+      "type": "public",
+      "name_local": "Navroʻz bayrami"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Day of Memory and Honour",
+      "type": "public",
+      "name_local": "Xotira va qadrlash kuni"
+    },
+    {
+      "date": "2027-05-10",
+      "name": "Day of Memory and Honour (substitute day)",
+      "type": "public",
+      "name_local": "Xotira va qadrlash kuni"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Qurbon hayiti"
+    },
+    {
+      "date": "2027-05-17",
+      "name": "Eid al-Adha (substitute day)",
+      "type": "public",
+      "name_local": "Qurbon hayiti"
+    },
+    {
+      "date": "2027-09-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Mustaqillik kuni"
+    },
+    {
+      "date": "2027-10-01",
+      "name": "Teachers and Mentors Day",
+      "type": "public",
+      "name_local": "Oʻqituvchi va murabbiylar kuni"
+    },
+    {
+      "date": "2027-12-08",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitutsiya kuni"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yangi yil bayrami"
+    },
+    {
+      "date": "2028-01-03",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Yangi yil bayrami"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "Eid al-Fitr",
+      "type": "public",
+      "name_local": "Roʻza hayiti"
+    },
+    {
+      "date": "2028-02-28",
+      "name": "Eid al-Fitr (substitute day)",
+      "type": "public",
+      "name_local": "Roʻza hayiti"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Xalqaro xotin-qizlar kuni"
+    },
+    {
+      "date": "2028-03-21",
+      "name": "Nowruz",
+      "type": "public",
+      "name_local": "Navroʻz bayrami"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Qurbon hayiti"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Day of Memory and Honour",
+      "type": "public",
+      "name_local": "Xotira va qadrlash kuni"
+    },
+    {
+      "date": "2028-09-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Mustaqillik kuni"
+    },
+    {
+      "date": "2028-10-01",
+      "name": "Teachers and Mentors Day",
+      "type": "public",
+      "name_local": "Oʻqituvchi va murabbiylar kuni"
+    },
+    {
+      "date": "2028-10-02",
+      "name": "Teachers and Mentors Day (substitute day)",
+      "type": "public",
+      "name_local": "Oʻqituvchi va murabbiylar kuni"
+    },
+    {
+      "date": "2028-12-08",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitutsiya kuni"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yangi yil bayrami"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "Eid al-Fitr",
+      "type": "public",
+      "name_local": "Roʻza hayiti"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Xalqaro xotin-qizlar kuni"
+    },
+    {
+      "date": "2029-03-21",
+      "name": "Nowruz",
+      "type": "public",
+      "name_local": "Navroʻz bayrami"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Qurbon hayiti"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Day of Memory and Honour",
+      "type": "public",
+      "name_local": "Xotira va qadrlash kuni"
+    },
+    {
+      "date": "2029-09-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Mustaqillik kuni"
+    },
+    {
+      "date": "2029-09-03",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Mustaqillik kuni"
+    },
+    {
+      "date": "2029-10-01",
+      "name": "Teachers and Mentors Day",
+      "type": "public",
+      "name_local": "Oʻqituvchi va murabbiylar kuni"
+    },
+    {
+      "date": "2029-12-08",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitutsiya kuni"
+    },
+    {
+      "date": "2029-12-10",
+      "name": "Constitution Day (substitute day)",
+      "type": "public",
+      "name_local": "Konstitutsiya kuni"
+    }
+  ]
+}

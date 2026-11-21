@@ -2,12 +2,12 @@
   "meta": {
     "country": "AX",
     "name": "Aland Islands",
-    "generatedAt": "2026-09-01",
+    "generatedAt": "2026-11-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.35.0",
+    "source": "date-holidays@3.37.0",
     "primaryLanguage": "sv",
     "types": [
       "public"
@@ -25,12 +25,6 @@
       "name": "Epiphany",
       "type": "public",
       "name_local": "trettondedag jul"
-    },
-    {
-      "date": "2025-03-30",
-      "name": "Demilitarization Day",
-      "type": "public",
-      "name_local": "Ålands demilitariseringsdag"
     },
     {
       "date": "2025-04-18",
@@ -57,16 +51,10 @@
       "name_local": "Kristi himmelsfärdsdag"
     },
     {
-      "date": "2025-06-09",
-      "name": "Autonomy Day",
-      "type": "public",
-      "name_local": "Självstyrelsedagen"
-    },
-    {
       "date": "2025-06-21",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2025-12-06",
@@ -99,12 +87,6 @@
       "name_local": "trettondedag jul"
     },
     {
-      "date": "2026-03-30",
-      "name": "Demilitarization Day",
-      "type": "public",
-      "name_local": "Ålands demilitariseringsdag"
-    },
-    {
       "date": "2026-04-03",
       "name": "Good Friday",
       "type": "public",
@@ -129,16 +111,10 @@
       "name_local": "Kristi himmelsfärdsdag"
     },
     {
-      "date": "2026-06-09",
-      "name": "Autonomy Day",
-      "type": "public",
-      "name_local": "Självstyrelsedagen"
-    },
-    {
       "date": "2026-06-20",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2026-12-06",
@@ -183,12 +159,6 @@
       "name_local": "annandag påsk"
     },
     {
-      "date": "2027-03-30",
-      "name": "Demilitarization Day",
-      "type": "public",
-      "name_local": "Ålands demilitariseringsdag"
-    },
-    {
       "date": "2027-05-01",
       "name": "Labour Day",
       "type": "public",
@@ -201,16 +171,10 @@
       "name_local": "Kristi himmelsfärdsdag"
     },
     {
-      "date": "2027-06-09",
-      "name": "Autonomy Day",
-      "type": "public",
-      "name_local": "Självstyrelsedagen"
-    },
-    {
       "date": "2027-06-26",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2027-12-06",
@@ -243,12 +207,6 @@
       "name_local": "trettondedag jul"
     },
     {
-      "date": "2028-03-30",
-      "name": "Demilitarization Day",
-      "type": "public",
-      "name_local": "Ålands demilitariseringsdag"
-    },
-    {
       "date": "2028-04-14",
       "name": "Good Friday",
       "type": "public",
@@ -273,16 +231,10 @@
       "name_local": "Kristi himmelsfärdsdag"
     },
     {
-      "date": "2028-06-09",
-      "name": "Autonomy Day",
-      "type": "public",
-      "name_local": "Självstyrelsedagen"
-    },
-    {
       "date": "2028-06-24",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2028-12-06",
@@ -316,12 +268,6 @@
     },
     {
       "date": "2029-03-30",
-      "name": "Demilitarization Day",
-      "type": "public",
-      "name_local": "Ålands demilitariseringsdag"
-    },
-    {
-      "date": "2029-03-30",
       "name": "Good Friday",
       "type": "public",
       "name_local": "långfredagen"
@@ -345,16 +291,10 @@
       "name_local": "Kristi himmelsfärdsdag"
     },
     {
-      "date": "2029-06-09",
-      "name": "Autonomy Day",
-      "type": "public",
-      "name_local": "Självstyrelsedagen"
-    },
-    {
       "date": "2029-06-23",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Midsommardagen"
+      "name_local": "midsommardagen"
     },
     {
       "date": "2029-12-06",
