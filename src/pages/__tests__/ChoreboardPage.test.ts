@@ -594,7 +594,9 @@ describe('a grown-up viewer', () => {
  * value, the achieved banner shows under the head while it is up, and "Give Stars" (a step-4
  * stub) sits at the right of the switch on Stars and Rewards and on a kid's day for a grown-up.
  */
-describe('stars and rewards', () => {
+// Each test here mounts the whole page (about 2 s alone). In the full suite, with every core
+// busy, two of them crossed the 5 s default and blocked a push twice on 2026-11-21.
+describe('stars and rewards', { timeout: 15_000 }, () => {
   const STAR_IDS = [
     'star-count',
     'chore-day-ring',
