@@ -110,15 +110,6 @@ export function durationIso(film: Timed): string {
   return `PT${m ? `${m}M` : ''}${s || !m ? `${s}S` : ''}`;
 }
 
-/** "1 minute 7 seconds", for the card's accessible name. */
-export function durationSpoken(film: Timed): string {
-  const [m, s] = minutesSeconds(film);
-  const parts: string[] = [];
-  if (m) parts.push(`${m} ${m === 1 ? 'minute' : 'minutes'}`);
-  if (s || !m) parts.push(`${s} ${s === 1 ? 'second' : 'seconds'}`);
-  return parts.join(' ');
-}
-
 /** The film as a schema.org VideoObject, a node in the page's JSON-LD @graph. */
 export function videoObject(film: Film): Record<string, unknown> {
   return {

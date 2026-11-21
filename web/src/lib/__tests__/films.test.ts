@@ -11,7 +11,6 @@ import {
   MUSICAL_YT_TARGET,
   durationClock,
   durationIso,
-  durationSpoken,
   errorReason,
   newMilestones,
   videoObject,
@@ -65,17 +64,13 @@ describe('durations', () => {
   it('derives every string from the 67 seconds of the musical', () => {
     expect(durationClock(MUSICAL)).toBe('1:07');
     expect(durationIso(MUSICAL)).toBe('PT1M7S');
-    expect(durationSpoken(MUSICAL)).toBe('1 minute 7 seconds');
   });
 
   it('handles whole minutes, short films and plurals', () => {
     expect(durationClock({ durationS: 60 })).toBe('1:00');
     expect(durationIso({ durationS: 60 })).toBe('PT1M');
-    expect(durationSpoken({ durationS: 60 })).toBe('1 minute');
     expect(durationClock({ durationS: 7 })).toBe('0:07');
     expect(durationIso({ durationS: 7 })).toBe('PT7S');
-    expect(durationSpoken({ durationS: 1 })).toBe('1 second');
-    expect(durationSpoken({ durationS: 121 })).toBe('2 minutes 1 second');
     expect(durationIso({ durationS: 0 })).toBe('PT0S');
   });
 });

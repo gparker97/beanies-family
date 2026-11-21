@@ -8,6 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-21
+
+### Added
+
+- Public holidays for Uzbekistan. The holiday and airport data were refreshed (Western Sydney International and Balesin Island are new).
+
+### Changed
+
+- Dependency updates, including security fixes in dompurify, fast-uri and happy-dom.
+
+### Fixed
+
+- The film's play button on the homepage now gives screen readers its visible text in the order it is shown.
+
 ## 2026-11-20
 
 ### Added
