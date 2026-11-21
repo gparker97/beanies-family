@@ -37,6 +37,7 @@ describe('useNativeShell (ADR-029 A5)', () => {
     addListener.mockResolvedValue({ remove: vi.fn() });
     exitApp.mockResolvedValue(undefined);
     document.documentElement.classList.remove('dark');
+    document.documentElement.style.touchAction = '';
     document.querySelectorAll('meta[name="viewport"]').forEach((m) => m.remove());
     __resetNativeShellForTesting();
   });
@@ -46,6 +47,13 @@ describe('useNativeShell (ADR-029 A5)', () => {
     useNativeShell();
     expect(hide).not.toHaveBeenCalled();
     expect(addListener).not.toHaveBeenCalled();
+    // The web app and PWA stay zoomable.
+    expect(document.documentElement.style.touchAction).toBe('');
+  });
+
+  it('on native: blocks pinch and double-tap zoom but keeps panning', () => {
+    useNativeShell();
+    expect(document.documentElement.style.touchAction).toBe('pan-x pan-y');
   });
 
   it('on native: hides the splash, goes edge-to-edge, sets icon contrast, registers a backButton listener', () => {

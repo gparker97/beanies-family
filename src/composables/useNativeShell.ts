@@ -76,6 +76,13 @@ export function useNativeShell(): void {
     viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
   }
 
+  // No pinch or double-tap zoom in the native apps. Capacitor's `zoomEnabled: false` default
+  // (`setBuiltInZoomControls(false)`) is supposed to do this on Android, yet the 1.6 build
+  // still pinch-zoomed the whole app on an Android 16 tablet (Lenovo TB336FU, 2026-11-21).
+  // `touch-action` is enforced by the page itself, so it holds whatever the WebView setting
+  // does. Panning is kept; the web app and PWA stay zoomable (WCAG 1.4.4) as this is native-only.
+  document.documentElement.style.touchAction = 'pan-x pan-y';
+
   // Go edge-to-edge: the WebView draws under a transparent status bar so the page
   // background blends through it (matching the PWA), instead of the system's
   // black bar / translucent scrim. Mandatory on Android 16 (SDK 36) anyway, where
