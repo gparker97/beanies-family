@@ -6,7 +6,7 @@
 - **Plan:** `~/projects/beanies-ops/docs/plans/2026-11-17-view-only-external-calendars.md`
 - **Research:** `~/projects/beanies-ops/docs/research/2026-11-17-view-only-calendar-scope.md`
 - **Implementation:** `src/stores/calendarViewStore.ts`, `src/utils/calendar/externalEvents.ts`, `src/services/calendar/calendarAuth.ts` (grant kinds), `src/utils/calendar/grantGuard.ts`, `src/stores/calendarClashStore.ts`
-- **Feature flag:** `viewOnlyCalendars` (committed `false` until Google approves the new OAuth scope)
+- **Feature flag:** `viewOnlyCalendars` (committed `false` until Google approved the new OAuth scope; `true` since 2026-11-23)
 
 ## Context
 

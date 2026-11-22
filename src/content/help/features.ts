@@ -1,13 +1,12 @@
 import type { HelpArticle } from './types';
 import { ADDRESS_SUGGESTIONS_HELP_LIVE } from './liveFlags';
 
-// View-only external calendars (#145). Built and ready, but NOT published: the feature
-// ships behind the `viewOnlyCalendars` flag, which stays off until Google approves the
-// `calendar.events.readonly` scope. Flip this to true in the same change that flips that
-// flag in `src/config/featureFlags.committed.ts`. The spread at the end of
-// FEATURES_ARTICLES keeps the article out of the index, search, sitemap and llms-full
-// until then (the same pattern as `CALENDAR_SYNC_HELP_LIVE` in security.ts).
-const VIEW_ANOTHER_CALENDAR_HELP_LIVE = false;
+// View-only external calendars (#145). Published 2026-11-23, in the same change that
+// flipped the `viewOnlyCalendars` flag in `src/config/featureFlags.committed.ts` after
+// Google approved the `calendar.events.readonly` scope. Setting this back to false takes
+// the article out of the index, search, sitemap and llms-full through the spread at the
+// end of FEATURES_ARTICLES (the same pattern as `CALENDAR_SYNC_HELP_LIVE` in security.ts).
+const VIEW_ANOTHER_CALENDAR_HELP_LIVE = true;
 const VIEW_ANOTHER_CALENDAR_ARTICLE: HelpArticle = {
   slug: 'view-another-calendar',
   category: 'features',
@@ -16,7 +15,7 @@ const VIEW_ANOTHER_CALENDAR_ARTICLE: HelpArticle = {
     'Add a calendar that is shared with you, like a grandparent’s or a work calendar, so its events show on your family calendar. View only: beanies.family never changes it.',
   icon: '\u{1F440}',
   readTime: 5,
-  updatedDate: '2026-11-17',
+  updatedDate: '2026-11-23',
   sections: [
     {
       type: 'paragraph',

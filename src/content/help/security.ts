@@ -133,7 +133,7 @@ const CLASH_NUDGE_ARTICLE: HelpArticle = {
     'beanies can gently warn you when a family activity overlaps something on a connected calendar — reading only when your events are, never what they are.',
   icon: '\u{1F4C5}',
   readTime: 3,
-  updatedDate: '2026-06-11',
+  updatedDate: '2026-11-23',
   sections: [
     { type: 'heading', content: 'What it does', level: 2, id: 'what-it-does' },
     {
@@ -151,6 +151,11 @@ const CLASH_NUDGE_ARTICLE: HelpArticle = {
       type: 'paragraph',
       content:
         'beanies also recognises its own synced activities and skips them, so it never warns you about a clash with itself. Events you’ve marked as <strong>“free”</strong> (like some birthdays or public holidays) don’t count as a clash either.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'A calendar your family has added as <strong>view only</strong> is checked for overlaps too. Its events are already read to show them on your family calendar (title, time, location and link, never descriptions or guest lists), so the clash check makes no extra request for them. Read more in <a href="/help/features/view-another-calendar">View Someone Else’s Google Calendar</a>.',
     },
     { type: 'heading', content: 'Quieting an overlap', level: 2, id: 'quieting' },
     {

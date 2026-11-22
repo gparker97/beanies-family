@@ -119,15 +119,14 @@ export const FLAG_REGISTRY = [
     // View-only external calendars (plan 2026-11-17). Gates every view-only SURFACE and the
     // `calendar.events.readonly` consent; the two doc collections (`calendarViewAccounts`,
     // `viewedCalendars`) exist for everyone and stay empty while this is off.
-    // ⚠️ MUST STAY OFF IN PRODUCTION until Google approves `calendar.events.readonly`
-    // ("sensitive"): before approval any consent that includes it shows the unverified-app
-    // screen and counts against the 100-user cap. Flip it only after the approval lands.
-    // REVIEW BY 2027-02-15 (90 days): if Google has refused or not yet decided, decide then
-    // whether to keep waiting or delete the gated code (the empty collections stay, harmless).
+    // ON for everyone since flag day, 2026-11-23: Google approved `calendar.events.readonly`
+    // ("sensitive") that day, so the consent no longer shows the unverified-app screen. It
+    // stays as the kill switch for the view-only surfaces and that consent.
+    // REVIEW BY 2027-02-15: decide then whether to remove the flag and its off branches.
     id: 'viewOnlyCalendars',
     label: 'View-only calendars',
     description:
-      'Show shared Google calendars read-only on the family calendar and the wall; must stay off in production until Google approves calendar.events.readonly (review by 2027-02-15).',
+      'Show shared Google calendars read-only on the family calendar and the wall. On for everyone since 2026-11-23, when Google approved calendar.events.readonly (review by 2027-02-15).',
   },
   {
     // #150 (plan 2026-11-18-location-autofill-and-link-150). Gates address suggestions from

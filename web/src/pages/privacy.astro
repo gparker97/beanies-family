@@ -6,7 +6,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
   title="privacy policy — beanies.family"
   description="beanies.family is local-first. your family's data lives on your device. we don't collect it, we don't store it, and we don't sell it. ever."
   canonicalPath="/privacy"
-  lastUpdated="19 November 2026"
+  lastUpdated="23 November 2026"
   breadcrumbLabel="privacy policy"
 >
   <section>
@@ -293,7 +293,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>what we write:</strong> beanies creates and updates events for your beanies activities, and it only ever deletes an event it created itself. an event that existed before beanies is never deleted by us</li>
       <li><strong>what we read, normally:</strong> when the clash nudge is on, we ask only whether you are busy at a given time on your connected calendar. we request times, not content. we read the content of events only when you ask us to, by running the one-time import or by adding a calendar as view only</li>
       <li><strong>what we read during a one-time import:</strong> if you choose to import your existing events, we read the <strong>title, description, place, times and repeat pattern</strong> of events on the calendars you tick, for the next 12 months (and, when address suggestions are turned on, the video call link the event carries). this happens only when you ask for it, and you review every event before anything is imported</li>
-      <li><strong>view only calendars:</strong> a member can choose to add a calendar that is shared with them as view only (this option is rolling out and may not be in your app yet). for that, we request the additional scope <code>calendar.events.readonly</code> (read events on calendars you can see), which is what allows a calendar owned by someone else to be read at all</li>
+      <li><strong>view only calendars:</strong> a member can choose to add a calendar that is shared with them as view only. for that, we request the additional scope <code>calendar.events.readonly</code> (read events on calendars you can see), which is what allows a calendar owned by someone else to be read at all</li>
       <li><strong>what we read for a view only calendar:</strong> the <strong>title, time, location, visibility and link</strong> of its events (and, when address suggestions are turned on, the video call link the event carries), so your family can see them next to your own plans. we never read descriptions, and we never read guest lists. if the calendar was shared with you as busy times only, or the member chose "show as busy only", the title and location are dropped before anything is shown</li>
       <li><strong>who sees them:</strong> everyone in the family. adding a calendar tells the member who adds it to check with the calendar's owner first. beanies.family never changes, writes to or deletes anything on a view only calendar, and never sends its events to any other calendar</li>
       <li><strong>where they are kept:</strong> view only events are held only on each device while the app is in use. they are never saved in your <code>.beanpod</code> and never sent to or stored on any server of ours. the single exception: if you turn on "Include in Home-Screen Widgets" for a calendar, that calendar's events are saved on that device so the widget can show them. that file never leaves the device</li>

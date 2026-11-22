@@ -17,6 +17,49 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.23',
+    date: '2026-11-23',
+    month: '23 november 2026',
+    summary: {
+      en: 'A calendar shared with you can now be added as view only.',
+      beanie: 'a calendar shared with you can now be added as view only.',
+    },
+    features: [
+      {
+        icon: '👀',
+        title: { en: 'View only calendars', beanie: 'view only calendars' },
+        description: {
+          en: "A Google calendar that someone shares with you, like a grandparent's or a work calendar, can now be added as view only in Settings, so its events show next to your family's plans. Nothing on it is ever changed. The phone apps get it with their next update.",
+          beanie:
+            "a google calendar that someone shares with you, like a grandparent's or a work calendar, can now be added as view only in settings, so its events show next to your family's plans. nothing on it is ever changed. the phone apps get it with their next update.",
+        },
+        tryItRoute: '/settings',
+      },
+      {
+        icon: '🛠️',
+        title: { en: 'Small fixes', beanie: 'small fixes' },
+        description: {
+          en: 'The weekly reward is now always named on the Beanie Wall, tall photos fit the photo viewer, and pinch zoom is blocked in the phone and tablet apps.',
+          beanie:
+            'the weekly reward is now always named on the beanie wall, tall photos fit the photo viewer, and pinch zoom is blocked in the phone and tablet apps.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.19',
     date: '2026-11-19',
     month: '19 november 2026',
