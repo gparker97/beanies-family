@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- View only calendars are now on for everyone: a Google calendar that is shared with you can be added in Settings so its events show on the family calendar, the Nook and the beanie wall. A new help article explains it.
+- View only calendars are now on for everyone: any Google calendar that is shared with you or that you can sign in to can be added in Settings, so its events show on the family calendar, the Nook and the beanie wall. A new help article explains it.
 
 ### Changed
 
