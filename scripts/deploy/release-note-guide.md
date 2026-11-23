@@ -22,23 +22,27 @@ in `deploys.ts` (the registry merges + sorts them). See `ReleaseNote` +
   note — but if there is genuinely nothing a user could perceive, you may skip
   the note. Default to adding one.
 
-## 0. ⭐ `spotlight` is greg's call, never yours
+## 0. ⭐ `spotlight` follows the version bump
 
-**Default it to ABSENT.** Set `spotlight: true` ONLY when greg has asked for a spotlight in
-that session, in those words.
+**The rule (greg, 2026-11-23):** a **minor or major** `APP_VERSION` bump (`1.6` → `1.7`,
+`1.x` → `2.0`) gets `spotlight: true`. A **patch or revision** (`1.7` → `1.7.1`, `R<n>`)
+gets none. greg can override either way for a given release; without an override, follow
+the bump.
+
+The two decisions are therefore one: whether a release is a minor or a patch is greg's
+call (§3b, never bump the minor or major automatically), and the spotlight follows from
+it. Never judge the spotlight from the size of the diff. That is how two spotlights shipped
+on the same day in September 2026, the second one auto-opening onto a near-duplicate of the
+first (see `docs/lessons.md`).
 
 `spotlight` does not just badge the bell, it **auto-opens the drawer** on everyone's next
-update. That is an interruption, and whether a release has earned one is a judgement about
-the product and its audience, not about how much code moved. Judging it from the size of the
-diff is how two spotlights shipped on the same day in September 2026, the second one
-auto-opening onto a near-duplicate of the first (see `docs/lessons.md`).
+update, which is why a patch never carries one by default: a patch usually exists because
+the release before it needed a fix, and announcing that as a headline tells a family about
+a fix to something they never saw broken. A patch that follows a noted release within hours
+gets no new note at all.
 
-A same-day revision (`R<n>` or a `.1`) is almost never independently significant: it exists
-because the release before it was wrong, and announcing that as a headline tells a family
-about a fix to something they never saw broken. Give it the summary-only minor form.
-
-If the work genuinely looks spotlight-worthy, propose it at the decision gate and let greg
-say yes. Shipping without one is trivially recoverable; shipping with one is not.
+At the decision gate, state the proposed bump and the spotlight it implies in one line
+("1.7, minor, spotlight" or "1.7.1, patch, no spotlight").
 
 ## 1. Judge significance
 
@@ -50,7 +54,8 @@ diff, and the top of `CHANGELOG.md` (the granular record for this deploy).
   `spotlight` omitted (badge only, never auto-opens).
 - **Significant** — a new feature, a meaningfully new way to do something, a
   notable fix users felt, a privacy/security-relevant change. → a clear,
-  benefit-led message and `spotlight: true` (auto-opens the drawer once).
+  benefit-led message with `features`. Whether it also gets `spotlight: true`
+  is decided by the version bump (§0), not by significance.
 
 ## 2. Write the note (in greg's voice)
 
@@ -184,7 +189,8 @@ instead of rotting like the old hardcoded `v1.0.0 - MVP`.
    },
    ```
 
-   A significant entry adds `spotlight: true`, a one-line `summary`, and a
+   A significant entry adds a one-line `summary`, `spotlight: true` when the
+   bump is a minor or major (§0), and a
    `features` block per new thing (headline + detail):
 
    ```ts
