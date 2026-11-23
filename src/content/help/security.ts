@@ -155,7 +155,7 @@ const CLASH_NUDGE_ARTICLE: HelpArticle = {
     {
       type: 'paragraph',
       content:
-        'A calendar your family has added as <strong>view only</strong> is checked for overlaps too. Its events are already read to show them on your family calendar (title, time, location and link, never descriptions or guest lists), so the clash check makes no extra request for them. Read more in <a href="/help/features/view-another-calendar">View Someone Else’s Google Calendar</a>.',
+        'A calendar your family has added as <strong>view only</strong> is checked for overlaps too. Its events are already read to show them on your family calendar (title, time, location and link, never descriptions or guest lists), so the clash check makes no extra request for them. Read more in <a href="/help/features/view-another-calendar">View Any Google Calendar</a>.',
     },
     { type: 'heading', content: 'Quieting an overlap', level: 2, id: 'quieting' },
     {

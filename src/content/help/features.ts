@@ -10,9 +10,9 @@ const VIEW_ANOTHER_CALENDAR_HELP_LIVE = true;
 const VIEW_ANOTHER_CALENDAR_ARTICLE: HelpArticle = {
   slug: 'view-another-calendar',
   category: 'features',
-  title: 'View Someone Else’s Google Calendar',
+  title: 'View Any Google Calendar',
   excerpt:
-    'Add a calendar that is shared with you, like a grandparent’s or a work calendar, so its events show on your family calendar. View only: beanies.family never changes it.',
+    'Add any Google calendar as view only, one that is shared with you, like a grandparent’s, or one you can sign in to, like a work calendar, so its events show on your family calendar. beanies.family never changes it.',
   icon: '\u{1F440}',
   readTime: 5,
   updatedDate: '2026-11-23',
@@ -20,18 +20,18 @@ const VIEW_ANOTHER_CALENDAR_ARTICLE: HelpArticle = {
     {
       type: 'paragraph',
       content:
-        'Some of the plans that matter most to your family live in a calendar you do not own: a grandparent’s babysitting days, a partner’s work calendar. If you are working out who has school pickup, it helps to see those events right next to your own. <strong>View only</strong> lets you add a calendar that is shared with you, so its events show on your family calendar, the Nook and the beanie wall.',
+        'Some of the plans that matter most to your family live in a calendar you do not own: a grandparent’s babysitting days, a partner’s work calendar. If you are working out who has school pickup, it helps to see those events right next to your own. <strong>View only</strong> lets you add any Google calendar you can see: one that is shared with you, or one in a Google account you can sign in to, such as a work account. Its events show on your family calendar, the Nook and the beanie wall.',
     },
     {
       type: 'paragraph',
       content:
-        'By the end of this guide you will have someone else’s calendar showing on yours, set up the way you like, and you will know exactly what beanies.family reads from it.',
+        'By the end of this guide you will have that calendar showing on yours, set up the way you like, and you will know exactly what beanies.family reads from it.',
     },
     { type: 'heading', content: 'Before you start', level: 2, id: 'before-you-start' },
     {
       type: 'paragraph',
       content:
-        'The calendar has to be <strong>shared with you in Google</strong> first, and added to <strong>your own Google Calendar list</strong>. Ask its owner to share it with your Google account (they can choose <strong>See all event details</strong> or <strong>See only free/busy</strong>), then accept the invitation or add it in Google Calendar so it appears under <strong>Other calendars</strong>. beanies.family can only offer calendars that are already in your list.',
+        'The calendar has to be in the <strong>Google Calendar list</strong> of the account you sign in with. A calendar in an account of your own, such as a work account, is already there: sign in with that account when you add it. For a calendar that belongs to someone else, ask its owner to <strong>share it with your Google account</strong> (they can choose <strong>See all event details</strong> or <strong>See only free/busy</strong>), then accept the invitation or add it in Google Calendar so it appears under <strong>Other calendars</strong>. beanies.family can only offer calendars that are already in the list, and not one your family already syncs to or views.',
     },
     { type: 'heading', content: 'Adding the calendar', level: 2, id: 'adding' },
     {

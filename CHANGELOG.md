@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - The privacy policy and the clash warning help article now describe view only calendars as available.
+- The view only calendar help article and the privacy policy now say any Google calendar can be added, shared with you or in an account you sign in to.
 
 ## 2026-11-22
 
