@@ -7,6 +7,14 @@ import type { TodoItem, TodoRepeat } from '@/types/models';
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
+// `useToday` reads the clock once, at import, so fake timers set in a `beforeEach` never
+// reach it. Pin the day here, or the "Show from" cases expire when the real date passes
+// their fixture dates (they did on 2026-11-25).
+vi.mock('@/composables/useToday', async () => {
+  const { ref } = await import('vue');
+  return { useToday: () => ({ today: ref('2026-11-10') }) };
+});
+
 function todo(overrides: Partial<TodoItem> = {}): TodoItem {
   return {
     id: 't-1',
