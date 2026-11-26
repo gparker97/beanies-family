@@ -1,16 +1,24 @@
 /**
- * Live flight checks (#143): today's departures as daily-briefing rows.
+ * Live flight checks (#143): today's departures and homecoming arrivals as daily-briefing rows.
  *
- * One row per departure per day, for the people it concerns:
- *   - a plain row ("Everyone flies at 17:00 today") for a timed departure, audience by
- *     `classifyAudience` on the segment's resolved travellers, like an activity;
- *   - when the airline changed or cancelled the flight, THE CHANGE ROW REPLACES the plain row
- *     (never both), and it goes to `isChangeRecipient`s: every adult, plus a travelling child.
- *     The two rows differ by icon and caption only, because the toast paints every row on the
- *     same accent surface.
+ * Each departure occurrence gives up to two rows, each built on its own (`departureRow`,
+ * `arrivalRow`), so a throw in one never drops the other:
+ *   - on its departure day, a plain row ("Everyone flies at 17:00 today") for a timed
+ *     departure, audience by `classifyAudience` on the segment's resolved travellers, like an
+ *     activity; when the airline changed or cancelled the flight, THE CHANGE ROW REPLACES the
+ *     plain row (never both), and it goes to `isChangeRecipient`s: every adult, plus a
+ *     travelling child. The two rows differ by icon and caption only, because the toast paints
+ *     every row on the same accent surface;
+ *   - on its arrival day, for a flight home (`ctx.homecomingFor`, the rule in
+ *     `utils/homecoming.ts`), an arrival row ("Jill lands at 12:40am") to everyone who is not
+ *     on the flight and is not a pet; an arrival before `EARLY_ARRIVAL_BEFORE` also shows the
+ *     day before ("Jill lands tonight at 12:40am"). Built from the DEPARTURE occurrence, which
+ *     carries the schedule, whatever day it departed (`travelRowsRange` fetches far enough
+ *     back).
+ * Every row opens the trip on that flight (`flightRoute`).
  *
  * Pure (the `buildCardBriefingRows` precedent): `useCriticalItems` calls it once and stamps the
- * hide key on the result like any other row.
+ * hide key on the result like any other row. A skipped row is reported through `ctx.onSkipped`.
  */
 import type { FamilyMember, LanguageCode } from '@/types/models';
 import type { FlightVerification } from '@/types/flightStatus';
@@ -20,10 +28,14 @@ import { transportEmoji } from '@/utils/vacation';
 import { airportCode, isFlightType } from '@/utils/travelCodes';
 import { classifyAudience } from '@/utils/audience';
 import { formatNameList } from '@/utils/assignees';
+import { entityDeepLink } from '@/utils/entityDeepLink';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
+import { addDaysYmd, resolveArrival } from '@/utils/flightStatus/schedule';
 import {
+  arrivalRowMessage,
   checkedAgo,
+  clockTime,
   departureRowMessage,
   placeTerminal,
   terminalLabel,
@@ -33,10 +45,33 @@ import { isChangeRecipient } from '@/utils/flightStatus/audience';
 import {
   CHANGE_NEWS_MS,
   flightLabel,
+  noticeRevision,
   occurrenceNotice,
   type OccurrenceNotice,
 } from '@/utils/flightStatus/occurrenceNotice';
 import type { CriticalItem } from '@/composables/useCriticalItems';
+
+/** How many days before today a departure is fetched: a flight across the date line can land
+ *  two calendar days after it leaves. */
+export const ARRIVAL_LOOKBACK_DAYS = 2;
+/** An arrival before this (airport wall clock) also shows the evening before, as "tonight". */
+const EARLY_ARRIVAL_BEFORE = '06:00';
+/** A "tonight" row's sort time (`CriticalItem.time` is sort and key only, never shown). */
+const TONIGHT_SORT_TIME = '23:59';
+
+/**
+ * The occurrence range the builder needs for `today`: departures from `ARRIVAL_LOOKBACK_DAYS`
+ * back (landing today) to tomorrow (landing early tomorrow, a "tonight" row). Just today when
+ * `today` is not a `YYYY-MM-DD`, so an undefined bound never reaches the store's filter.
+ */
+export function travelRowsRange(today: string): { from: string; to: string } {
+  const from = addDaysYmd(today, -ARRIVAL_LOOKBACK_DAYS);
+  const to = addDaysYmd(today, 1);
+  return from !== undefined && to !== undefined ? { from, to } : { from: today, to: today };
+}
+
+/** Which of a flight's two rows: named in a skip report (function names are minified). */
+export type TravelRowKind = 'departure' | 'arrival';
 
 export interface TravelRowsContext {
   /** Local calendar day, `YYYY-MM-DD`. */
@@ -49,6 +84,15 @@ export interface TravelRowsContext {
   lang?: LanguageCode;
   /** The flight-status store's per-segment view model (undefined for an unknown segment). */
   verificationFor: (segmentId: string) => FlightVerification | undefined;
+  /** The travellers for whom this flight is the one home (`vacationStore.homecomingFor`). */
+  homecomingFor: (segmentId: string) => readonly string[];
+  /** Told about each row the builder had to skip (it threw). The caller reports it. */
+  onSkipped?: (o: TravelSegmentOccurrence, err: unknown, row: TravelRowKind) => void;
+}
+
+/** The trip in Travel Plans, opened on this flight's card. */
+function flightRoute(o: TravelSegmentOccurrence): CriticalItem['route'] {
+  return entityDeepLink('vacation', o.vacationId, { segment: o.segmentId });
 }
 
 /** "Jill and Sam" for the people on the flight, or null when it is the whole family. */
@@ -64,6 +108,22 @@ function travellerNames(
     return { names: null, count: everyone.length };
   }
   return { names: formatNameList(people.map((m) => m.name)), count: people.length };
+}
+
+/**
+ * The caption's live part: "Checked 12 min ago" plus the caller's already formatted `detail`
+ * (the gate for a departure, the belt for an arrival), or "Not checked live".
+ */
+function liveCaptionParts(
+  v: FlightVerification | undefined,
+  ctx: TravelRowsContext,
+  detail?: string
+): string[] {
+  if (v && v.state !== 'not-live' && v.state !== 'unavailable' && v.checkedAt !== undefined) {
+    const checked = checkedAgo(ctx.t, v.checkedAt, ctx.nowMs);
+    return detail ? [checked, detail] : [checked];
+  }
+  return [ctx.t('flightChecks.chip.notLive')];
 }
 
 /**
@@ -83,13 +143,10 @@ function plainCaption(o: TravelSegmentOccurrence, ctx: TravelRowsContext): strin
     : terminalLabel(ctx.t, o.schedule?.terminal);
   if (terminal) parts.push(terminal);
   const v = isFlight ? ctx.verificationFor(o.segmentId) : undefined;
-  if (v && v.state !== 'not-live' && v.state !== 'unavailable' && v.checkedAt !== undefined) {
-    parts.push(checkedAgo(ctx.t, v.checkedAt, ctx.nowMs));
-    if (v.live?.gate)
-      parts.push(fillTemplate(ctx.t('nook.criticalTravelGate'), { gate: v.live.gate }));
-  } else {
-    parts.push(ctx.t('flightChecks.chip.notLive'));
-  }
+  const gate = v?.live?.gate
+    ? fillTemplate(ctx.t('nook.criticalTravelGate'), { gate: v.live.gate })
+    : undefined;
+  parts.push(...liveCaptionParts(v, ctx, gate));
   return parts.join(' · ');
 }
 
@@ -107,7 +164,7 @@ function noticeRow(
     icon: notice.kind === 'cancelled' ? '🚫' : '🔄',
     time: o.time ?? '',
     completable: false,
-    route: { path: '/travel', query: { vacation: o.vacationId } },
+    route: flightRoute(o),
   };
 }
 
@@ -135,13 +192,97 @@ function plainRow(o: TravelSegmentOccurrence, ctx: TravelRowsContext): CriticalI
     icon: transportEmoji(o.transportType, 'departure'),
     time: o.time,
     completable: false,
-    route: { path: '/travel', query: { vacation: o.vacationId } },
+    route: flightRoute(o),
   };
 }
 
+/** The departure day's row: the airline's change or cancellation, else the plain row. */
+function departureRow(o: TravelSegmentOccurrence, ctx: TravelRowsContext): CriticalItem | null {
+  if (o.date !== ctx.today) return null;
+  const notice = occurrenceNotice(ctx.t, o, ctx.lang);
+  const news =
+    notice !== null && (notice.kind === 'cancelled' || ctx.nowMs - notice.atMs <= CHANGE_NEWS_MS);
+  return news && isChangeRecipient(ctx.viewer, o)
+    ? noticeRow(o, notice, ctx)
+    : news
+      ? null // a child who is not on this flight hears nothing about it
+      : plainRow(o, ctx);
+}
+
 /**
- * The rows for `occurrences` (any range; only today's departures are used).
- * Total: one malformed occurrence is skipped, never aborts the briefing.
+ * The arrival row of a flight home, to the people at home: "Jill lands at 12:40am" on the
+ * arrival day, "Jill lands tonight at 12:40am" the day before an arrival before
+ * `EARLY_ARRIVAL_BEFORE`. The airline's estimate wins over the plan while a live check carries
+ * one. None for anyone on the flight, a pet, a flight that is nobody's way home, or a
+ * cancelled flight (on the plan, or known on this device only).
+ * Caption: "SQ318 · SIN Terminal 1 · Checked 12 min ago · Belt 7 · Scheduled 12:40am".
+ */
+function arrivalRow(o: TravelSegmentOccurrence, ctx: TravelRowsContext): CriticalItem | null {
+  if (!isFlightType(o.transportType)) return null;
+  if (ctx.viewer.isPet) return null;
+  if (resolveSegmentTravellers(o.travellerIds, o.tripAssigneeIds).includes(ctx.viewer.id)) {
+    return null;
+  }
+  const who = travellerNames(ctx.homecomingFor(o.segmentId), ctx);
+  if (who.names === null) return null;
+  const v = ctx.verificationFor(o.segmentId);
+  if (noticeRevision(o.live)?.kind === 'cancelled' || v?.state === 'cancelled') return null;
+  const arrival = resolveArrival(o.schedule, v?.live?.estimatedArrival);
+  if (!arrival) return null;
+  const tomorrow = addDaysYmd(ctx.today, 1);
+  const when =
+    arrival.date === ctx.today
+      ? 'today'
+      : tomorrow !== undefined && arrival.date === tomorrow && arrival.time < EARLY_ARRIVAL_BEFORE
+        ? 'tonight'
+        : null;
+  if (when === null) return null;
+  const belt = v?.live?.belt
+    ? fillTemplate(ctx.t('nook.criticalTravelBelt'), { belt: v.live.belt })
+    : undefined;
+  const arrivalCode = airportCode(o.arrivalAirport);
+  // Like the time: the airline's terminal wins while a live check carries one (a change this
+  // device has seen may not be written to the plan yet, e.g. on a view-only device).
+  const arrivalTerminal =
+    (v?.live ? v.provider?.arrivalTerminal : undefined) ?? o.schedule?.arrivalTerminal;
+  const parts = [
+    flightLabel(o),
+    // The airport always shows, with its terminal when one is known.
+    placeTerminal(ctx.t, arrivalCode, arrivalTerminal) || arrivalCode,
+    ...liveCaptionParts(v, ctx, belt),
+    arrival.scheduledTime !== undefined
+      ? fillTemplate(ctx.t('flightChecks.row.scheduled'), {
+          time: clockTime(arrival.scheduledTime),
+        })
+      : '',
+  ];
+  return {
+    id: `travel-arrival:${o.segmentId}`,
+    type: 'travel',
+    message: arrivalRowMessage(ctx.t, {
+      names: who.names,
+      count: who.count,
+      time: arrival.time,
+      tonight: when === 'tonight',
+    }),
+    caption: parts.filter(Boolean).join(' · '),
+    icon: transportEmoji(o.transportType, 'arrival'),
+    time: when === 'today' ? arrival.time : TONIGHT_SORT_TIME,
+    completable: false,
+    route: flightRoute(o),
+  };
+}
+
+const ROW_BUILDERS = [
+  { row: 'departure', build: departureRow },
+  { row: 'arrival', build: arrivalRow },
+] as const satisfies readonly { row: TravelRowKind; build: typeof departureRow }[];
+
+/**
+ * The rows for `occurrences` (any range; departure occurrences only: the departure row on its
+ * own day, the arrival row on the arrival day, see `travelRowsRange`).
+ * Total: each row is built on its own, and one that throws is skipped (and told to
+ * `ctx.onSkipped`), never dropping the flight's other row or aborting the briefing.
  */
 export function buildTravelBriefingRows(
   occurrences: readonly TravelSegmentOccurrence[],
@@ -149,21 +290,18 @@ export function buildTravelBriefingRows(
 ): CriticalItem[] {
   const out: CriticalItem[] = [];
   for (const o of occurrences) {
-    try {
-      if (o.kind !== 'departure' || o.date !== ctx.today) continue;
-      const notice = occurrenceNotice(ctx.t, o, ctx.lang);
-      const news =
-        notice !== null &&
-        (notice.kind === 'cancelled' || ctx.nowMs - notice.atMs <= CHANGE_NEWS_MS);
-      const row =
-        news && isChangeRecipient(ctx.viewer, o)
-          ? noticeRow(o, notice, ctx)
-          : news
-            ? null // a child who is not on this flight hears nothing about it
-            : plainRow(o, ctx);
-      if (row) out.push(row);
-    } catch (err) {
-      console.warn(`[travelBriefingRows] skipped occurrence ${o?.segmentId ?? '?'}:`, err);
+    if (o?.kind !== 'departure') continue;
+    for (const { row, build } of ROW_BUILDERS) {
+      try {
+        const item = build(o, ctx);
+        if (item) out.push(item);
+      } catch (err) {
+        console.warn(
+          `[travelBriefingRows] skipped the ${row} row for occurrence ${o?.segmentId ?? '?'}:`,
+          err
+        );
+        ctx.onSkipped?.(o, err, row);
+      }
     }
   }
   return out;

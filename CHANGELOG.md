@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-27
+
+### Added
+
+- The daily briefing now tells the family at home when someone lands on their flight home, with the airport, terminal and the airline's latest time.
+- Tapping a travel row in the daily briefing now opens that flight in Travel Plans.
+
 ## 2026-11-26
 
 ### Added

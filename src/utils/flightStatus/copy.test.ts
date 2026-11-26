@@ -20,6 +20,7 @@ import {
   hasFlightChip,
   isAlertStatus,
   conflictSentence,
+  arrivalRowMessage,
   departureRowMessage,
   fillNoteLine,
   clockTime,
@@ -167,6 +168,23 @@ describe('departureRowMessage', () => {
     expect(row('Jill and Sam', 2, true)).toBe('Jill and Sam fly at 5pm today');
     expect(row(null, 4, false)).toBe('Everyone leaves at 5pm today');
     expect(row('Jill and Sam', 2, false)).toBe('Jill and Sam leave at 5pm today');
+  });
+});
+
+describe('arrivalRowMessage', () => {
+  it('one person and several, today and tonight', () => {
+    const row = (names: string, count: number, tonight: boolean) =>
+      arrivalRowMessage(t, { names, count, time: '00:40', tonight });
+    expect(row('Jill', 1, false)).toBe('Jill lands at 12:40am');
+    expect(row('Jill and Sam', 2, false)).toBe('Jill and Sam land at 12:40am');
+    expect(row('Jill', 1, true)).toBe('Jill lands tonight at 12:40am');
+    expect(row('Jill and Sam', 2, true)).toBe('Jill and Sam land tonight at 12:40am');
+  });
+
+  it('in Chinese', () => {
+    expect(arrivalRowMessage(zh, { names: 'Jill', count: 1, time: '17:00', tonight: false })).toBe(
+      'Jill 5pm 降落'
+    );
   });
 });
 

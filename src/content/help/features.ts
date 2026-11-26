@@ -4449,8 +4449,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     excerpt:
       'beanies.family checks your family’s flights against the airline’s live schedule, so the plan you trust is the plan the airline is running.',
     icon: '✈\u{FE0F}',
-    readTime: 4,
-    updatedDate: '2026-11-26',
+    readTime: 5,
+    updatedDate: '2026-11-27',
     sections: [
       {
         type: 'paragraph',
@@ -4532,6 +4532,22 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'From a day before departure until after it has landed, the flight number on the card becomes a link. Tap it to open the flight on <strong>FlightAware</strong> in a new tab, with its full status and real-time updates, so the traveller and everyone watching at home can follow along. It works on every plan, and the link carries only the flight number.',
+      },
+      {
+        type: 'heading',
+        content: 'Flights in the daily briefing',
+        level: 2,
+        id: 'daily-briefing',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On the day, the people flying see their departure in the <strong>daily briefing</strong> on the Family Nook, for example <strong>Jill flies at 5pm today</strong>. Everyone else in the family sees when a traveller lands on the <strong>flight home</strong>, for example <strong>Jill lands at 12:40am</strong>, with the flight number, the arrival airport and its terminal, and, while the flight is being checked, the airline’s estimated time and the baggage belt. A flight that lands before 6am also shows the evening before, as <strong>Jill lands tonight at 12:40am</strong>. Tap either row to open the trip in Travel Plans with that flight open. Like every briefing row, each can be dismissed on its own.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The flight home is worked out from the trip. For each traveller it is their last flight, when that flight lands where their first one left from, or was added as the <strong>Return</strong> of a round trip. A trip with only one flight for a traveller also shows its landing, since it may be the flight home. Flights out on a round trip, connections on the way and cancelled flights get no landing row.',
       },
       {
         type: 'heading',

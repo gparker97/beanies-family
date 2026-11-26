@@ -17,6 +17,7 @@ import {
 } from '@/utils/vacation';
 import { toISODateString, extractDatePart } from '@/utils/date';
 import { mergeExtractedIntoVacation } from '@/utils/segmentMerge';
+import { homecomingTravellers } from '@/utils/homecoming';
 import { useToday } from '@/composables/useToday';
 import { trackFeature } from '@/services/analytics/plausible';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -26,6 +27,7 @@ export type SegmentWriteResult = 'saved' | 'missing' | 'failed';
 
 import type {
   FamilyVacation,
+  UUID,
   VacationTravelSegment,
   VacationAccommodation,
   VacationTransportation,
@@ -110,6 +112,44 @@ export const useVacationStore = defineStore('vacations', () => {
       });
       return [];
     }
+  }
+
+  /**
+   * Per segment id, the travellers for whom that flight is the one home (`homecomingTravellers`),
+   * across every vacation. Each vacation is computed on its own, on the `safeExtract` pattern:
+   * one that throws is reported (`homecoming failed`) and contributes no entries. Bounded like
+   * `safeExtract`: the computed re-runs only when `vacations` changes.
+   */
+  const homecomingBySegment = computed(() => {
+    const map = new Map<string, readonly UUID[]>();
+    for (const v of vacations.value) {
+      try {
+        for (const [segmentId, ids] of homecomingTravellers(
+          v.travelSegments ?? [],
+          v.assigneeIds ?? []
+        )) {
+          map.set(segmentId, ids);
+        }
+      } catch (err) {
+        // No allowlisted key exists for a vacation id, so it goes to the device console only.
+        console.error(`[vacationStore] homecoming failed on vacation ${v?.id ?? '<no id>'}:`, err);
+        reportError({
+          surface: 'vacation-segment',
+          severity: 'error',
+          message: 'homecoming failed',
+          error: err,
+          context: { action: 'homecoming_failed' },
+        });
+      }
+    }
+    return map;
+  });
+
+  const NOBODY: readonly UUID[] = Object.freeze([]);
+
+  /** The travellers for whom this flight is the one home; empty when it is nobody's. */
+  function homecomingFor(segmentId: string): readonly UUID[] {
+    return homecomingBySegment.value.get(segmentId) ?? NOBODY;
   }
 
   /**
@@ -624,6 +664,7 @@ export const useVacationStore = defineStore('vacations', () => {
     getVacationById,
     allTravelSegmentOccurrences,
     travelSegmentOccurrencesInRange,
+    homecomingFor,
     // Actions
     loadVacations,
     createVacation,

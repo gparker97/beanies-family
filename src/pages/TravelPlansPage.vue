@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -23,7 +23,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { isFlightType } from '@/utils/travelCodes';
 import { hasFlightChip } from '@/utils/flightStatus/copy';
-import { datePart, normaliseTime } from '@/utils/flightStatus/schedule';
+import { departureSortKey } from '@/utils/flightStatus/schedule';
 import { usePhotoStore } from '@/stores/photoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -402,10 +402,6 @@ const { groupedByDate, accommodationGaps, undatedItems } = useVacationTimeline(
  * The desktop rail's "Live checks" rows (#143): every flight in the selected trip, soonest
  * first, with its verification. Empty (and the card hidden) for a trip with no flight.
  */
-function liveCheckSortKey(s: { departureDate?: string; departureTime?: string }): string {
-  return `${datePart(s.departureDate) ?? '9999'} ${normaliseTime(s.departureTime) ?? ''}`;
-}
-
 const liveCheckRows = computed(() => {
   const v = selectedVacation.value;
   if (!v) return [];
@@ -416,7 +412,7 @@ const liveCheckRows = computed(() => {
       // A flight that is over has nothing left to check and carries no chip.
       .filter((r) => r.verification !== undefined && hasFlightChip(r.verification))
       // Soonest first, on the tuple's own normalisers: "9:05" sorts before "18:30".
-      .sort((a, b) => liveCheckSortKey(a.seg).localeCompare(liveCheckSortKey(b.seg)))
+      .sort((a, b) => departureSortKey(a.seg).localeCompare(departureSortKey(b.seg)))
       .map(({ seg, verification }) => ({
         id: seg.id,
         label: segmentFlightLabel(seg),
@@ -461,13 +457,19 @@ const outOfRangeHints = computed(() => {
   return ids;
 });
 
+/** Scroll a segment's card into view; false when no card for it is rendered. The id is
+ *  escaped: it can come from the URL (`?segment=`). */
+function scrollToSegment(id: string): boolean {
+  const el = document.querySelector(`[data-segment-id="${CSS.escape(id)}"]`);
+  if (!(el instanceof HTMLElement)) return false;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return true;
+}
+
 function scrollToOutOfRange(): void {
   const firstId = outOfRangeHints.value[0];
   if (!firstId) return;
-  const el = document.querySelector(`[data-segment-id="${firstId}"]`);
-  if (el instanceof HTMLElement) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
+  scrollToSegment(firstId);
 }
 
 /** True when today falls inside `[tripStart, tripEnd]` inclusive. */
@@ -774,6 +776,48 @@ function isCollapsed(id: string): boolean {
 function setCollapsed(id: string, val: boolean) {
   collapsedCards.value[id] = val;
 }
+
+/**
+ * Open one flight's card and bring it into view: the daily briefing's travel rows link here
+ * (`?segment=<id>` beside `?vacation=`). Expands only that card and leaves the others as they
+ * are (a route change between trips skips `selectTrip`, so the map is not assumed clean, and a
+ * reset would race the expand). The trip stays open whatever happens.
+ */
+async function focusSegment(id: string): Promise<void> {
+  if (!(selectedVacation.value?.travelSegments ?? []).some((s) => s.id === id)) {
+    logEvent({
+      level: 'warn',
+      surface: 'travel',
+      message: 'segment_missing',
+      context: { action: 'segment_missing' },
+    });
+    return;
+  }
+  setCollapsed(id, false);
+  await nextTick();
+  const shown = scrollToSegment(id);
+  logEvent({
+    level: shown ? 'info' : 'warn',
+    surface: 'travel',
+    message: shown ? 'segment_focus' : 'segment_not_rendered',
+    context: { action: shown ? 'segment_focus' : 'segment_not_rendered' },
+  });
+}
+
+// `?segment=` is one-shot: handled once the trip is in view (the page mounts before the trips
+// hydrate), then removed, so a refresh or Back does not re-expand and a second tap on the same
+// briefing row focuses again.
+watch(
+  () => [selectedVacation.value?.id, route.query.segment] as const,
+  async ([, segment]) => {
+    if (tripView.value !== 'detail' || typeof segment !== 'string') return;
+    await focusSegment(segment);
+    // The user may have moved on while the card opened: only clear the param this run handled.
+    if (route.query.segment !== segment) return;
+    void router.replace({ query: { ...route.query, segment: undefined } });
+  },
+  { immediate: true }
+);
 
 // ── Edit modals ──────────────────────────────────────────────────────────────
 

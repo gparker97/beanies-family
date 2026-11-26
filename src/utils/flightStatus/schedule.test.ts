@@ -8,14 +8,18 @@ import {
   LIVE_STATE_FIELDS,
   REVISION_FIELDS,
   TUPLE_FIELDS,
+  addDaysYmd,
   arrivalTerminalRecord,
   changeNoticeRevision,
   classifyDiff,
+  departureSortKey,
   diffTuple,
+  hhmm,
   liveRecordOf,
   normaliseTerminal,
   parseUtcMs,
   pickLiveState,
+  resolveArrival,
   revisionOf,
   splitLocal,
   tupleFromLeg,
@@ -687,5 +691,94 @@ describe('tupleFromLeg: an arrival terminal with no key is not stated', () => {
 
   it('the departure terminal is read as written (it is part of the revision)', () => {
     expect(terminals('Terminal', '2').terminal).toBe('Terminal');
+  });
+});
+
+describe('resolveArrival: when the briefing says a flight lands', () => {
+  const plan = { arrivalDate: '2026-12-14', arrivalTime: '00:40' };
+
+  it('the plan, without an estimate', () => {
+    expect(resolveArrival(plan, undefined)).toEqual({ date: '2026-12-14', time: '00:40' });
+    expect(resolveArrival({ arrivalDate: '2026-12-14', arrivalTime: '0:40' }, undefined)).toEqual({
+      date: '2026-12-14',
+      time: '00:40',
+    });
+  });
+
+  it('the estimate wins, with the planned time when it differs', () => {
+    expect(resolveArrival(plan, '2026-12-14 01:15+08:00')).toEqual({
+      date: '2026-12-14',
+      time: '01:15',
+      scheduledTime: '00:40',
+    });
+    // An estimate on time adds nothing.
+    expect(resolveArrival(plan, '2026-12-14T00:40')).toEqual({ date: '2026-12-14', time: '00:40' });
+  });
+
+  it('an estimate can move the day', () => {
+    const late = { arrivalDate: '2026-12-13', arrivalTime: '23:30' };
+    expect(resolveArrival(late, '2026-12-14 00:20Z')).toEqual({
+      date: '2026-12-14',
+      time: '00:20',
+      scheduledTime: '23:30',
+    });
+  });
+
+  it('an estimate without a planned time has no scheduled time', () => {
+    expect(resolveArrival({ arrivalDate: '2026-12-14' }, '2026-12-14 01:15')).toEqual({
+      date: '2026-12-14',
+      time: '01:15',
+    });
+  });
+
+  it('a malformed estimate falls back to the plan', () => {
+    expect(resolveArrival(plan, 'soon')).toEqual({ date: '2026-12-14', time: '00:40' });
+  });
+
+  it('an estimate with an unusable time falls back to the plan', () => {
+    expect(
+      resolveArrival({ arrivalDate: '2026-12-14', arrivalTime: '00:40' }, '2026-12-14T24:00')
+    ).toEqual({ date: '2026-12-14', time: '00:40' });
+  });
+
+  it('null without a date, without a time, or with an invalid time', () => {
+    expect(resolveArrival({ arrivalTime: '00:40' }, undefined)).toBeNull();
+    expect(resolveArrival({ arrivalDate: '2026-12-14' }, undefined)).toBeNull();
+    expect(
+      resolveArrival({ arrivalDate: '2026-12-14', arrivalTime: '25:00' }, undefined)
+    ).toBeNull();
+    expect(
+      resolveArrival({ arrivalDate: '2026-12-14', arrivalTime: 'late' }, undefined)
+    ).toBeNull();
+    expect(resolveArrival(undefined, undefined)).toBeNull();
+  });
+});
+
+describe('hhmm, addDaysYmd and departureSortKey', () => {
+  it('hhmm keeps only a real clock time', () => {
+    expect(hhmm('9:05')).toBe('09:05');
+    expect(hhmm('23:59:00')).toBe('23:59');
+    expect(hhmm('25:00')).toBeUndefined();
+    expect(hhmm('12:60')).toBeUndefined();
+    expect(hhmm('noon')).toBeUndefined();
+    expect(hhmm(undefined)).toBeUndefined();
+  });
+
+  it('addDaysYmd steps calendar days across months and years', () => {
+    expect(addDaysYmd('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDaysYmd('2026-03-01', -2)).toBe('2026-02-27');
+    expect(addDaysYmd('soon', 1)).toBeUndefined();
+  });
+
+  it('departureSortKey orders by date then normalised time, undated last', () => {
+    const keys = [
+      { departureDate: '2026-12-02', departureTime: '18:30' },
+      { departureDate: undefined, departureTime: '01:00' },
+      { departureDate: '2026-12-02', departureTime: '9:05' },
+      { departureDate: '2026-12-01T00:00:00Z' },
+    ]
+      .map(departureSortKey)
+      .sort();
+    expect(keys).toEqual(['2026-12-01 ', '2026-12-02 09:05', '2026-12-02 18:30', '9999 01:00']);
   });
 });

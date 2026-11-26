@@ -10,10 +10,11 @@
  * the RIGHT NUMBER of times. That is precisely the class of mistake template surgery makes,
  * and it is the class unit tests on extracted components cannot catch.
  */
-import { enableAutoUnmount, mount } from '@vue/test-utils';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { FamilyVacation } from '@/types/models';
+import { defineComponent, h } from 'vue';
+import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -307,4 +308,116 @@ describe('TravelPlansPage — smoke', () => {
       .mock.calls.filter(([e]) => e.message === 'vacation_not_found');
     expect(notFound).toHaveLength(0);
   }, 20_000);
+
+  describe('`?segment=` opens one flight (the daily briefing travel rows)', () => {
+    // A stub that renders the card's real anchor, so the page's query-and-scroll can find it.
+    const CardStub = defineComponent({
+      props: { item: { type: Object, required: true }, collapsed: Boolean },
+      setup: (props) => () =>
+        h('div', {
+          'data-segment-id': (props.item as { id: string }).id,
+          'data-collapsed': String(props.collapsed),
+        }),
+    });
+    const flight = (id: string): VacationTravelSegment => ({
+      id,
+      type: 'flight_return',
+      title: '',
+      status: 'booked',
+      departureDate: '2099-07-09',
+      departureTime: '21:00',
+    });
+    const segmentEvents = async () => {
+      const { logEvent } = await import('@/services/telemetry');
+      return vi
+        .mocked(logEvent)
+        .mock.calls.map(([e]) => e)
+        .filter((e) => e.surface === 'travel' && e.message.startsWith('segment_'));
+    };
+    async function mountOn(query: Record<string, string>) {
+      const { useVacationStore } = await import('@/stores/vacationStore');
+      useVacationStore().vacations = [trip({ travelSegments: [flight('seg-a'), flight('seg-b')] })];
+      routeState.query = query;
+      const { default: Page } = await import('../TravelPlansPage.vue');
+      return mount(Page, {
+        attachTo: document.body,
+        global: { stubs: { teleport: true, TimelineSegmentCard: CardStub } },
+        shallow: true,
+      });
+    }
+
+    const realScrollIntoView = Element.prototype.scrollIntoView;
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn();
+    });
+    afterEach(() => {
+      Element.prototype.scrollIntoView = realScrollIntoView;
+    });
+
+    it('expands that card, scrolls to it, logs segment_focus and consumes the param', async () => {
+      const w = await mountOn({ vacation: 'vac-1', segment: 'seg-b' });
+      await flushPromises();
+
+      expect(w.find('[data-segment-id="seg-b"]').attributes('data-collapsed')).toBe('false');
+      expect(w.find('[data-segment-id="seg-a"]').attributes('data-collapsed')).toBe('true');
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalledOnce();
+      expect(await segmentEvents()).toEqual([
+        expect.objectContaining({ level: 'info', message: 'segment_focus' }),
+      ]);
+      expect(routerMock.replace).toHaveBeenCalledWith({
+        query: { vacation: 'vac-1', segment: undefined },
+      });
+    }, 20_000);
+
+    it('a second tap on the same row focuses again once the param was consumed', async () => {
+      await mountOn({ vacation: 'vac-1', segment: 'seg-b' });
+      await flushPromises();
+      // The router consumes the param (the mock does not move the route), then the row is
+      // tapped again: the same `?segment=` returns and is focused again.
+      routeState.query = { vacation: 'vac-1' };
+      await flushPromises();
+      routeState.query = { vacation: 'vac-1', segment: 'seg-b' };
+      await flushPromises();
+
+      const focus = (await segmentEvents()).filter((e) => e.message === 'segment_focus');
+      expect(focus).toHaveLength(2);
+      expect(routerMock.replace).toHaveBeenCalledTimes(2);
+    }, 20_000);
+
+    it('a stale segment id opens the trip, logs segment_missing and consumes the param', async () => {
+      const w = await mountOn({ vacation: 'vac-1', segment: 'gone' });
+      await flushPromises();
+
+      expect(w.text()).toContain('Japan Trip');
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      expect(await segmentEvents()).toEqual([
+        expect.objectContaining({ level: 'warn', message: 'segment_missing' }),
+      ]);
+      expect(routerMock.replace).toHaveBeenCalledWith({
+        query: { vacation: 'vac-1', segment: undefined },
+      });
+    }, 20_000);
+
+    it('waits for the trips on a cold start before focusing', async () => {
+      const { useVacationStore } = await import('@/stores/vacationStore');
+      const store = useVacationStore();
+      store.vacations = [];
+      routeState.query = { vacation: 'vac-1', segment: 'seg-a' };
+      const { default: Page } = await import('../TravelPlansPage.vue');
+      mount(Page, {
+        attachTo: document.body,
+        global: { stubs: { teleport: true, TimelineSegmentCard: CardStub } },
+        shallow: true,
+      });
+      await flushPromises();
+      expect(await segmentEvents()).toEqual([]);
+      expect(routerMock.replace).not.toHaveBeenCalled();
+
+      store.vacations = [trip({ travelSegments: [flight('seg-a')] })];
+      await flushPromises();
+      expect(await segmentEvents()).toEqual([
+        expect.objectContaining({ message: 'segment_focus' }),
+      ]);
+    }, 20_000);
+  });
 });

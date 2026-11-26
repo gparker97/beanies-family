@@ -14,7 +14,7 @@ import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { useChoreStore } from '@/stores/choreStore';
-import { buildTravelBriefingRows } from '@/composables/criticalItems/travelRows';
+import { buildTravelBriefingRows, travelRowsRange } from '@/composables/criticalItems/travelRows';
 import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
 import { useExternalEvents } from '@/composables/useExternalEvents';
 import { externalEventTitle, externalWindowOn } from '@/utils/calendar/externalDisplay';
@@ -24,6 +24,7 @@ import { buildCardBriefingRows, ymdOf, type CardBriefingRow } from '@/utils/resp
 import { useTranslation } from '@/composables/useTranslation';
 import { BRIEFING_HIDE_PREFIX } from '@/utils/notifications';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import {
   formatTime12,
   formatDateShort,
@@ -52,6 +53,8 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { showToast } from '@/composables/useToast';
 import type { ChoreBlock } from '@/types/models';
 import type { ExternalEvent } from '@/types/externalEvents';
+import type { TravelSegmentOccurrence } from '@/utils/vacation';
+import type { TravelRowKind } from '@/composables/criticalItems/travelRows';
 
 export interface CriticalItem {
   id: string;
@@ -202,6 +205,31 @@ const MOVED_KEYS = {
   from: 'whoOwnsWhat.briefing.movedAway',
   to: 'whoOwnsWhat.briefing.movedToYou',
 } satisfies Record<'from' | 'to', UIStringKey>;
+
+/**
+ * Segments whose briefing travel row has been reported skipped this session. The briefing is a
+ * computed that re-runs often (it reads `Date.now()`), so a row that keeps throwing is reported
+ * once per segment and row, not once per render. No allowlisted key exists for a segment id, so the id
+ * stays in the device console (`buildTravelBriefingRows` warns with it).
+ */
+const reportedTravelSkips = new Set<string>();
+
+function reportTravelRowSkipped(
+  o: TravelSegmentOccurrence,
+  err: unknown,
+  row: TravelRowKind
+): void {
+  const key = `${o?.segmentId ?? '?'}:${row}`;
+  if (reportedTravelSkips.has(key)) return;
+  reportedTravelSkips.add(key);
+  reportError({
+    surface: 'daily-briefing',
+    severity: 'warning',
+    message: 'travel row skipped',
+    error: err,
+    context: { action: 'travel_row_skipped', detail: row },
+  });
+}
 
 export function useCriticalItems() {
   const familyStore = useFamilyStore();
@@ -520,10 +548,12 @@ export function useCriticalItems() {
       }
     }
 
-    // ── Today's departures (#143): plain rows, or the airline's change/cancellation ──
+    // ── Today's departures (#143): plain rows, or the airline's change/cancellation; and the
+    // flights home landing today (or early tomorrow), for the people at home ──
+    const travelRange = travelRowsRange(todayStr.value);
     items.push(
       ...buildTravelBriefingRows(
-        vacationStore.travelSegmentOccurrencesInRange(todayStr.value, todayStr.value),
+        vacationStore.travelSegmentOccurrencesInRange(travelRange.from, travelRange.to),
         {
           today: todayStr.value,
           nowMs: Date.now(),
@@ -533,6 +563,8 @@ export function useCriticalItems() {
           t,
           lang: currentLanguage.value,
           verificationFor: flightStatusStore.verificationFor,
+          homecomingFor: vacationStore.homecomingFor,
+          onSkipped: reportTravelRowSkipped,
         }
       )
     );

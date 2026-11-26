@@ -110,6 +110,14 @@ export function normaliseTime(value: string | undefined): string | undefined {
   return ok ? `${h!.padStart(2, '0')}:${mi}` : v;
 }
 
+/** The stored time as `HH:mm` (`normaliseTime`, the tuple rule), only when it is a real
+ *  clock time: a zone conversion of "25:00" or free text would be a wrong instant. */
+export function hhmm(value: string | undefined): string | undefined {
+  const t = normaliseTime(value);
+  const m = t ? /^(\d{2}):(\d{2})$/.exec(t) : null;
+  return m && Number(m[1]) <= 23 && Number(m[2]) <= 59 ? t : undefined;
+}
+
 /** The `YYYY-MM-DD` part of a stored date (a legacy value may carry a time); anything
  *  unrecognised is returned trimmed, never dropped. */
 export function datePart(value: string | undefined): string | undefined {
@@ -118,11 +126,46 @@ export function datePart(value: string | undefined): string | undefined {
   return /^\d{4}-\d{2}-\d{2}/.exec(v)?.[0] ?? v;
 }
 
-function addDaysYmd(ymd: string, days: number): string | undefined {
+/** `YYYY-MM-DD` plus `days` (negative goes back), calendar arithmetic with no zone; undefined
+ *  for anything that is not a `YYYY-MM-DD`. */
+export function addDaysYmd(ymd: string, days: number): string | undefined {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
   if (!m) return undefined;
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days));
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * The one sort key for flights by departure: airport wall clock, date then time, on the tuple's
+ * own normalisers ("9:05" sorts before "18:30"); an undated flight sorts last. The rail's
+ * "Live checks" rows and the homecoming rule (`utils/homecoming.ts`) both order by it.
+ */
+export function departureSortKey(s: { departureDate?: string; departureTime?: string }): string {
+  return `${datePart(s.departureDate) ?? '9999'} ${normaliseTime(s.departureTime) ?? ''}`;
+}
+
+/**
+ * When a flight lands, as the briefing tells it: the airline's estimate (`estimatedArrival`,
+ * an airport-local string read by `splitLocal`) when a live check carries one, else the plan's
+ * `arrivalDate` / `arrivalTime`. Null without a date or without a real clock time (`hhmm`).
+ * `scheduledTime` is set only when the estimate is used and its time differs from the plan's.
+ */
+export function resolveArrival(
+  schedule: Pick<ScheduleTuple, 'arrivalDate' | 'arrivalTime'> | undefined,
+  estimatedArrival: string | undefined
+): { date: string; time: string; scheduledTime?: string } | null {
+  const planned = hhmm(schedule?.arrivalTime);
+  const estimate = splitLocal(estimatedArrival);
+  // An estimate whose time is unusable ("24:00") falls back to the plan, never drops the row.
+  const time = estimate ? hhmm(estimate.time) : undefined;
+  if (estimate && time !== undefined) {
+    return planned !== undefined && planned !== time
+      ? { date: estimate.date, time, scheduledTime: planned }
+      : { date: estimate.date, time };
+  }
+  const date = datePart(schedule?.arrivalDate);
+  if (!date || planned === undefined) return null;
+  return { date, time: planned };
 }
 
 /**

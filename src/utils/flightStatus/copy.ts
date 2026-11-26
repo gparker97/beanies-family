@@ -490,6 +490,26 @@ export function departureRowMessage(
   return fillTemplate(t(key), { names: input.names, time: clockTime(input.time) });
 }
 
+/**
+ * The briefing row's message for a flight home, to the people at home: "Jill lands at
+ * 12:40am", "Jill and Sam land at 12:40am"; "Jill lands tonight at 12:40am" when it lands
+ * early tomorrow. `names` is the caller's joined list, `count` how many people it names.
+ */
+export function arrivalRowMessage(
+  t: TranslateFn,
+  input: { names: string; count: number; time: string; tonight: boolean }
+): string {
+  const one = input.count === 1;
+  const key = input.tonight
+    ? one
+      ? 'flightChecks.row.landsTonight.one'
+      : 'flightChecks.row.landsTonight.other'
+    : one
+      ? 'flightChecks.row.lands.one'
+      : 'flightChecks.row.lands.other';
+  return fillTemplate(t(key), { names: input.names, time: clockTime(input.time) });
+}
+
 /** "just now", "12 min ago", "3 h ago", "2 d ago": the age of a check, by the caller's clock. */
 export function agoText(t: TranslateFn, atMs: number, nowMs: number): string {
   const age = Math.max(0, nowMs - atMs);

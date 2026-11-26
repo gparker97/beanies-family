@@ -984,6 +984,64 @@ describe('vacationStore', () => {
       reportSpy.mockRestore();
     });
 
+    it('homecomingFor: the travellers for whom a flight is the one home', () => {
+      const store = useVacationStore();
+      store.vacations = [
+        makeVacation({
+          id: 'v1',
+          travelSegments: [
+            flightSegment({ id: 'out', departureAirport: 'SIN', arrivalAirport: 'LHR' }),
+            flightSegment({
+              id: 'back',
+              type: 'flight_return',
+              departureAirport: 'LHR',
+              arrivalAirport: 'SIN',
+              departureDate: '2026-06-20',
+            }),
+          ],
+        }),
+      ];
+      expect(store.homecomingFor('back')).toEqual(['m-1', 'm-2']);
+      expect(store.homecomingFor('out')).toEqual([]);
+      expect(store.homecomingFor('unknown')).toEqual([]);
+    });
+
+    it('homecomingFor: a malformed vacation is skipped and reported; the others still answer', () => {
+      const reportSpy = vi.spyOn(errorReporter, 'reportError').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const store = useVacationStore();
+      store.vacations = [
+        makeVacation({
+          id: 'v-bad',
+          // A missing array is read as no segments; a null entry is what still throws.
+          travelSegments: [null as unknown as VacationTravelSegment],
+        }),
+        makeVacation({
+          id: 'v-good',
+          travelSegments: [flightSegment({ id: 'only', type: 'flight_return' })],
+        }),
+      ];
+
+      expect(store.homecomingFor('only')).toEqual(['m-1', 'm-2']);
+      expect(reportSpy).toHaveBeenCalledOnce();
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'vacation-segment',
+          severity: 'error',
+          message: 'homecoming failed',
+          error: expect.any(Error),
+          context: { action: 'homecoming_failed' },
+        })
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringMatching(/v-bad/), expect.any(Error));
+      // Bounded: asking again does not re-run (or re-report) until `vacations` changes.
+      store.homecomingFor('only');
+      expect(reportSpy).toHaveBeenCalledOnce();
+
+      reportSpy.mockRestore();
+      consoleSpy.mockRestore();
+    });
+
     it('reactively reflects mutations to vacations[]', () => {
       const store = useVacationStore();
       store.vacations = [makeVacation({ id: 'v1', travelSegments: [] })];

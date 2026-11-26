@@ -17,7 +17,7 @@
 import type { FlightCheck } from '@/types/flightStatus';
 import type { VacationTravelSegment } from '@/types/models';
 import { wallClockInZone } from '@/utils/timeZone';
-import { datePart, normaliseTime, parseUtcMs, splitLocal } from './schedule';
+import { datePart, hhmm, parseUtcMs, splitLocal } from './schedule';
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -51,14 +51,6 @@ type TimedSegment = Pick<
 function ymd(value: string | undefined): string | undefined {
   const d = datePart(value);
   return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : undefined;
-}
-
-/** The stored time as `HH:mm` (`normaliseTime`, the tuple rule), only when it is a real
- *  clock time: a zone conversion of "25:00" or free text would be a wrong instant. */
-function hhmm(value: string | undefined): string | undefined {
-  const t = normaliseTime(value);
-  const m = t ? /^(\d{2}):(\d{2})$/.exec(t) : null;
-  return m && Number(m[1]) <= 23 && Number(m[2]) <= 59 ? t : undefined;
 }
 
 /**

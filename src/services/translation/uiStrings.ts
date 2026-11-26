@@ -11298,6 +11298,10 @@ const STRING_DEFS = {
     en: 'Gate {gate}',
     beanie: 'gate {gate}',
   },
+  'nook.criticalTravelBelt': {
+    en: 'Belt {belt}',
+    beanie: 'belt {belt}',
+  },
   'notifications.kindTravelDeparture': {
     en: 'Departure',
     beanie: 'departure',
@@ -16125,6 +16129,23 @@ const STRING_DEFS = {
     en: '{names} leave at {time} today',
     beanie: '{names} leave at {time} today',
   },
+  'flightChecks.row.lands.one': {
+    en: '{names} lands at {time}',
+    beanie: '{names} lands at {time}',
+  },
+  'flightChecks.row.lands.other': {
+    en: '{names} land at {time}',
+    beanie: '{names} land at {time}',
+  },
+  'flightChecks.row.landsTonight.one': {
+    en: '{names} lands tonight at {time}',
+    beanie: '{names} lands tonight at {time}',
+  },
+  'flightChecks.row.landsTonight.other': {
+    en: '{names} land tonight at {time}',
+    beanie: '{names} land tonight at {time}',
+  },
+  'flightChecks.row.scheduled': { en: 'Scheduled {time}', beanie: 'scheduled {time}' },
   'flightChecks.chip.checksFrom': { en: 'Checks from {date}', beanie: 'checks from {date}' },
   'flightChecks.chip.checking': { en: 'Checking…', beanie: 'checking…' },
   'flightChecks.chip.unavailable': { en: "Couldn't check", beanie: "couldn't check" },
