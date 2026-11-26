@@ -125,6 +125,7 @@ import { readFlightStatusCache } from '@/services/flightStatus/flightStatusCache
 import { pushToken as osPushToken } from '@/services/native/pushRegistration';
 import { CHANGE_NOTICE_DELAY_MS, liveNoticeId } from '@/utils/notifications/travel';
 import { revisionOf, tupleFromLeg } from '@/utils/flightStatus/schedule';
+import { cancelRevisionOf } from '@/utils/flightStatus/verify';
 import { MAX_FETCHES_PER_RUN, useFlightStatusStore } from '../flightStatusStore';
 
 /** The airline moved SQ318 to 18:30 from Terminal 3. */
@@ -1867,5 +1868,302 @@ describe('trackUrlFor: the FlightAware link around the day of travel', () => {
     const store = useFlightStatusStore();
     expect(store.trackUrlFor('seg-1')).not.toBeNull();
     expect(store.trackUrlFor('nope')).toBeNull();
+  });
+});
+
+describe('the arrival terminal (read from the arrival leg, beside the frozen revision)', () => {
+  const withArrival = (leg: FlightLeg, terminal: string): FlightLeg => ({
+    ...leg,
+    arrival: { ...leg.arrival, terminal },
+  });
+  const LEG_REV = revisionOf(tupleFromLeg(makeLeg({})));
+  /** The `liveArrivalTerminal` record of SQ318's arrival terminal on the booked day. */
+  const REC = (terminal: string) => `SQ318|2026-12-13|${terminal}`;
+  /** A flight whose arrival terminal the airline already published, and the plan took. */
+  const filledFlight = () =>
+    makeFlight({ arrivalTerminal: '2', liveArrivalTerminal: REC('2'), liveRevision: LEG_REV });
+
+  it('a first arrival terminal is filled quietly, and flight_fields names it', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(makeLeg({}), '2')]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(segment()).toMatchObject({ arrivalTerminal: '2', liveArrivalTerminal: REC('2') });
+    expect(segment().notes).toMatch(/^Arrival Terminal 2 added from Singapore Airlines, /);
+    expect(events('flight change applied')[0]?.context).toEqual({
+      action: 'applied',
+      flight_state: 'verified',
+      flight_fields: 'arrivalTerminal',
+      detail: 'quiet_fill',
+    });
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'verified', applied: true });
+  });
+
+  it('a Conflict plus an arrival-terminal fill writes and logs the arrival terminal alone', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, departureTime: '19:00' }));
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(moved, '2')]));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(updateSegment).toHaveBeenCalledTimes(2);
+    expect(Object.keys(updateSegment.mock.calls[1]![2]).sort()).toEqual([
+      'arrivalTerminal',
+      'liveArrivalTerminal',
+      'notes',
+    ]);
+    expect(segment()).toMatchObject({ departureTime: '19:00', arrivalTerminal: '2' });
+    expect(events('flight change applied')[1]?.context).toMatchObject({
+      flight_fields: 'arrivalTerminal',
+      detail: 'quiet_fill',
+    });
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+  });
+
+  it('a moved arrival terminal keeps one notice id before and after it is written', async () => {
+    vacationsState.vacations = [trip([filledFlight()])];
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(makeLeg({}), '3')]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({
+      state: 'changed',
+      applied: false,
+      was: { arrivalTerminal: '2' },
+    });
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    canEdit.value = true;
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(segment()).toMatchObject({
+      arrivalTerminal: '3',
+      liveArrivalTerminal: REC('3'),
+      liveWas: { arrivalTerminal: '2' },
+    });
+    expect(store.verificationFor('seg-1')).toMatchObject({
+      state: 'changed',
+      applied: true,
+      dismissed: true,
+    });
+    expect(liveNoticeId('seg-1', segment())).toBe(`travel-change:seg-1:${LEG_REV}~${REC('3')}`);
+  });
+
+  it('"Update with airline data" over a Conflict plus an owed fill: one write, every airline value, and an Undo', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, departureTime: '19:00' }));
+    const notesBefore = segment().notes!;
+    // The airline then publishes the arrival terminal; this device may not write it yet.
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(moved, '2')]));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(segment().arrivalTerminal).toBeUndefined();
+    canEdit.value = true;
+    const writes = updateSegment.mock.calls.length;
+    const before = { ...segment() };
+
+    const out = await store.takeAirline('seg-1');
+    expect(out.result).toBe('saved');
+    // The take replaced the family's hand-edited 19:00, so it can be undone.
+    expect(out.undo).toBeTypeOf('function');
+    expect(updateSegment.mock.calls.length).toBe(writes + 1);
+    expect(updateSegment.mock.calls.at(-1)?.[2]).toMatchObject({
+      departureTime: '18:30',
+      arrivalTerminal: '2',
+      liveArrivalTerminal: REC('2'),
+    });
+    expect(segment().notes!.split('\n')).toHaveLength(notesBefore.split('\n').length + 1);
+    expect(events('flight airline taken').at(-1)?.context).toEqual({
+      action: 'take_airline',
+      flight_fields: 'departureTime,arrivalTerminal',
+    });
+    // A take that records only a quiet fill announces nothing new, so the Changed notice it
+    // answers is folded beside the Undo toast, exactly as on the provider path.
+    expect(store.verificationFor('seg-1')).toMatchObject({
+      state: 'changed',
+      applied: true,
+      dismissed: true,
+    });
+    expect(updateSegment.mock.calls.at(-1)?.[2]).not.toHaveProperty('liveAppliedAt');
+    expect(events('flight notice dismissed').at(-1)?.context).toMatchObject({
+      action: 'dismissed',
+      detail: 'take_airline',
+    });
+
+    // Undo restores the hand-edited time and the prior live state exactly, and reopens the fold.
+    expect(await out.undo!()).toBe('saved');
+    expect(events('flight notice reopened').at(-1)?.context).toMatchObject({
+      detail: 'undo_take',
+    });
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+    const restored = segment();
+    expect(restored.departureTime).toBe('19:00');
+    expect(restored.arrivalTerminal).toBeUndefined();
+    expect(restored.liveArrivalTerminal).toBeUndefined();
+    expect(restored.notes).toBe(notesBefore);
+    for (const k of Object.keys(before) as (keyof VacationTravelSegment)[]) {
+      expect(restored[k]).toEqual(before[k]);
+    }
+    for (const k of Object.keys(restored) as (keyof VacationTravelSegment)[]) {
+      if (restored[k] !== undefined) expect(before).toHaveProperty(k);
+    }
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+  });
+
+  it('a recording take that announces a change over a hand edit has an Undo and folds nothing', async () => {
+    // The plan took the airline's arrival terminal 2, then the family typed 5 by hand.
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(makeLeg({}), '2')]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(segment()).toMatchObject({ arrivalTerminal: '2', liveArrivalTerminal: REC('2') });
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, arrivalTerminal: '5' }));
+    // The airline then moves the departure; this device may not write it yet.
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(moved, '2')]));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+    canEdit.value = true;
+
+    const out = await store.takeAirline('seg-1');
+    expect(out.result).toBe('saved');
+    // It replaced the hand-typed arrival terminal, so it can be undone...
+    expect(out.undo).toBeTypeOf('function');
+    expect(updateSegment.mock.calls.at(-1)?.[2]).toMatchObject({
+      departureTime: '18:30',
+      arrivalTerminal: '2',
+      liveAppliedAt: expect.any(String),
+    });
+    // ...and it announces a change the person never saw: its notice stays open.
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+    expect(events('flight notice dismissed')).toHaveLength(0);
+  });
+
+  it('a recording take over an untouched plan still has no Undo', async () => {
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(moved, '2')]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    canEdit.value = true;
+    expect(await store.takeAirline('seg-1')).toEqual({ result: 'saved' });
+    expect(segment()).toMatchObject({ departureTime: '18:30', liveArrivalTerminal: REC('2') });
+  });
+
+  it('the conflict log names the contested fields, once per answer incl. the arrival terminal', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(moved, '2')]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(segment()).toMatchObject({ departureTime: '18:30', liveArrivalTerminal: REC('2') });
+    const v = vacationsState.vacations[0]!;
+    // The family edits the departure time AND the recorded arrival terminal by hand.
+    v.travelSegments = v.travelSegments.map((s) => ({
+      ...s,
+      departureTime: '19:00',
+      arrivalTerminal: '5',
+    }));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(events('flight conflict shown').map((e) => e.context)).toEqual([
+      { action: 'conflict', flight_fields: 'departureTime,arrivalTerminal' },
+    ]);
+    // The same answer again is not logged twice.
+    vi.setSystemTime(NOW + 2 * LATER);
+    await store.run('tick');
+    expect(events('flight conflict shown')).toHaveLength(1);
+    // The airline moves the arrival terminal on the SAME revision: the plan takes it, the
+    // hand-edited time stays contested, and this new answer is logged once.
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(moved, '3')]));
+    vi.setSystemTime(NOW + 3 * LATER);
+    await store.run('tick');
+    expect(segment()).toMatchObject({ departureTime: '19:00', arrivalTerminal: '3' });
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    expect(events('flight conflict shown').map((e) => e.context)).toEqual([
+      { action: 'conflict', flight_fields: 'departureTime,arrivalTerminal' },
+      { action: 'conflict', flight_fields: 'departureTime' },
+    ]);
+  });
+
+  it('"Update with airline data" on an unrecorded cancellation records it: no Undo', async () => {
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({ status: 'Canceled' })]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    canEdit.value = true;
+    expect(await store.takeAirline('seg-1')).toEqual({ result: 'saved' });
+    expect(segment()).toMatchObject({ status: 'pending' });
+    expect(segment().liveCancelledAt).toBeDefined();
+    expect(events('flight airline taken').at(-1)?.context).toEqual({
+      action: 'take_airline',
+      flight_fields: '',
+    });
+  });
+
+  describe('push suppression honours pushable', () => {
+    const MOVED_REV = revisionOf(tupleFromLeg(moved));
+    const fires = (stamp: number) => stamp + CHANGE_NOTICE_DELAY_MS > Date.now();
+
+    beforeEach(() => {
+      h.platform = 'ios';
+    });
+
+    /** This device registered the old revision; another device's writes arrive by sync. */
+    async function laggingRegistration() {
+      h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+      canEdit.value = false;
+      const store = useFlightStatusStore();
+      await store.run('open');
+      expect(store.alerts['seg-1']?.rev).toBe(LEG_REV);
+      return store;
+    }
+
+    it('an arrival-terminal-only notice is never pre-dated by a lagging registration', async () => {
+      const store = await laggingRegistration();
+      Object.assign(segment(), {
+        departureTime: '18:30',
+        terminal: '3',
+        arrivalTerminal: '3',
+        liveRevision: MOVED_REV,
+        liveArrivalTerminal: '3',
+        liveWas: { arrivalTerminal: '2', at: new Date(NOW).toISOString() },
+        liveAppliedAt: new Date(NOW).toISOString(),
+      });
+      expect(fires(store.noticeFirstSeen(liveNoticeId('seg-1', segment())!, 'seg-1'))).toBe(true);
+      expect(events('notice suppressed')).toEqual([]);
+    });
+
+    it('a notice that also moved the departure is pre-dated as before', async () => {
+      const store = await laggingRegistration();
+      Object.assign(segment(), {
+        departureTime: '18:30',
+        terminal: '3',
+        arrivalTerminal: '3',
+        liveRevision: MOVED_REV,
+        liveArrivalTerminal: '3',
+        liveWas: { departureTime: '17:00', arrivalTerminal: '2', at: new Date(NOW).toISOString() },
+        liveAppliedAt: new Date(NOW).toISOString(),
+      });
+      expect(fires(store.noticeFirstSeen(liveNoticeId('seg-1', segment())!, 'seg-1'))).toBe(false);
+      expect(events('notice suppressed')).toHaveLength(1);
+    });
+
+    it('a cancellation is pre-dated as before', async () => {
+      const store = await laggingRegistration();
+      Object.assign(segment(), {
+        status: 'pending',
+        liveRevision: cancelRevisionOf(tupleFromLeg(makeLeg({}))),
+        liveCancelledAt: new Date(NOW).toISOString(),
+      });
+      expect(fires(store.noticeFirstSeen(liveNoticeId('seg-1', segment())!, 'seg-1'))).toBe(false);
+      expect(events('notice suppressed')).toHaveLength(1);
+    });
   });
 });

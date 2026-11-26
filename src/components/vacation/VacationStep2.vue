@@ -500,12 +500,22 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
                   @update:model-value="updateSegment(idx, 'bookingReference', String($event))"
                 />
               </FormFieldGroup>
-              <FormFieldGroup :label="t('vacation.field.terminal')">
+            </div>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <FormFieldGroup :label="t('vacation.field.departureTerminal')">
                 <BaseInput
                   :model-value="seg.terminal ?? ''"
                   :placeholder="t('vacation.field.terminalPlaceholder')"
                   class="vacation-teal-input"
                   @update:model-value="updateSegment(idx, 'terminal', String($event))"
+                />
+              </FormFieldGroup>
+              <FormFieldGroup :label="t('vacation.field.arrivalTerminal')">
+                <BaseInput
+                  :model-value="seg.arrivalTerminal ?? ''"
+                  :placeholder="t('vacation.field.terminalPlaceholder')"
+                  class="vacation-teal-input"
+                  @update:model-value="updateSegment(idx, 'arrivalTerminal', String($event))"
                 />
               </FormFieldGroup>
             </div>

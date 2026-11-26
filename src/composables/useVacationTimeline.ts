@@ -25,8 +25,14 @@ import {
   type TimingSegment,
 } from '@/utils/vacation';
 import { isTravellerSubset, resolveSegmentTravellers } from '@/utils/segmentTravellers';
-import { isFlightType } from '@/utils/travelCodes';
-import { airportCheck, fieldCheck, type FieldCheck } from '@/utils/flightStatus/copy';
+import { airportCode, isFlightType } from '@/utils/travelCodes';
+import {
+  airportCheck,
+  fieldCheck,
+  placeTerminalShort,
+  terminalRoute,
+  type FieldCheck,
+} from '@/utils/flightStatus/copy';
 import { splitLocal } from '@/utils/flightStatus/schedule';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -52,6 +58,9 @@ export interface DetailRow {
   displayValue?: string;
   /** Model field name for inline editing (omit for read-only display) */
   field?: string;
+  /** A read-only row's model field when the when-band can show it instead (a flight's
+   *  terminals): the band-consumed filter drops the row exactly when the band shows it. */
+  bandField?: string;
   /** Input type for inline editing (default: 'text') */
   inputType?: 'text' | 'date' | 'time';
   /** Show copy-to-clipboard badge (booking ref only) */
@@ -206,6 +215,7 @@ export function buildTravelKeyValue(seg: {
   departureDate?: string;
   departureTime?: string;
   terminal?: string;
+  arrivalTerminal?: string;
   cruiseLine?: string;
   shipName?: string;
   embarkationDate?: string;
@@ -234,7 +244,13 @@ export function buildTravelKeyValue(seg: {
     const carrierLabel = flightCodeLabel(seg.airline, seg.flightNumber);
     if (carrierLabel) p.push(carrierLabel);
     pushDeparture();
-    if (seg.terminal) p.push(seg.terminal);
+    // "SIN T3 → LHR T2": each known terminal tied to its airport, never bare (a terminal with
+    // no airport entered is omitted here; the card's band and rows still show it).
+    const terminals = terminalRoute([
+      placeTerminalShort(airportCode(seg.departureAirport), seg.terminal),
+      placeTerminalShort(airportCode(seg.arrivalAirport), seg.arrivalTerminal),
+    ]);
+    if (terminals) p.push(terminals);
   } else if (seg.type === 'cruise') {
     if (seg.shipName) p.push(seg.shipName);
     if (seg.embarkationDate && seg.disembarkationDate) {
@@ -364,11 +380,23 @@ export function travelDetailRows(
         value: seg.flightNumber,
         field: 'flightNumber',
       });
+    // The band's place lines are the terminals' home; these labelled rows are the fallback
+    // for a terminal the band cannot show (an undated flight, a one-cell band), dropped by the
+    // band-consumed filter (`bandField`) exactly when the band shows it.
     if (seg.terminal) {
       rows.push({
-        label: t('segmentRow.terminal'),
+        label: t('vacation.field.departureTerminal'),
         value: seg.terminal,
+        bandField: 'terminal',
         check: fieldCheck(v, ['terminal']),
+      });
+    }
+    if (seg.arrivalTerminal) {
+      rows.push({
+        label: t('vacation.field.arrivalTerminal'),
+        value: seg.arrivalTerminal,
+        bandField: 'arrivalTerminal',
+        check: fieldCheck(v, ['arrivalTerminal']),
       });
     }
     if (v?.live) rows.push(...liveRows(seg, v.live, t));
@@ -636,7 +664,10 @@ function withTiming(
   const built = buildWhenBand(kind, seg);
   if (!built) return { detailRows: rows };
   const consumed = new Set(built.consumed);
-  const detailRows = rows.filter((r) => !r.field || !consumed.has(r.field));
+  const detailRows = rows.filter((r) => {
+    const f = r.field ?? r.bandField;
+    return !f || !consumed.has(f);
+  });
   const span = segmentSpan(kind, seg);
   const phase = classifySegmentPhase(span, today);
   const isOngoingSpan = phase === 'now' && !!span.end && span.end !== span.start;

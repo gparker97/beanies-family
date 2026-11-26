@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ZH_STRINGS } from '@/services/translation/zh';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import type { FlightVerification } from '@/types/flightStatus';
+import type { FlightVerification, ScheduleTuple } from '@/types/flightStatus';
+import type { TranslateFn } from '@/utils/format';
+import { FIELD_KIND, TUPLE_FIELDS, type TupleField } from './schedule';
 import {
   agoText,
   airlineName,
@@ -20,8 +22,14 @@ import {
   conflictSentence,
   departureRowMessage,
   fillNoteLine,
+  clockTime,
+  joinSentences,
+  placeTerminal,
+  placeTerminalShort,
+  planTerminal,
   shortDate,
   terminalLabel,
+  terminalRoute,
   wasLine,
 } from './copy';
 import { t } from './__tests__/fixtures';
@@ -126,7 +134,7 @@ describe('was lines and notes', () => {
   it('the quiet fill line', () => {
     expect(
       fillNoteLine(t, ['terminal'], { terminal: '3' }, 'Singapore Airlines', '2026-12-12', 'en')
-    ).toBe('Terminal 3 added from Singapore Airlines, 12 Dec');
+    ).toBe('Departure Terminal 3 added from Singapore Airlines, 12 Dec');
     expect(
       fillNoteLine(
         t,
@@ -136,7 +144,17 @@ describe('was lines and notes', () => {
         '2026-12-12',
         'en'
       )
-    ).toBe('Departure time 6:30pm, Terminal 3 added from the airline, 12 Dec');
+    ).toBe('Departure time 6:30pm, Departure Terminal 3 added from the airline, 12 Dec');
+    expect(
+      fillNoteLine(
+        t,
+        ['terminal', 'arrivalTerminal'],
+        { terminal: '3', arrivalTerminal: 'TBIT' },
+        'the airline',
+        '2026-12-12',
+        'en'
+      )
+    ).toBe('Departure Terminal 3, Arrival TBIT added from the airline, 12 Dec');
   });
 });
 
@@ -294,7 +312,17 @@ describe('fieldCheck / bandChecks / airportCheck', () => {
   it('confirmed for each value the airline states and the plan matches, however old or spelled', () => {
     expect(fieldCheck(v(), ['terminal'])).toBe('confirmed');
     expect(fieldCheck(v({ fresh: false }), ['terminal'])).toBe('confirmed');
-    expect(bandChecks(v())).toEqual({ start: 'confirmed', end: 'confirmed' });
+    expect(bandChecks(v())).toEqual({
+      start: 'confirmed',
+      end: 'confirmed',
+      startPlace: 'confirmed',
+      endPlace: undefined,
+    });
+    expect(
+      bandChecks(
+        v({ mine: { ...plan, arrivalTerminal: '2' }, provider: { ...plan, arrivalTerminal: 'T2' } })
+      ).endPlace
+    ).toBe('confirmed');
     expect(bandChecks(v({ provider: { ...plan, departureTime: '18:30:00' } })).start).toBe(
       'confirmed'
     );
@@ -303,7 +331,12 @@ describe('fieldCheck / bandChecks / airportCheck', () => {
 
   it('a value the airline does not state is never marked', () => {
     const provider = { departureDate: plan.departureDate, departureTime: plan.departureTime };
-    expect(bandChecks(v({ provider }))).toEqual({ start: 'confirmed', end: undefined });
+    expect(bandChecks(v({ provider }))).toEqual({
+      start: 'confirmed',
+      end: undefined,
+      startPlace: undefined,
+      endPlace: undefined,
+    });
     expect(fieldCheck(v({ provider }), ['terminal'])).toBeUndefined();
   });
 
@@ -313,13 +346,20 @@ describe('fieldCheck / bandChecks / airportCheck', () => {
       applied: false,
       mine: { ...plan, departureTime: '19:00', terminal: '3' },
     });
-    expect(bandChecks(c)).toEqual({ start: 'conflict', end: 'confirmed' });
+    expect(bandChecks(c)).toEqual({ start: 'conflict', end: 'confirmed', startPlace: 'conflict' });
     expect(fieldCheck(c, ['terminal'])).toBe('conflict');
   });
 
   it('an airline change not yet in the plan says changed on the moved value only', () => {
     const c = v({ state: 'changed', applied: false, provider: { ...plan, arrivalTime: '01:10' } });
-    expect(bandChecks(c)).toEqual({ start: 'confirmed', end: 'changed' });
+    expect(bandChecks(c)).toEqual({ start: 'confirmed', end: 'changed', startPlace: 'confirmed' });
+    const arrival = v({
+      state: 'changed',
+      applied: false,
+      mine: { ...plan, arrivalTerminal: '2' },
+      provider: { ...plan, arrivalTerminal: '3' },
+    });
+    expect(bandChecks(arrival)).toMatchObject({ end: 'confirmed', endPlace: 'changed' });
   });
 
   it('a quiet fill (the plan lacks a value under verified) carries no mark', () => {
@@ -337,7 +377,12 @@ describe('fieldCheck / bandChecks / airportCheck', () => {
       v({ state: 'unavailable' }),
       undefined,
     ]) {
-      expect(bandChecks(bad)).toEqual({ start: undefined, end: undefined });
+      expect(bandChecks(bad)).toEqual({
+        start: undefined,
+        end: undefined,
+        startPlace: undefined,
+        endPlace: undefined,
+      });
       expect(fieldCheck(bad, ['terminal'])).toBeUndefined();
       expect(airportCheck(bad, 'SIN', 'from')).toBeUndefined();
     }
@@ -393,5 +438,240 @@ describe('confirmedLive', () => {
     expect(confirmedLive({ state: 'verified', checkedAt: 1, live: { status: 'Expected' } })).toBe(
       true
     );
+  });
+});
+
+describe('terminal display: planTerminal and the place helpers', () => {
+  it.each([
+    ['3', 'Terminal 3', 'T3'],
+    ['T3', 'Terminal 3', 'T3'],
+    ['terminal 3', 'Terminal 3', 'T3'],
+    ['Terminal 2E', 'Terminal 2E', 'T2E'],
+    ['B', 'Terminal B', 'TB'],
+    ['TBIT', 'TBIT', 'TBIT'],
+    ['Tom Bradley', 'Tom Bradley', 'Tom Bradley'],
+    ['International', 'International', 'International'],
+    [' Tom Bradley ', 'Tom Bradley', 'Tom Bradley'],
+  ])('%s → %s / %s (a named terminal is written as the plan holds it)', (raw, long, short) => {
+    expect(planTerminal(t, raw)).toBe(long);
+    expect(placeTerminalShort('SIN', raw)).toBe(`SIN ${short}`);
+  });
+
+  it("'' for no terminal", () => {
+    for (const raw of [undefined, '', '  ', 'Terminal']) {
+      expect(planTerminal(t, raw)).toBe('');
+      expect(placeTerminalShort('SIN', raw)).toBe('');
+    }
+  });
+
+  it('a terminal is tied to its airport, and never shown without one', () => {
+    expect(placeTerminal(t, 'LHR', 'T2')).toBe('LHR Terminal 2');
+    expect(placeTerminal(t, 'LAX', 'Tom Bradley')).toBe('LAX Tom Bradley');
+    expect(placeTerminal(t, '', '2')).toBe('');
+    expect(placeTerminal(t, undefined, '2')).toBe('');
+    expect(placeTerminal(t, 'LHR', undefined)).toBe('');
+    expect(placeTerminalShort('SIN', 'Terminal 3')).toBe('SIN T3');
+    expect(placeTerminalShort('LAX', 'TBIT')).toBe('LAX TBIT');
+    expect(placeTerminalShort(' ', '3')).toBe('');
+    expect(placeTerminalShort('SIN', '')).toBe('');
+    expect(placeTerminal(zh, 'LHR', '2')).toBe('LHR 2 号航站楼');
+  });
+
+  it('terminalRoute joins the known parts only', () => {
+    expect(terminalRoute(['SIN T3', 'LHR T2'])).toBe('SIN T3 → LHR T2');
+    expect(terminalRoute(['', 'LHR T2'])).toBe('LHR T2');
+    expect(terminalRoute([placeTerminalShort('SIN', '3'), undefined])).toBe('SIN T3');
+    expect(terminalRoute(['', ''])).toBe('');
+  });
+
+  it('joinSentences: a space in English, none after a Chinese stop, an empty side dropped', () => {
+    expect(joinSentences('One.', 'Two.')).toBe('One. Two.');
+    expect(joinSentences('一。', '二。')).toBe('一。二。');
+    expect(joinSentences('', 'Two.')).toBe('Two.');
+    expect(joinSentences('One.', '')).toBe('One.');
+  });
+});
+
+describe('the arrival terminal in the change copy', () => {
+  const now = {
+    departureDate: '2026-12-13',
+    departureTime: '18:30',
+    terminal: '3',
+    arrivalDate: '2026-12-14',
+    arrivalTime: '00:40',
+    arrivalTerminal: '2',
+  };
+
+  it('alone, it is the lead: never read as the departure terminal', () => {
+    expect(changeSentence(t, 'SQ318', now, { arrivalTerminal: '5' })).toBe(
+      'SQ318 now arrives at Terminal 2. Your plan has been updated.'
+    );
+    expect(changeSentence(t, 'SQ318', now, { arrivalTerminal: '5' }, 'en', false)).toBe(
+      'SQ318 now arrives at Terminal 2.'
+    );
+    expect(changeSentence(zh, 'SQ318', now, { arrivalTerminal: '5' }, 'zh')).toBe(
+      'SQ318 现改为在2 号航站楼到达。你的行程已随之更新。'
+    );
+  });
+
+  it('with other moves, it follows the unchanged lead', () => {
+    expect(changeSentence(t, 'SQ318', now, { departureTime: '17:00', arrivalTerminal: '5' })).toBe(
+      'SQ318 now leaves at 6:30pm from Terminal 3. SQ318 now arrives at Terminal 2. Your plan has been updated.'
+    );
+    expect(changeSentence(t, 'SQ318', now, { arrivalTime: '23:10', arrivalTerminal: '5' })).toBe(
+      'SQ318 now lands at 12:40am. SQ318 now arrives at Terminal 2. Your plan has been updated.'
+    );
+    expect(
+      changeSentence(zh, 'SQ318', now, { departureTime: '17:00', arrivalTerminal: '5' }, 'zh')
+    ).toBe(
+      'SQ318 现改为 6:30pm 从3 号航站楼起飞。SQ318 现改为在2 号航站楼到达。你的行程已随之更新。'
+    );
+  });
+
+  it('the was line names the arrival end', () => {
+    expect(wasLine(t, { arrivalTerminal: '5' })).toBe('Was arriving at Terminal 5');
+    expect(wasLine(t, { departureTime: '17:00', arrivalTerminal: '5' })).toBe(
+      'Was 5pm, arriving at Terminal 5'
+    );
+    expect(wasLine(zh, { arrivalTerminal: '5' })).toBe('原为在5 号航站楼到达');
+    expect(changeNoteLine(t, { arrivalTerminal: '5' }, '2026-12-12', 'en')).toBe(
+      'Changed on 12 Dec: Was arriving at Terminal 5'
+    );
+  });
+
+  it('a named arrival terminal is written as the plan holds it, never as its comparison key', () => {
+    const lax = { ...now, arrivalTerminal: 'TBIT' };
+    expect(changeSentence(t, 'SQ318', lax, { arrivalTerminal: '5' }, 'en', false)).toBe(
+      'SQ318 now arrives at TBIT.'
+    );
+    expect(changeSentence(zh, 'SQ318', lax, { arrivalTerminal: '5' }, 'zh', false)).toBe(
+      'SQ318 现改为在TBIT到达。'
+    );
+    expect(wasLine(t, { arrivalTerminal: 'TBIT' })).toBe('Was arriving at TBIT');
+    expect(wasLine(t, { departureTime: '17:00', arrivalTerminal: 'Tom Bradley' })).toBe(
+      'Was 5pm, arriving at Tom Bradley'
+    );
+    expect(wasLine(zh, { arrivalTerminal: 'TBIT' })).toBe('原为在TBIT到达');
+    expect(
+      conflictSentence(t, {
+        mine: { arrivalTerminal: 'TBIT' },
+        provider: { arrivalTerminal: '4' },
+        airline: 'Singapore Airlines',
+      })
+    ).toBe('Your plan says arriving at TBIT. Singapore Airlines says arriving at Terminal 4.');
+    expect(
+      conflictSentence(
+        zh,
+        { mine: { arrivalTerminal: 'TBIT' }, provider: { arrivalTerminal: '4' }, airline: 'SQ' },
+        'zh'
+      )
+    ).toContain('TBIT');
+    // The departure sentences keep printing the key (the Lambda's push copy restates them).
+    expect(changeSentence(t, 'SQ318', { ...now, terminal: 'TBIT' }, { terminal: '2' })).toBe(
+      'SQ318 now leaves from Terminal BIT. Your plan has been updated.'
+    );
+  });
+
+  it('an arrival terminal the plan no longer holds is left out, never printed empty', () => {
+    const cleared = { ...now, arrivalTerminal: undefined };
+    // Alone, the lead still names the flight (the sentence is also the bell and OS title).
+    expect(changeSentence(t, 'SQ318', cleared, { arrivalTerminal: '5' })).toBe(
+      "SQ318's arrival terminal changed. Your plan has been updated."
+    );
+    expect(changeSentence(t, 'SQ318', cleared, { arrivalTerminal: '5' }, 'en', false)).toBe(
+      "SQ318's arrival terminal changed."
+    );
+    expect(changeSentence(zh, 'SQ318', cleared, { arrivalTerminal: '5' }, 'zh')).toBe(
+      'SQ318 的到达航站楼已变更。你的行程已随之更新。'
+    );
+    expect(changeSentence(zh, 'SQ318', cleared, { arrivalTerminal: '5' }, 'zh', false)).toBe(
+      'SQ318 的到达航站楼已变更。'
+    );
+    // A blank (not just absent) arrival terminal reads the same.
+    expect(
+      changeSentence(t, 'SQ318', { ...now, arrivalTerminal: '  ' }, { arrivalTerminal: '5' })
+    ).toBe("SQ318's arrival terminal changed. Your plan has been updated.");
+    expect(
+      changeSentence(t, 'SQ318', cleared, { departureTime: '17:00', arrivalTerminal: '5' })
+    ).toBe('SQ318 now leaves at 6:30pm from Terminal 3. Your plan has been updated.');
+    expect(
+      changeSentence(zh, 'SQ318', cleared, { departureTime: '17:00', arrivalTerminal: '5' }, 'zh')
+    ).toBe('SQ318 现改为 6:30pm 从3 号航站楼起飞。你的行程已随之更新。');
+    expect(wasLine(t, { departureTime: '17:00', arrivalTerminal: 'Terminal' })).toBe('Was 5pm');
+    for (const tr of [t, zh]) {
+      for (const s of [
+        changeSentence(tr, 'SQ318', cleared, { arrivalTerminal: '5' }),
+        changeSentence(tr, 'SQ318', cleared, { departureTime: '17:00', arrivalTerminal: '5' }),
+      ]) {
+        expect(s).not.toMatch(/arrives at \.|在到达|[{}]/);
+      }
+    }
+  });
+
+  it('a Conflict over the arrival terminal names both sides', () => {
+    expect(
+      conflictSentence(t, {
+        mine: { departureDate: '2026-11-09', arrivalTerminal: '5' },
+        provider: { departureDate: '2026-11-09', arrivalTerminal: '2' },
+        airline: 'Singapore Airlines',
+      })
+    ).toBe(
+      'Your plan says arriving at Terminal 5. Singapore Airlines says arriving at Terminal 2.'
+    );
+  });
+});
+
+describe('every field has every sentence (exhaustiveness guard)', () => {
+  /** An old and a new value per kind of field. */
+  const VALUES: Record<TupleField, [old: string, now: string]> = {
+    departureDate: ['2026-12-12', '2026-12-13'],
+    departureTime: ['17:00', '18:30'],
+    terminal: ['2', '3'],
+    arrivalDate: ['2026-12-13', '2026-12-14'],
+    arrivalTime: ['23:10', '00:40'],
+    arrivalTerminal: ['1', '4'],
+  };
+  const shown = (tr: TranslateFn, f: TupleField, raw: string, lang: 'en' | 'zh') => {
+    switch (FIELD_KIND[f]) {
+      case 'date':
+        return shortDate(raw, lang);
+      case 'time':
+        return clockTime(raw);
+      case 'terminal':
+        return terminalLabel(tr, raw);
+    }
+  };
+  const NOW: ScheduleTuple = Object.fromEntries(TUPLE_FIELDS.map((f) => [f, VALUES[f][1]]));
+
+  it.each(
+    TUPLE_FIELDS.flatMap((f) =>
+      (['en', 'zh'] as const).map((lang) => [f, lang] as [TupleField, 'en' | 'zh'])
+    )
+  )('%s (%s)', (f, lang) => {
+    const tr = lang === 'en' ? t : zh;
+    const [oldValue, newValue] = VALUES[f];
+    const was: ScheduleTuple = { [f]: oldValue };
+    const before = shown(tr, f, oldValue, lang);
+    const after = shown(tr, f, newValue, lang);
+
+    const line = wasLine(tr, was, lang);
+    expect(line).not.toBe('');
+    expect(line).toContain(before);
+
+    const fill = fillNoteLine(tr, [f], { [f]: newValue }, 'Singapore Airlines', '2026-12-12', lang);
+    expect(fill).toContain(after);
+
+    const conflict = conflictSentence(
+      tr,
+      { mine: { [f]: oldValue }, provider: { [f]: newValue }, airline: 'Singapore Airlines' },
+      lang
+    );
+    expect(conflict).toContain(before);
+    expect(conflict).toContain(after);
+
+    const change = changeSentence(tr, 'SQ318', NOW, was, lang);
+    expect(change).toContain(after);
+
+    for (const s of [line, fill, conflict, change]) expect(s).not.toMatch(/[{}]/);
   });
 });

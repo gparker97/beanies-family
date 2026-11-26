@@ -102,15 +102,15 @@ import {
   type AlertSpec,
 } from '@/utils/flightStatus/alerts';
 import { isFlightType } from '@/utils/travelCodes';
-import { noticeRevision } from '@/utils/flightStatus/occurrenceNotice';
+import { changeNoticeRevision, noticeRevision } from '@/utils/flightStatus/occurrenceNotice';
 import { normaliseFlightNumber } from '@/utils/flightStatus/flightNumber';
 import { flightTrackUrl } from '@/utils/flightStatus/flightAware';
 import { operatedAs, pickLeg } from '@/utils/flightStatus/match';
 import {
-  diffTuple,
+  TUPLE_FIELDS,
+  arrivalTerminalRecord,
+  classifyDiff,
   revisionOf,
-  tupleFromLeg,
-  tupleFromSegment,
 } from '@/utils/flightStatus/schedule';
 import {
   cancelRevisionOf,
@@ -118,8 +118,9 @@ import {
   deriveVerification,
   planChange,
   revertPlan,
+  revisionAfterWrite,
   shouldApply,
-  takeProviderPatch,
+  takeAirlinePatch,
   unresolvedEntry,
   usableCheck as usableCheckFor,
   type SegmentPatch,
@@ -320,9 +321,11 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    * The key "Got it" folds a segment's notice under on this device: its bell/OS id
    * (`liveNoticeId`, from the synced fields), except for an airline change or cancellation
    * NOT in the plan (`applied: false`: this member may not edit trips, or the write failed),
-   * which has no synced id, or only an older revision's. That one is keyed on the provider's
-   * revision: the id `liveNoticeId` gives a change once it is written, and a new airline
-   * revision is a new key. A cancellation is keyed on its revision alone on BOTH paths (never
+   * which has no synced id, or only an older revision's. That one is keyed on the revision the
+   * write will leave (`revisionAfterWrite`, through `changeNoticeRevision` with the airline's
+   * arrival terminal record when it moved): the
+   * id `liveNoticeId` gives a change once it is written, and a new airline revision is a new
+   * key. A cancellation is keyed on its revision alone on BOTH paths (never
    * the bell/OS id's `@liveCancelledAt`), so one dismissed before its write lands stays
    * dismissed once it is written. `liveNoticeId` itself stays the bell/OS id. Every notice
    * with a provider answer therefore has a key; only the synced-fields fallback can lack one.
@@ -333,7 +336,15 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     v: FlightVerification
   ): string | null {
     if (v.applied === false && v.provider) {
-      if (v.state === 'changed') return travelChangeId(segmentId, revisionOf(v.provider));
+      if (v.state === 'changed') {
+        // Named as the write will leave it (`revisionAfterWrite`), so one id before and after.
+        const revision = changeNoticeRevision(
+          revisionAfterWrite(seg, v.provider) ?? revisionOf(v.provider),
+          arrivalTerminalRecord(seg, v.provider),
+          v.was
+        );
+        return travelChangeId(segmentId, revision);
+      }
       if (v.state === 'cancelled') return travelCancelId(segmentId, cancelRevisionOf(v.provider));
     }
     if (noticeRevision(seg)?.kind === 'cancelled') {
@@ -495,9 +506,11 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    * moves it.
    *
    * Phase 2: when a push already told this device (`pushCovered`: a registration for the
-   * segment's flight, CONFIRMED by the server, whose `rev` is not the segment's current `liveRevision`), the stamp is
-   * PRE-DATED, so the reminder builder finds its fireAt behind now and drops it, on this
-   * rebuild and every later one. Twice the delay, not once: the builder captured its `now`
+   * segment's flight, CONFIRMED by the server, whose `rev` is not the segment's current
+   * `liveRevision`), the stamp is PRE-DATED, so the reminder builder finds its fireAt behind
+   * now and drops it, on this rebuild and every later one. Only for a notice a push could have
+   * been (`noticeRevision`'s `pushable`): the server never pushes an arrival-terminal-only
+   * change, so a lagging registration is no evidence of one. Twice the delay, not once: the builder captured its `now`
    * a few milliseconds before calling here, and a stamp only one delay back would put fireAt
    * just ahead of it.
    */
@@ -505,7 +518,10 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     const known = noticed.value[id];
     if (known !== undefined) return known;
     const seg = current(segmentId)?.segment;
-    const covered = !!seg && pushCovered(alerts.value[segmentId], seg, seg.liveRevision);
+    const covered =
+      !!seg &&
+      noticeRevision(seg)?.pushable === true &&
+      pushCovered(alerts.value[segmentId], seg, seg.liveRevision);
     const now = Date.now();
     const stamp = covered ? now - 2 * CHANGE_NOTICE_DELAY_MS : now;
     noticed.value = { ...noticed.value, [id]: stamp };
@@ -585,16 +601,26 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     });
   }
 
+  /** Once per airline answer per session: the revision AND the arrival terminal record, so a
+   *  Conflict over the arrival terminal on a revision already logged is still logged once.
+   *  `flight_fields` names the contested fields (field names, never values), or `status` for
+   *  a re-booked flight the airline still lists as cancelled (the `applied` event's rule). */
   function logConflict(seg: VacationTravelSegment, v: FlightVerification): void {
     if (v.state !== 'conflict' || !v.provider) return;
-    const key = `${seg.id}|${revisionOf(v.provider)}`;
+    const key = `${seg.id}|${revisionOf(v.provider)}~${arrivalTerminalRecord(seg, v.provider) ?? ''}`;
     if (conflictsLogged.has(key)) return;
     conflictsLogged.add(key);
     logEvent({
       level: 'info',
       surface: SURFACE,
       message: 'flight conflict shown',
-      context: { action: 'conflict' },
+      context: {
+        action: 'conflict',
+        flight_fields:
+          v.live?.status === 'Canceled'
+            ? 'status'
+            : classifyDiff(seg, v.provider).contested.join(','),
+      },
     });
   }
 
@@ -603,11 +629,11 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     return { t: translationStore.t, lang: translationStore.currentLanguage };
   }
 
-  /** The changed field names for `flight_fields` ("departureTime,terminal"), never values. */
-  function fieldsOf(seg: VacationTravelSegment, check: FlightCheck): string {
-    if (!check.leg) return '';
-    const d = diffTuple(tupleFromSegment(seg), tupleFromLeg(check.leg, check.arrivalLeg));
-    return [...d.changed, ...d.filled].join(',');
+  /** The schedule field names a patch writes, for `flight_fields` ("departureTime,terminal"),
+   *  never values. From the WRITTEN patch, so a Conflict field deliberately left alone is not
+   *  listed. */
+  function fieldsOf(patch: SegmentPatch): string {
+    return TUPLE_FIELDS.filter((f) => f in patch).join(',');
   }
 
   /**
@@ -708,7 +734,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     const cancelled = patch.status === 'pending' && patch.liveCancelledAt !== undefined;
     return write(c, patch, {
       state: cancelled ? 'cancelled' : patch.liveAppliedAt ? 'changed' : 'verified',
-      fields: cancelled ? 'status' : fieldsOf(c.segment, check),
+      fields: cancelled ? 'status' : fieldsOf(patch),
       quiet: !cancelled && patch.liveAppliedAt === undefined,
     });
   }
@@ -1339,8 +1365,9 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     };
   }
 
-  /** The keys a take's Undo writes back: every key the provider patch wrote (schedule fields,
-   *  `status`, `arrivesNextDay`), and `sortDate` whenever the date moved (`updateSegment` moves
+  /** The keys a take's Undo writes back: every key the take wrote (schedule fields, `status`,
+   *  `arrivesNextDay`, and on a recording take the live keys and `notes`), and `sortDate`
+   *  whenever the date moved (`updateSegment` moves
    *  it with `departureDate` unless the patch names one, so naming it restores a custom order,
    *  or clears one the move added). */
   function undoKeys(patch: SegmentPatch): (keyof VacationTravelSegment)[] {
@@ -1348,17 +1375,22 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     return patch.departureDate !== undefined ? [...keys, 'sortDate'] : keys;
   }
 
-  /** "Update with airline data" (Conflict): write the cached leg, skipping `shouldApply` (whose
-   *  revision rule is exactly what keeps a manual edit). `missing` without a USABLE cached
-   *  leg: none at all, or one for another flight number or day (a stale answer is never
-   *  written over the family's edit), logged so the refusal is visible.
+  /** "Update with airline data" (Conflict): write the cached leg (`takeAirlinePatch`), past
+   *  the `shouldApply` rule that is exactly what keeps a manual edit. `missing` without a
+   *  USABLE cached leg: none at all, or one for another flight number or day (a stale answer
+   *  is never written over the family's edit), logged so the refusal is visible.
    *
    *  Two paths. The provider patch (the person decided exactly what the Conflict showed) is
    *  final in one step: the notice block it would raise is folded for the person, and `undo`
    *  writes the values captured BEFORE the write back (not `liveWas`, which predates the
-   *  airline's change). When a newer airline revision landed between render and tap, the take
-   *  records it through `planChange` like any airline change: no fold and no `undo`, so the
-   *  Changed notice ("Put it back") and the OS/bell notice announce what the person never saw. */
+   *  airline's change). When the airline's answer is not recorded yet (`recordsAnswer`: a
+   *  newer revision, or an arrival terminal not acted on, landed between render and tap), the
+   *  take records it like any airline change, in the same write: no fold when it announces a
+   *  change or cancellation, so the Changed notice ("Put it back") and the OS/bell notice
+   *  announce what the person never saw (a take that only records a quiet fill announces
+   *  nothing, so it folds the current notice like the provider path), and no
+   *  `undo` unless the take also replaced a hand-edited value (`overwrites`): then `undo`
+   *  writes back every key the take wrote (values, live keys, notes), as on the other path. */
   async function takeAirline(segmentId: string): Promise<TakeAirlineResult> {
     const c = current(segmentId);
     if (!c) return { result: 'missing' };
@@ -1375,13 +1407,19 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       });
       return { result: 'missing' };
     }
-    // An airline answer not yet recorded (a newer revision) is a real change: record it once,
+    // An airline answer not yet recorded (`recordsAnswer`) is a real change: record it once,
     // with its notes line. Otherwise the change is already recorded and only the values return.
-    const newerRevision = shouldApply(c.segment, check.leg, check.arrivalLeg);
-    const patch = newerRevision
-      ? planChange(c.segment, check.leg, check.arrivalLeg, Date.now(), copy())
-      : takeProviderPatch(c.segment, check.leg, check.arrivalLeg);
-    const prior = newerRevision ? null : captureBefore(c.segment, undoKeys(patch));
+    const { patch, recordsAnswer, overwrites } = takeAirlinePatch(
+      c.segment,
+      check.leg,
+      check.arrivalLeg,
+      Date.now(),
+      copy()
+    );
+    // An Undo whenever the take replaces a value the family chose: always on the provider path,
+    // and on a recording take that also overwrites a contested (hand-edited) field.
+    const prior =
+      !recordsAnswer || overwrites.length > 0 ? captureBefore(c.segment, undoKeys(patch)) : null;
     const written = await writeSegment(c, patch, 'take_airline');
     if (written === 'refused') return { result: 'failed' };
     const result = written;
@@ -1391,13 +1429,21 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       message: result === 'saved' ? 'flight airline taken' : 'flight change apply failed',
       context:
         result === 'saved'
-          ? { action: 'take_airline', flight_fields: fieldsOf(c.segment, check) }
+          ? { action: 'take_airline', flight_fields: fieldsOf(patch) }
           : { action: 'apply_failed', save_status: result, detail: 'take_airline' },
     });
     if (result !== 'saved' || !prior) return { result };
-    const key = currentNoticeKey(segmentId);
-    const addedKey = key && markDismissed(segmentId, key, true, 'take_airline') ? key : null;
-    if (addedKey) takeFolds.add(addedKey);
+    // A take that ANNOUNCES something (a change or a cancellation: `liveAppliedAt` /
+    // `liveCancelledAt`) raises a new notice the person never saw, so it is left open. Every
+    // other take folds the notice it answers, a recording one that only records a quiet fill
+    // included: that write raises no notice, and the old one must not stay open beside the Undo.
+    const announces = patch.liveAppliedAt !== undefined || patch.liveCancelledAt !== undefined;
+    let addedKey: string | null = null;
+    if (!announces) {
+      const key = currentNoticeKey(segmentId);
+      addedKey = key && markDismissed(segmentId, key, true, 'take_airline') ? key : null;
+      if (addedKey) takeFolds.add(addedKey);
+    }
     return { result, undo: undoTake(c, prior, addedKey) };
   }
 

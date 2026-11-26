@@ -2027,8 +2027,11 @@ export interface VacationTravelSegment {
   arrivalTime?: string;
   arrivesNextDay?: boolean;
 
-  // Departure terminal — shared by flights ("Terminal 1") and cruises ("Cruise Terminal A").
+  // Departure terminal for flights ("Terminal 1"), cruise terminal for cruises ("Cruise Terminal A").
   terminal?: string;
+  /** A flight's arrival terminal ("Terminal 2"). Flights only: cruises keep the one `terminal`.
+   *  Older builds keep it on save (patches merge) and never show it. */
+  arrivalTerminal?: string;
 
   // Return flight fields (used in combined flight entry, split on save)
   returnAirline?: string;
@@ -2088,12 +2091,21 @@ export interface VacationTravelSegment {
    *  provider while the revision matches = a manual edit (Conflict). A persisted value is data
    *  format, never a hash (see src/utils/stableVariant.ts:7-22). */
   liveRevision?: string;
+  /** The arrival terminal of the last airline answer this plan acted on, scoped to the flight:
+   *  `<flight number>|<airline's departure day>|<normalised terminal>` ("SQ318|2026-12-13|2",
+   *  `arrivalTerminalRecord` in `utils/flightStatus/schedule.ts`, the one builder). The arrival
+   *  terminal's companion to `liveRevision`, which is frozen at its five parts and never carries
+   *  it. Differing from the airline's answer's record = not acted on yet (a re-booked number or
+   *  day included); equal while the segment differs = the family's own edit (Conflict).
+   *  Machine-written and replaced whole. */
+  liveArrivalTerminal?: string;
   liveWas?: {
     departureDate?: string;
     departureTime?: string;
     terminal?: string;
     arrivalDate?: string;
     arrivalTime?: string;
+    arrivalTerminal?: string;
     /** ISO */
     at: string;
   };
@@ -2103,11 +2115,11 @@ export interface VacationTravelSegment {
   liveCancelledAt?: string;
 }
 
-/** The four synced live-check fields of a segment, copied as one unit by `pickLiveState`
- *  (`utils/flightStatus/schedule.ts`) so the field list exists once. */
+/** The five synced live-check fields of a segment, copied as one unit by `pickLiveState`
+ *  (`utils/flightStatus/schedule.ts`, over `LIVE_STATE_FIELDS`) so the field list exists once. */
 export type SegmentLiveState = Pick<
   VacationTravelSegment,
-  'liveRevision' | 'liveWas' | 'liveAppliedAt' | 'liveCancelledAt'
+  'liveRevision' | 'liveArrivalTerminal' | 'liveWas' | 'liveAppliedAt' | 'liveCancelledAt'
 >;
 
 export interface VacationAccommodation {

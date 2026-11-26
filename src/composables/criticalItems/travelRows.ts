@@ -17,12 +17,18 @@ import type { FlightVerification } from '@/types/flightStatus';
 import type { TranslateFn } from '@/utils/format';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
 import { transportEmoji } from '@/utils/vacation';
-import { isFlightType } from '@/utils/travelCodes';
+import { airportCode, isFlightType } from '@/utils/travelCodes';
 import { classifyAudience } from '@/utils/audience';
 import { formatNameList } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
-import { checkedAgo, departureRowMessage, terminalLabel } from '@/utils/flightStatus/copy';
+import {
+  checkedAgo,
+  departureRowMessage,
+  placeTerminal,
+  terminalLabel,
+  terminalRoute,
+} from '@/utils/flightStatus/copy';
 import { isChangeRecipient } from '@/utils/flightStatus/audience';
 import {
   CHANGE_NEWS_MS,
@@ -60,12 +66,21 @@ function travellerNames(
   return { names: formatNameList(people.map((m) => m.name)), count: people.length };
 }
 
-/** The caption: "SQ318 · Terminal 3 · Checked 12 min ago · Gate B12", or "... · Not checked live". */
+/**
+ * The caption: "SQ318 · SIN Terminal 3 → LHR Terminal 2 · Checked 12 min ago · Gate B12", or
+ * "... · Not checked live". A flight's terminals are each tied to their airport (a terminal
+ * with no airport entered is omitted, never shown bare); any other kind keeps its one terminal.
+ */
 function plainCaption(o: TravelSegmentOccurrence, ctx: TravelRowsContext): string {
   const parts: string[] = [];
   const isFlight = isFlightType(o.transportType);
   if (isFlight) parts.push(flightLabel(o));
-  const terminal = terminalLabel(ctx.t, o.schedule?.terminal);
+  const terminal = isFlight
+    ? terminalRoute([
+        placeTerminal(ctx.t, airportCode(o.departureAirport), o.schedule?.terminal),
+        placeTerminal(ctx.t, airportCode(o.arrivalAirport), o.schedule?.arrivalTerminal),
+      ])
+    : terminalLabel(ctx.t, o.schedule?.terminal);
   if (terminal) parts.push(terminal);
   const v = isFlight ? ctx.verificationFor(o.segmentId) : undefined;
   if (v && v.state !== 'not-live' && v.state !== 'unavailable' && v.checkedAt !== undefined) {

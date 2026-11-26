@@ -81,11 +81,36 @@ describe('travelDetailRows plan-value checks (terminal, from, to)', () => {
   it("marks the flight terminal with what the airline's latest answer says, however old", () => {
     const seg = flight({ terminal: 'Terminal 2' });
     const check = (v?: FlightVerification) =>
-      rowOf(travelDetailRows(seg, t as never, v), 'segmentRow.terminal')?.check;
+      rowOf(travelDetailRows(seg, t as never, v), 'vacation.field.departureTerminal')?.check;
     expect(check(answer('T2'))).toBe('confirmed');
     expect(check(answer('2', { fresh: false }))).toBe('confirmed');
     expect(check(answer('3', { state: 'conflict', applied: false }))).toBe('conflict');
     expect(check()).toBeUndefined();
+  });
+
+  it('marks the arrival terminal row from the arrival terminal alone', () => {
+    const seg = flight({ terminal: 'Terminal 2', arrivalTerminal: '5' });
+    const check = (v?: FlightVerification) =>
+      rowOf(travelDetailRows(seg, t as never, v), 'vacation.field.arrivalTerminal')?.check;
+    const arr = (arrivalTerminal: string, over: Partial<FlightVerification> = {}) =>
+      answer('2', {
+        mine: { terminal: 'Terminal 2', arrivalTerminal: '5' },
+        provider: { terminal: '2', arrivalTerminal },
+        ...over,
+      });
+    expect(check(arr('T5'))).toBe('confirmed');
+    expect(check(arr('3', { state: 'changed', applied: false }))).toBe('changed');
+    // the departure terminal disagreeing says nothing about the arrival one
+    expect(
+      check(
+        answer('3', {
+          state: 'conflict',
+          applied: false,
+          mine: { terminal: 'Terminal 2', arrivalTerminal: '5' },
+          provider: { terminal: '3', arrivalTerminal: '5' },
+        })
+      )
+    ).toBe('confirmed');
   });
 
   it("marks From / To when the booking carries the matched leg's airport code", () => {
@@ -104,6 +129,9 @@ describe('travelDetailRows plan-value checks (terminal, from, to)', () => {
     expect(
       rowOf(travelDetailRows(cruise, t as never, answer('2')), 'segmentRow.terminal')?.check
     ).toBeUndefined();
+    expect(
+      travelDetailRows(cruise, t as never, answer('2')).some((r) => r.bandField !== undefined)
+    ).toBe(false);
   });
 });
 

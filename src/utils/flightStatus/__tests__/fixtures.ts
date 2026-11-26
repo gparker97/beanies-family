@@ -10,6 +10,9 @@ import { UI_STRINGS, type UIStringKey } from '@/services/translation/uiStrings';
 /** The English translator, as the stores pass `useTranslationStore().t`. */
 export const t = (k: UIStringKey): string => UI_STRINGS[k];
 
+/** A provider leg. Deliberately NO default arrival terminal: with one, every booking below
+ *  (which holds none) would read as an arrival-terminal fill. A case that needs one passes
+ *  `arr: { terminal }`. */
 export function makeLeg(over: {
   number?: string;
   status?: string;

@@ -14,6 +14,7 @@ import {
   buildTravelSegmentTitle,
 } from './vacation';
 import { airlineLabel, airportLabel } from './vacation';
+import { isFlightType } from './travelCodes';
 import { normalizePersonName } from '@/utils/segmentTravellers';
 import type { TravelExtractionResult, TravelSegmentDraft } from '@/services/ai/types';
 import type {
@@ -92,6 +93,7 @@ const TRAVEL_FIELDS = [
   'arrivalDate',
   'arrivalTime',
   'terminal',
+  'arrivalTerminal',
   'cruiseLine',
   'shipName',
   'departurePort',
@@ -203,7 +205,11 @@ function expandCodesToPickerValues(fields: Record<string, string>): Record<strin
 
 function toTravelSegment(draft: TravelSegmentDraft): VacationTravelSegment {
   const type = coerceType(draft.type, TRAVEL_TYPES, 'activity');
-  const mapped = expandCodesToPickerValues(pickFields(draft.fields, TRAVEL_FIELDS));
+  // Only a flight has an arrival terminal column; a train or cruise draft's value folds into notes.
+  const fieldKeys = isFlightType(type)
+    ? TRAVEL_FIELDS
+    : TRAVEL_FIELDS.filter((k) => k !== 'arrivalTerminal');
+  const mapped = expandCodesToPickerValues(pickFields(draft.fields, fieldKeys));
   const primaryDate =
     mapped.departureDate || mapped.embarkationDate || mapped.arrivalDate || undefined;
   const seg: VacationTravelSegment = {
@@ -219,7 +225,7 @@ function toTravelSegment(draft: TravelSegmentDraft): VacationTravelSegment {
     ...(draft.bookingReference.trim() ? { bookingReference: draft.bookingReference.trim() } : {}),
     ...(primaryDate ? { sortDate: primaryDate } : {}),
   };
-  const notes = buildNotes(draft, TRAVEL_FIELDS);
+  const notes = buildNotes(draft, fieldKeys);
   if (notes) seg.notes = notes;
   return seg;
 }

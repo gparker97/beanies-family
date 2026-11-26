@@ -233,6 +233,41 @@ describe('TravelSegmentEditModal', () => {
     expect(updateSegment).toHaveBeenCalledWith('v1', 'act', { title: 'Aquarium' });
   });
 
+  it('saves the departure and arrival terminals as separate patch keys', async () => {
+    const { updateSegment } = setup();
+    const w = await mountOpen(TravelSegmentEditModal, {
+      segment: vacation.travelSegments[0],
+      segmentIndex: 0,
+    });
+    (w.vm as Vm).terminal = 'Terminal 1';
+    (w.vm as Vm).arrivalTerminal = 'Terminal 2';
+    await save(w);
+    // The return flight must not inherit either terminal: only the outbound is patched.
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(updateSegment).toHaveBeenCalledWith('v1', 'out', {
+      terminal: 'Terminal 1',
+      arrivalTerminal: 'Terminal 2',
+    });
+  });
+
+  it('a cruise edit sends its terminal and never an arrivalTerminal', async () => {
+    const { store, updateSegment } = setup();
+    const cruise = {
+      id: 'cr',
+      type: 'cruise',
+      title: 'Cruise',
+      status: 'pending',
+      embarkationDate: '2026-12-02',
+      disembarkationDate: '2026-12-09',
+      terminal: 'Cruise Terminal A',
+    };
+    store.vacations[0]!.travelSegments.push(cruise as never);
+    const w = await mountOpen(TravelSegmentEditModal, { segment: cruise, segmentIndex: 2 });
+    (w.vm as Vm).terminal = 'Cruise Terminal B';
+    await save(w);
+    expect(updateSegment).toHaveBeenCalledWith('v1', 'cr', { terminal: 'Cruise Terminal B' });
+  });
+
   it('does not touch a return flight the user has diverged', async () => {
     const { store, updateSegment } = setup();
     store.vacations[0]!.travelSegments[1]!.airline = 'Virgin';

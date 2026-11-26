@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { FlightCheck } from '@/types/flightStatus';
+import type { FlightCheck, FlightLeg } from '@/types/flightStatus';
 import type { VacationTravelSegment } from '@/types/models';
-import { revisionOf, tupleFromLeg } from './schedule';
+import { revisionOf, tupleFromLeg, tupleFromWas } from './schedule';
 import {
   CANCELLED_REVISION_SUFFIX,
   deriveVerification,
@@ -11,11 +11,13 @@ import {
   providerTuple,
   revertPlan,
   shouldApply,
+  takeAirlinePatch,
   takeProviderPatch,
   unresolvedEntry,
   usableCheck,
   type VerifyContext,
 } from './verify';
+import { liveNoticeId } from '@/utils/notifications/travel';
 import { makeCheck, makeFlight, makeLeg, t } from './__tests__/fixtures';
 
 const NOW = Date.parse('2026-12-12T09:00:00Z');
@@ -129,7 +131,9 @@ describe('deriveVerification: the six states', () => {
     const reverted = { ...applied, ...revertPlan(applied) };
     expect(deriveVerification(reverted, check, undefined, ctx()).state).toBe('conflict');
     expect(shouldApply(reverted, moved)).toBe(false);
-    const taken = { ...reverted, ...planChange(reverted, moved, undefined, NOW, COPY) };
+    const take = takeAirlinePatch(reverted, moved, undefined, NOW, COPY);
+    expect(take.recordsAnswer).toBe(false);
+    const taken = { ...reverted, ...take.patch };
     expect(deriveVerification(taken, check, undefined, ctx()).state).toBe('changed');
   });
 
@@ -386,7 +390,7 @@ describe('shouldApply / planChange: idempotency', () => {
     const patch = planChange(seg, leg, undefined, NOW, COPY);
     expect(patch.terminal).toBe('3');
     expect(patch.liveRevision).toBe(revisionOf(tupleFromLeg(leg)));
-    expect(patch.notes).toMatch(/^Terminal 3 added from Singapore Airlines, /);
+    expect(patch.notes).toMatch(/^Departure Terminal 3 added from Singapore Airlines, /);
     expect(patch).not.toHaveProperty('liveWas');
     expect(patch).not.toHaveProperty('liveAppliedAt');
     const filled = { ...seg, ...patch };
@@ -630,5 +634,362 @@ describe('deriveVerification: fresh', () => {
     );
     expect(v.state).toBe('verified');
     expect(v.fresh).toBe(false);
+  });
+});
+
+describe('the arrival terminal: checked beside the frozen revision', () => {
+  /** `leg` with the arrival terminal the airline publishes. */
+  const withArrival = (leg: FlightLeg, terminal: string) => ({
+    ...leg,
+    arrival: { ...leg.arrival, terminal },
+  });
+  const AT = new Date(NOW).toISOString();
+  /** The `liveArrivalTerminal` record of SQ318's arrival terminal on the airline's day. */
+  const REC = (terminal: string, day = '2026-12-13') => `SQ318|${day}|${terminal}`;
+  const run = (seg: VacationTravelSegment, leg: FlightLeg) => applyRun(seg, makeCheck(leg));
+  const state = (seg: VacationTravelSegment, leg: FlightLeg) =>
+    deriveVerification(seg, makeCheck(leg), undefined, ctx());
+
+  it('a fill: written quietly with its record and a labelled notes line, then verified', () => {
+    const leg = withArrival(makeLeg({}), '2');
+    const seg = makeFlight();
+    expect(state(seg, leg)).toMatchObject({ state: 'verified', applied: false });
+    expect(shouldApply(seg, leg)).toBe(true);
+    // No `liveRevision`: an arrival-terminal-only write records only the arrival terminal.
+    expect(planChange(seg, leg, undefined, NOW, COPY)).toEqual({
+      arrivalTerminal: '2',
+      liveArrivalTerminal: REC('2'),
+      notes: expect.stringMatching(/^Arrival Terminal 2 added from Singapore Airlines, /),
+    });
+    const filled = run(seg, leg);
+    expect(shouldApply(filled, leg)).toBe(false);
+    expect(state(filled, leg)).toMatchObject({ state: 'verified', applied: true });
+  });
+
+  it('the rollout: an applied 5-part change is filled once and nothing else about it moves', () => {
+    const applied = run(makeFlight(), moved);
+    const leg = withArrival(moved, '2');
+    expect(shouldApply(applied, leg)).toBe(true);
+    const patch = planChange(applied, leg, undefined, NOW, COPY);
+    expect(Object.keys(patch).sort()).toEqual(['arrivalTerminal', 'liveArrivalTerminal', 'notes']);
+    const filled = { ...applied, ...patch };
+    expect(shouldApply(filled, leg)).toBe(false);
+    const v = state(filled, leg);
+    expect(v).toMatchObject({ state: 'changed', applied: true });
+    expect(v.was).toEqual(tupleFromWas(applied.liveWas));
+  });
+
+  it('a change: announced before the write, struck out and noted after, put back to a Conflict', () => {
+    const filled = run(makeFlight(), withArrival(makeLeg({}), '2'));
+    const leg = withArrival(makeLeg({}), '3');
+    expect(state(filled, leg)).toMatchObject({
+      state: 'changed',
+      applied: false,
+      was: { arrivalTerminal: '2' },
+    });
+    expect(shouldApply(filled, leg)).toBe(true);
+    const patch = planChange(filled, leg, undefined, NOW, COPY);
+    // The fill recorded no revision, so this first announced change records the airline's
+    // (`revisionAfterWrite` (c)): its notice is keyed on it.
+    expect(filled.liveRevision).toBeUndefined();
+    expect(patch).toEqual({
+      arrivalTerminal: '3',
+      liveRevision: revisionOf(tupleFromLeg(leg)),
+      liveArrivalTerminal: REC('3'),
+      liveWas: { at: AT, arrivalTerminal: '2' },
+      liveAppliedAt: AT,
+      notes: expect.stringMatching(/\nChanged on .*: Was arriving at Terminal 2$/),
+    });
+    const changed = { ...filled, ...patch };
+    expect(shouldApply(changed, leg)).toBe(false);
+    // Nothing differs: the applied change still reads changed, with `was` from liveWas.
+    expect(state(changed, leg)).toMatchObject({
+      state: 'changed',
+      applied: true,
+      was: { arrivalTerminal: '2' },
+    });
+
+    expect(revertPlan(changed)).toEqual({ arrivalTerminal: '2' });
+    const reverted = { ...changed, ...revertPlan(changed) };
+    expect(state(reverted, leg).state).toBe('conflict');
+    expect(shouldApply(reverted, leg)).toBe(false);
+
+    const take = takeAirlinePatch(reverted, leg, undefined, NOW, COPY);
+    expect(take).toEqual({
+      patch: { arrivalTerminal: '3' },
+      recordsAnswer: false,
+      overwrites: ['arrivalTerminal'],
+    });
+    expect(state({ ...reverted, ...take.patch }, leg).state).toBe('changed');
+  });
+
+  it('a hand edit after a fill is a Conflict, never overwritten by the next check', () => {
+    const leg = withArrival(makeLeg({}), '2');
+    const edited = { ...run(makeFlight(), leg), arrivalTerminal: '5' };
+    expect(state(edited, leg)).toMatchObject({ state: 'conflict', applied: false });
+    expect(shouldApply(edited, leg)).toBe(false);
+  });
+
+  it('a mixed change records both halves in one write and one notes line', () => {
+    const leg = withArrival(moved, '3');
+    const seg = makeFlight({ arrivalTerminal: '2', notes: 'Window seats' });
+    const patch = planChange(seg, leg, undefined, NOW, COPY);
+    expect(patch).toMatchObject({
+      departureTime: '18:30',
+      terminal: '3',
+      arrivalTerminal: '3',
+      liveRevision: revisionOf(tupleFromLeg(leg)),
+      liveArrivalTerminal: REC('3'),
+      liveWas: {
+        at: AT,
+        departureTime: '17:00',
+        terminal: 'Terminal 2',
+        arrivalDate: '2026-12-13',
+        arrivalTime: '23:10',
+        arrivalTerminal: '2',
+      },
+      arrivesNextDay: true,
+    });
+    expect(patch.notes).toMatch(
+      /^Window seats\nChanged on .*: Was 5pm from Terminal 2, arriving at Terminal 2$/
+    );
+  });
+
+  it('(a) a Conflict over a hand-edited time takes its first arrival terminal and stays Conflict', () => {
+    const edited = { ...run(makeFlight(), moved), departureTime: '19:00' };
+    const leg = withArrival(moved, '2');
+    expect(shouldApply(edited, leg)).toBe(true);
+    const patch = planChange(edited, leg, undefined, NOW, COPY);
+    expect(patch).not.toHaveProperty('departureTime');
+    expect(patch).not.toHaveProperty('liveWas');
+    expect(patch).not.toHaveProperty('liveAppliedAt');
+    expect(patch).toMatchObject({ arrivalTerminal: '2', liveArrivalTerminal: REC('2') });
+    const filled = { ...edited, ...patch };
+    expect(filled.departureTime).toBe('19:00');
+    expect(state(filled, leg).state).toBe('conflict');
+    expect(shouldApply(filled, leg)).toBe(false);
+  });
+
+  it('(b) the airline dropping its arrival terminal writes nothing', () => {
+    const filled = run(makeFlight(), withArrival(makeLeg({}), '2'));
+    expect(shouldApply(filled, makeLeg({}))).toBe(false);
+    expect(state(filled, makeLeg({})).state).toBe('verified');
+  });
+
+  it('(c) a reverted arrival terminal stays a Conflict when the departure time later moves', () => {
+    const filled = run(makeFlight(), withArrival(makeLeg({}), '2'));
+    const changed = run(filled, withArrival(makeLeg({}), '3'));
+    const reverted = { ...changed, ...revertPlan(changed) };
+    const later = withArrival(moved, '3');
+    expect(shouldApply(reverted, later)).toBe(true);
+    const after = run(reverted, later);
+    expect(after.departureTime).toBe('18:30');
+    expect(after.arrivalTerminal).toBe('2');
+    expect(state(after, later).state).toBe('conflict');
+    expect(shouldApply(after, later)).toBe(false);
+  });
+
+  it('(d) "Update with airline data" on a Conflict plus an owed fill writes every airline value', () => {
+    // The plan took the move (landing the next day), then the family set the arrival day back.
+    const edited = {
+      ...run(makeFlight(), moved),
+      arrivalDate: '2026-12-13',
+      arrivesNextDay: false,
+    };
+    const leg = withArrival(moved, '2');
+    expect(state(edited, leg).state).toBe('conflict');
+    const { patch, recordsAnswer, overwrites } = takeAirlinePatch(
+      edited,
+      leg,
+      undefined,
+      NOW,
+      COPY
+    );
+    expect(recordsAnswer).toBe(true);
+    expect(overwrites).toEqual(['arrivalDate']);
+    expect(patch).toEqual({
+      arrivalDate: '2026-12-14',
+      arrivesNextDay: true,
+      arrivalTerminal: '2',
+      liveArrivalTerminal: REC('2'),
+      notes: expect.stringMatching(/\nArrival Terminal 2 added from Singapore Airlines, /),
+    });
+    const taken = { ...edited, ...patch };
+    expect(shouldApply(taken, leg)).toBe(false);
+    expect(state(taken, leg)).toMatchObject({ state: 'changed', applied: true });
+  });
+
+  it('takeAirlinePatch on a cancelled leg records the cancellation once', () => {
+    const cancelled = makeLeg({ status: 'Canceled' });
+    const first = takeAirlinePatch(makeFlight(), cancelled, undefined, NOW, COPY);
+    expect(first.recordsAnswer).toBe(true);
+    expect(first.patch).toEqual({
+      status: 'pending',
+      liveCancelledAt: AT,
+      liveRevision: `${revisionOf(tupleFromLeg(cancelled))}${CANCELLED_REVISION_SUFFIX}`,
+      notes: expect.stringMatching(/^Cancelled by Singapore Airlines, /),
+    });
+    const rebooked = { ...makeFlight(), ...first.patch, status: 'booked' as const };
+    expect(takeAirlinePatch(rebooked, cancelled, undefined, NOW, COPY)).toEqual({
+      patch: { status: 'pending' },
+      recordsAnswer: false,
+      overwrites: [],
+    });
+  });
+
+  it('an applied change with only a fill pending still reads as that change (FIX: no vanishing notice)', () => {
+    const applied = run(makeFlight(), moved);
+    const leg = withArrival(moved, '2');
+    expect(shouldApply(applied, leg)).toBe(true);
+    expect(state(applied, leg)).toMatchObject({
+      state: 'changed',
+      applied: true,
+      was: tupleFromWas(applied.liveWas),
+    });
+    // Without an applied change, a pending fill is verified, not yet applied.
+    expect(state(makeFlight(), withArrival(makeLeg({}), '2'))).toMatchObject({
+      state: 'verified',
+      applied: false,
+    });
+  });
+
+  it('a quiet arrival-terminal fill never moves liveRevision, so an existing notice keeps its id', () => {
+    // Applied at R2, put back, then the airline returns to R1: the plan matches the five fields
+    // while liveRevision is still R2. Then the airline publishes the arrival terminal.
+    const applied = run(makeFlight(), moved);
+    const r2 = applied.liveRevision;
+    const back = { ...applied, ...revertPlan(applied) };
+    const r1 = withArrival(makeLeg({}), '2');
+    expect(revisionOf(tupleFromLeg(r1))).not.toBe(r2);
+    const id = liveNoticeId('seg-1', back);
+    expect(shouldApply(back, r1)).toBe(true);
+    const patch = planChange(back, r1, undefined, NOW, COPY);
+    expect(Object.keys(patch).sort()).toEqual(['arrivalTerminal', 'liveArrivalTerminal', 'notes']);
+    const filled = { ...back, ...patch };
+    expect(filled.liveRevision).toBe(r2);
+    expect(liveNoticeId('seg-1', filled)).toBe(id);
+    expect(shouldApply(filled, r1)).toBe(false);
+  });
+
+  it('an arrival-only fill on a flight with no liveRevision writes none; a five-field change does', () => {
+    const fill = planChange(makeFlight(), withArrival(makeLeg({}), '2'), undefined, NOW, COPY);
+    expect(fill).not.toHaveProperty('liveRevision');
+    const change = planChange(makeFlight(), withArrival(moved, '2'), undefined, NOW, COPY);
+    expect(change.liveRevision).toBe(revisionOf(tupleFromLeg(moved)));
+  });
+
+  it('a reinstatement that only fills an arrival terminal still clears the cancel marker', () => {
+    const seg = makeFlight();
+    const recorded = {
+      ...seg,
+      ...planChange(seg, makeLeg({ status: 'Canceled' }), undefined, NOW, COPY),
+    };
+    const running = withArrival(makeLeg({}), '2');
+    expect(shouldApply(recorded, running)).toBe(true);
+    const patch = planChange(recorded, running, undefined, NOW, COPY);
+    expect(patch).toMatchObject({
+      arrivalTerminal: '2',
+      liveRevision: revisionOf(tupleFromLeg(running)),
+      liveArrivalTerminal: REC('2'),
+    });
+    expect(shouldApply({ ...recorded, ...patch }, running)).toBe(false);
+  });
+
+  it('"Put it back" of a moved day and arrival terminal stays a Conflict: nothing is re-applied', () => {
+    const filled = run(makeFlight(), withArrival(makeLeg({}), '2'));
+    const nextDay = withArrival(
+      makeLeg({
+        dep: { scheduledLocal: '2026-12-14 17:00+08:00', scheduledUtc: '2026-12-14 09:00Z' },
+        arr: { scheduledLocal: '2026-12-14 23:10+00:00', scheduledUtc: '2026-12-14 23:10Z' },
+      }),
+      '3'
+    );
+    const applied = run(filled, nextDay);
+    expect(applied).toMatchObject({
+      departureDate: '2026-12-14',
+      arrivalTerminal: '3',
+      liveArrivalTerminal: REC('3', '2026-12-14'),
+    });
+    const back = { ...applied, ...revertPlan(applied) };
+    expect(back).toMatchObject({ departureDate: '2026-12-13', arrivalTerminal: '2' });
+    // The check queried the booked day, so it still answers the put-back plan.
+    const check = makeCheck(nextDay);
+    expect(usableCheck(back, check)).toBe(check);
+    expect(deriveVerification(back, check, undefined, ctx()).state).toBe('conflict');
+    expect(shouldApply(back, nextDay)).toBe(false);
+    expect(applyRun(back, check)).toBe(back);
+  });
+
+  it('a re-booked flight (new number or day) takes its arrival terminal as a fill, never a Conflict', () => {
+    const filled = run(makeFlight(), withArrival(makeLeg({}), '2'));
+    // A new flight number, same day, the arrival terminal cleared in the drawer.
+    const renumbered = { ...filled, flightNumber: 'SQ322', arrivalTerminal: undefined };
+    const sq322 = withArrival(makeLeg({ number: 'SQ 322' }), '2');
+    const c322 = makeCheck(sq322, { flight: 'SQ322' });
+    expect(deriveVerification(renumbered, c322, undefined, ctx())).toMatchObject({
+      state: 'verified',
+      applied: false,
+    });
+    expect(shouldApply(renumbered, sq322)).toBe(true);
+    expect(planChange(renumbered, sq322, undefined, NOW, COPY)).toMatchObject({
+      arrivalTerminal: '2',
+      liveArrivalTerminal: 'SQ322|2026-12-13|2',
+    });
+
+    // The same number on another day.
+    const redated = {
+      ...filled,
+      departureDate: '2026-12-14',
+      arrivalDate: '2026-12-14',
+      arrivalTerminal: undefined,
+    };
+    const dayLeg = withArrival(
+      makeLeg({
+        dep: { scheduledLocal: '2026-12-14 17:00+08:00', scheduledUtc: '2026-12-14 09:00Z' },
+        arr: { scheduledLocal: '2026-12-14 23:10+00:00', scheduledUtc: '2026-12-14 23:10Z' },
+      }),
+      '2'
+    );
+    const cDay = makeCheck(dayLeg, { date: '2026-12-14' });
+    expect(deriveVerification(redated, cDay, undefined, ctx())).toMatchObject({
+      state: 'verified',
+      applied: false,
+    });
+    expect(shouldApply(redated, dayLeg)).toBe(true);
+    expect(applyRun(redated, cDay)).toMatchObject({
+      arrivalTerminal: '2',
+      liveArrivalTerminal: REC('2', '2026-12-14'),
+    });
+  });
+
+  it('the same flight with its arrival terminal cleared by hand is still the Conflict', () => {
+    const leg = withArrival(makeLeg({}), '2');
+    const cleared = { ...run(makeFlight(), leg), arrivalTerminal: undefined };
+    expect(state(cleared, leg)).toMatchObject({ state: 'conflict', applied: false });
+    expect(shouldApply(cleared, leg)).toBe(false);
+  });
+
+  it('takeAirlinePatch names the hand-edited values a recording take overwrites', () => {
+    const edited = { ...run(makeFlight(), moved), departureTime: '19:00' };
+    const take = takeAirlinePatch(edited, withArrival(moved, '2'), undefined, NOW, COPY);
+    expect(take.recordsAnswer).toBe(true);
+    expect(take.overwrites).toEqual(['departureTime']);
+    expect(take.patch).toMatchObject({
+      departureTime: '18:30',
+      arrivalTerminal: '2',
+      liveArrivalTerminal: REC('2'),
+    });
+    // A pure newer revision over an untouched plan overwrites nothing the family chose.
+    const fresh = takeAirlinePatch(makeFlight(), moved, undefined, NOW, COPY);
+    expect(fresh).toMatchObject({ recordsAnswer: true, overwrites: [] });
+  });
+
+  it('a multi-stop arrival terminal comes from the arrival sector', () => {
+    const sector1 = makeLeg({ number: 'SQ 25', arr: { iata: 'FRA', terminal: '1' } });
+    const sector2 = makeLeg({ number: 'SQ 25', arr: { iata: 'JFK', terminal: '4' } });
+    expect(providerTuple(makeCheck(sector1, { arrivalLeg: sector2 }))?.arrivalTerminal).toBe('4');
+    expect(
+      providerTuple(makeCheck(sector1, { arrivalLeg: null }))?.arrivalTerminal
+    ).toBeUndefined();
   });
 });

@@ -4450,7 +4450,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'beanies.family checks your family’s flights against the airline’s live schedule, so the plan you trust is the plan the airline is running.',
     icon: '✈\u{FE0F}',
     readTime: 4,
-    updatedDate: '2026-11-14',
+    updatedDate: '2026-11-26',
     sections: [
       {
         type: 'paragraph',
@@ -4466,7 +4466,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "Any flight in a trip that has a flight number and a date. A flight is checked <strong>once when you enter or change it</strong>, so a schedule the airline has already moved, or a number that flies a different route, shows up right away. After that, checks begin <strong>three days before departure</strong>. Until then, the flight shows <strong>Checks from</strong> and the date it starts. Once checks are on, beanies looks when you open the app and every so often on the day, and a small chip on the flight tells you how fresh the answer is, such as <strong>Checked 12 min ago</strong>. A small tick in a <strong>Live</strong> pill means the airline's latest answer matches that value; the terminal gets one too when the airline agrees with your plan. If a far-away flight's first check left something unresolved, such as a change that could not be saved or a flight the airline could not find, beanies asks again after a week.",
+          "Any flight in a trip that has a flight number and a date. A flight is checked <strong>once when you enter or change it</strong>, so a schedule the airline has already moved, or a number that flies a different route, shows up right away. After that, checks begin <strong>three days before departure</strong>. Until then, the flight shows <strong>Checks from</strong> and the date it starts. Once checks are on, beanies looks when you open the app and every so often on the day, and a small chip on the flight tells you how fresh the answer is, such as <strong>Checked 12 min ago</strong>. A small tick in a <strong>Live</strong> pill means the airline's latest answer matches that value; each flight shows its <strong>departure terminal</strong> under the departure airport and its <strong>arrival terminal</strong> under the arrival airport, and each gets a Live pill too when the airline agrees with your plan. Both terminals are filled in from the airline and kept current. If a far-away flight's first check left something unresolved, such as a change that could not be saved or a flight the airline could not find, beanies asks again after a week.",
       },
       {
         type: 'heading',
@@ -4574,7 +4574,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          '<strong>Tell Me When a Flight Changes</strong> also covers alerts while the app is closed, on the iPhone and Android apps. When the airline moves a flight, the phone shows a notice even if beanies.family is not open, and the plan itself is updated the next time you open the app. The web app shows changes when you open it. Notices go to every adult in the family, and to a travelling child’s phone. When the notice arrives depends on the airline’s feed, so a delivery time cannot be promised; the change always shows up in the app on your next open.',
+          '<strong>Tell Me When a Flight Changes</strong> also covers alerts while the app is closed, on the iPhone and Android apps. When the airline moves a flight, the phone shows a notice even if beanies.family is not open, and the plan itself is updated the next time you open the app. That notice covers a change of time, date, departure terminal or a cancellation; a changed arrival terminal is shown the next time you open beanies.family. The web app shows changes when you open it. Notices go to every adult in the family, and to a travelling child’s phone. When the notice arrives depends on the airline’s feed, so a delivery time cannot be promised; the change always shows up in the app on your next open.',
       },
       {
         type: 'paragraph',

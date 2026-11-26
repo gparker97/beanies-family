@@ -10,9 +10,19 @@
 
 import type { FlightLeg, ScheduleTuple } from '../../types/flightStatus';
 import type { SegmentLiveState, VacationTravelSegment } from '../../types/models';
+import { normaliseFlightNumber } from './flightNumber';
 
-/** The order every tuple walk uses; `revisionOf` joins in this order. */
-export const TUPLE_FIELDS = [
+/**
+ * The five fields the persisted revision is made of, in the order `revisionOf` joins them.
+ * FROZEN: `liveRevision` in the family file and the Lambda's `sent_rev` are this positional,
+ * unversioned 5-part string, so a sixth part would re-apply every flight once, overwrite hand
+ * edits on Conflict flights and make the shared Lambda push repeats to older devices. The
+ * Lambda's `TUPLE_FIELDS` (`infrastructure/lambda/flight-status/schedule.mjs`) is the twin of
+ * THIS list, not of the client's six-field `TUPLE_FIELDS` (`scheduleParity.test.ts` pins it).
+ * `revisionOf` lists its parts by hand and iterates no list; this one exists for
+ * `classifyDiff`, the notice `pushable` rule and the parity test.
+ */
+export const REVISION_FIELDS = [
   'departureDate',
   'departureTime',
   'terminal',
@@ -20,8 +30,29 @@ export const TUPLE_FIELDS = [
   'arrivalTime',
 ] as const satisfies readonly (keyof ScheduleTuple)[];
 
+/**
+ * Every field a check compares, applies, strikes through and reverts: the revision's five plus
+ * the arrival terminal, which rides beside the revision (recorded as `liveArrivalTerminal`).
+ * Each is also the segment key of the same name (`planChange` / `revertPlan` write by it).
+ */
+export const TUPLE_FIELDS = [
+  ...REVISION_FIELDS,
+  'arrivalTerminal',
+] as const satisfies readonly (keyof ScheduleTuple)[];
+
 /** One schedule field, in `TUPLE_FIELDS` order. */
 export type TupleField = (typeof TUPLE_FIELDS)[number];
+
+/** What kind of value each field holds: how it is compared (`sameField`) and formatted
+ *  (`fillNoteLine`). Total, so a new field fails to compile until it is classified. */
+export const FIELD_KIND: Record<TupleField, 'date' | 'time' | 'terminal'> = {
+  departureDate: 'date',
+  departureTime: 'time',
+  terminal: 'terminal',
+  arrivalDate: 'date',
+  arrivalTime: 'time',
+  arrivalTerminal: 'terminal',
+};
 
 /**
  * Split a provider local time into `YYYY-MM-DD` and `HH:mm`, as written.
@@ -126,6 +157,7 @@ export function tupleFromSegment(
     | 'terminal'
     | 'arrivalDate'
     | 'arrivalTime'
+    | 'arrivalTerminal'
     | 'arrivesNextDay'
   >
 ): ScheduleTuple {
@@ -141,44 +173,51 @@ export function tupleFromSegment(
     terminal: seg.terminal?.trim() || undefined,
     arrivalDate,
     arrivalTime,
+    arrivalTerminal: seg.arrivalTerminal?.trim() || undefined,
   });
 }
 
 /**
  * The provider's schedule. Departure half (and departure terminal, raw) from `leg`; arrival
- * half from `arrivalLeg`, which is `leg` by default (a single-sector flight), the later sector
+ * half (and arrival terminal, raw) from `arrivalLeg`, which is `leg` by default (a single-sector flight), the later sector
  * of a multi-stop number, or `null` when no returned sector reaches the booking's arrival: the
  * arrival half is then undefined, and an undefined provider field is never compared or written.
  * `pickLeg`'s `arrivalLeg` has exactly these semantics, so `tupleFromLeg(m.leg, m.arrivalLeg)`.
+ *
+ * An arrival terminal with no comparison key (`normaliseTerminal` undefined: the bare word
+ * "Terminal") is read as not stated: it has no record (`arrivalTerminalRecord`), so against a
+ * plan with none it would be a Conflict nothing could ever settle. The departure terminal is
+ * read as written (it is part of the revision, which the Lambda restates).
  */
 export function tupleFromLeg(leg: FlightLeg, arrivalLeg: FlightLeg | null = leg): ScheduleTuple {
   const dep = splitLocal(leg.departure.scheduledLocal);
   const arr = arrivalLeg ? splitLocal(arrivalLeg.arrival.scheduledLocal) : null;
+  const arrivalTerminal = arrivalLeg?.arrival.terminal?.trim();
   return compact({
     departureDate: dep?.date,
     departureTime: dep?.time,
     terminal: leg.departure.terminal?.trim() || undefined,
     arrivalDate: arr?.date,
     arrivalTime: arr?.time,
+    arrivalTerminal: normaliseTerminal(arrivalTerminal) !== undefined ? arrivalTerminal : undefined,
   });
 }
 
-/** The values a segment held before the last airline change, as a tuple (drops `at`). */
+/** The values a segment held before the last airline change, as a tuple (drops `at`; `{}` for
+ *  a `liveWas` holding only `at`, which `noticeRevision` relies on). */
 export function tupleFromWas(liveWas: VacationTravelSegment['liveWas']): ScheduleTuple | undefined {
-  if (!liveWas) return undefined;
-  return compact({
-    departureDate: liveWas.departureDate,
-    departureTime: liveWas.departureTime,
-    terminal: liveWas.terminal,
-    arrivalDate: liveWas.arrivalDate,
-    arrivalTime: liveWas.arrivalTime,
-  });
+  return liveWas ? compact(liveWas) : undefined;
 }
 
 function sameField(f: TupleField, a: string | undefined, b: string): boolean {
-  if (f === 'terminal') return normaliseTerminal(a) === normaliseTerminal(b);
-  if (f === 'departureTime' || f === 'arrivalTime') return normaliseTime(a) === normaliseTime(b);
-  return datePart(a) === datePart(b);
+  switch (FIELD_KIND[f]) {
+    case 'terminal':
+      return normaliseTerminal(a) === normaliseTerminal(b);
+    case 'time':
+      return normaliseTime(a) === normaliseTime(b);
+    case 'date':
+      return datePart(a) === datePart(b);
+  }
 }
 
 /**
@@ -223,10 +262,11 @@ export function diffTuple(
 }
 
 /**
- * The canonical revision string persisted as `liveRevision`: the tuple itself, joined in
- * `TUPLE_FIELDS` order with `|`, terminal normalised, `''` for an undefined field
- * ("2026-12-13|18:30|3|2026-12-14|00:40"). Human-readable in the pod, synchronous, no crypto.
- * A terminal that appears later is a new revision, so it applies.
+ * The canonical revision string persisted as `liveRevision`: the tuple's five
+ * `REVISION_FIELDS`, joined in that order with `|`, terminal normalised, `''` for an undefined
+ * field ("2026-12-13|18:30|3|2026-12-14|00:40"). Human-readable in the pod, synchronous, no
+ * crypto. A departure terminal that appears later is a new revision, so it applies. The arrival
+ * terminal is NOT part of it (it is recorded as `liveArrivalTerminal`; see `classifyDiff`).
  *
  * A PERSISTED value: changing this format re-applies every flight once. Never fold it into a
  * shared hash helper (see `src/utils/stableVariant.ts`).
@@ -241,22 +281,101 @@ export function revisionOf(tuple: ScheduleTuple): string {
   ].join('|');
 }
 
-/** The four synced live fields, copied as one unit; undefined when the segment has none. The
- *  ONE place their names are listed outside the model. */
+/**
+ * The `liveArrivalTerminal` record of the airline's arrival terminal on THIS flight:
+ * `<flight number>|<departure day>|<terminal key>` ("SQ318|2026-12-13|2"), from the segment's
+ * number (`normaliseFlightNumber`, '' when it has none), the airline answer's departure day
+ * (`datePart`) and its arrival terminal's comparison key (`normaliseTerminal`). Undefined when
+ * the airline states no arrival terminal with a key, or no departure day (a malformed
+ * `scheduledLocal`): such an answer is never recorded.
+ *
+ * Self-scoping, like `liveRevision` (which embeds the airline's dates and times): a re-booked
+ * flight (a new number, or a new day, whose check answers with that day's leg) holds a record
+ * that no longer matches, so its arrival terminal is owed again (a fill), never the family's
+ * own edit. The day is the AIRLINE's, as in `liveRevision`, not the plan's: "Put it back" of a
+ * moved day restores the old day while the answer stays the same, and must stay a Conflict.
+ * The ONE builder of the record: `classifyDiff`, `planChange` and the store's notice key and
+ * conflict log all go through it. A PERSISTED value.
+ */
+export function arrivalTerminalRecord(
+  seg: Pick<VacationTravelSegment, 'airline' | 'flightNumber'>,
+  provider: Pick<ScheduleTuple, 'departureDate' | 'arrivalTerminal'>
+): string | undefined {
+  const key = normaliseTerminal(provider.arrivalTerminal);
+  const day = datePart(provider.departureDate);
+  if (key === undefined || day === undefined) return undefined;
+  const number = normaliseFlightNumber(seg.airline, seg.flightNumber)?.query ?? '';
+  return `${number}|${day}|${key}`;
+}
+
+/**
+ * How the airline's answer differs from the plan, split by whether the plan has acted on it.
+ * The five `REVISION_FIELDS` are recorded as `liveRevision`, `arrivalTerminal` as
+ * `liveArrivalTerminal` (`arrivalTerminalRecord`), each on its own, so a flight sitting in
+ * Conflict over a hand-edited time still takes the airline's first arrival terminal (only that
+ * field is owed). A differing field already acted on is the family's own edit:
+ *  - `changed`: owed, the plan holds a different value (announced, struck out, revertible);
+ *  - `filled`: owed, the plan holds none (a quiet fill);
+ *  - `contested`: differing, but this answer was already acted on (the Conflict; never
+ *    overwritten).
+ * A provider-undefined field is in none of them (the `diffTuple` rule), so the airline dropping
+ * its arrival terminal owes nothing. All three keep `TUPLE_FIELDS` order.
+ */
+export function classifyDiff(
+  seg: Parameters<typeof tupleFromSegment>[0] &
+    Pick<
+      VacationTravelSegment,
+      'liveRevision' | 'liveArrivalTerminal' | 'airline' | 'flightNumber'
+    >,
+  provider: ScheduleTuple
+): { changed: TupleField[]; filled: TupleField[]; contested: TupleField[] } {
+  const d = diffTuple(tupleFromSegment(seg), provider);
+  const revisionActed = revisionOf(provider) === seg.liveRevision;
+  const owed = (f: TupleField) =>
+    f === 'arrivalTerminal'
+      ? arrivalTerminalRecord(seg, provider) !== seg.liveArrivalTerminal
+      : !revisionActed;
+  const differing = TUPLE_FIELDS.filter((f) => d.changed.includes(f) || d.filled.includes(f));
+  return {
+    changed: d.changed.filter(owed),
+    filled: d.filled.filter(owed),
+    contested: differing.filter((f) => !owed(f)),
+  };
+}
+
+/** The synced live fields, in one list: `pickLiveState` copies exactly these. */
+export const LIVE_STATE_FIELDS = [
+  'liveRevision',
+  'liveArrivalTerminal',
+  'liveWas',
+  'liveAppliedAt',
+  'liveCancelledAt',
+] as const satisfies readonly (keyof SegmentLiveState)[];
+
+type ExpectTrue<T extends true> = T;
+/** Compile-time check, exported only so it is not an unused local: `LIVE_STATE_FIELDS` names
+ *  every `SegmentLiveState` key, so widening the Pick without listing the field here fails to
+ *  compile instead of silently dropping it. */
+export type LiveStateFieldsComplete = ExpectTrue<
+  [Exclude<keyof SegmentLiveState, (typeof LIVE_STATE_FIELDS)[number]>] extends [never]
+    ? true
+    : false
+>;
+
+/**
+ * The five synced live fields, copied as one unit (`liveWas` by value); undefined when the
+ * segment has none. The ONE place their names are listed outside the model. Occurrences get
+ * their live state only through here (`vacation.ts`), so a dropped field would change the bell
+ * and OS notice ids and stop them matching the store's dismiss key.
+ */
 export function pickLiveState(seg: SegmentLiveState): SegmentLiveState | undefined {
-  const { liveRevision, liveWas, liveAppliedAt, liveCancelledAt } = seg;
-  if (
-    liveRevision === undefined &&
-    liveWas === undefined &&
-    liveAppliedAt === undefined &&
-    liveCancelledAt === undefined
-  ) {
-    return undefined;
+  const out: Record<string, unknown> = {};
+  let any = false;
+  for (const f of LIVE_STATE_FIELDS) {
+    const v = seg[f];
+    if (v === undefined) continue;
+    any = true;
+    out[f] = typeof v === 'object' ? { ...v } : v;
   }
-  const out: SegmentLiveState = {};
-  if (liveRevision !== undefined) out.liveRevision = liveRevision;
-  if (liveWas !== undefined) out.liveWas = { ...liveWas };
-  if (liveAppliedAt !== undefined) out.liveAppliedAt = liveAppliedAt;
-  if (liveCancelledAt !== undefined) out.liveCancelledAt = liveCancelledAt;
-  return out;
+  return any ? (out as SegmentLiveState) : undefined;
 }

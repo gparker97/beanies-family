@@ -16,12 +16,13 @@ import type { FamilyMember, VacationTravelSegment } from '@/types/models';
 import * as server from '../../../../infrastructure/lambda/flight-status/schedule.mjs';
 import { desiredAlerts, registrationRev } from '../alerts';
 import { pickLeg } from '../match';
-import { parseUtcMs, revisionOf, tupleFromLeg } from '../schedule';
+import { REVISION_FIELDS, parseUtcMs, revisionOf, tupleFromLeg } from '../schedule';
 import { cancelRevisionOf, CANCELLED_REVISION_SUFFIX } from '../verify';
 import { makeCheck, makeFlight, makeLeg } from './fixtures';
 
 /** The Lambda module, typed at the boundary (plain JS, JSDoc only). */
 const lambda = server as unknown as {
+  TUPLE_FIELDS: readonly string[];
   revisionOf: (t: ScheduleTuple) => string;
   cancelRevisionOf: (t: ScheduleTuple) => string;
   CANCELLED_REVISION_SUFFIX: string;
@@ -59,7 +60,30 @@ const EDGE_TUPLES: ScheduleTuple[] = [
   },
   { arrivalDate: '2026-12-14', arrivalTime: '6:40' },
   { departureDate: 'soon', departureTime: 'later', terminal: '' },
+  // The arrival terminal is not part of the revision, on either side.
+  {
+    departureDate: '2026-12-13',
+    departureTime: '23:05',
+    terminal: '3',
+    arrivalDate: '2026-12-14',
+    arrivalTime: '06:40',
+    arrivalTerminal: 'T2',
+  },
+  { departureDate: '2026-12-13', arrivalTerminal: 'Tom Bradley' },
 ];
+
+/** The part of a client tuple the Lambda knows: its five revision fields. */
+function revisionProjection(tuple: ScheduleTuple): ScheduleTuple {
+  const out: ScheduleTuple = {};
+  for (const f of REVISION_FIELDS) if (tuple[f] !== undefined) out[f] = tuple[f];
+  return out;
+}
+
+describe('the revision fields are the twin of the Lambda tuple', () => {
+  it("the client's REVISION_FIELDS are the Lambda's TUPLE_FIELDS, in order", () => {
+    expect([...REVISION_FIELDS]).toEqual([...lambda.TUPLE_FIELDS]);
+  });
+});
 
 describe('revisionOf / cancelRevisionOf agree byte for byte', () => {
   it.each(EDGE_TUPLES.map((t) => [JSON.stringify(t), t]))('%s', (_label, tuple) => {
@@ -127,6 +151,11 @@ const SCENARIOS: Scenario[] = [
     name: 'no terminal published',
     legs: [makeLeg({ dep: { terminal: undefined } })],
     seg: {},
+  },
+  {
+    name: 'an arrival terminal published (not part of the revision)',
+    legs: [makeLeg({ arr: { terminal: '5' } })],
+    seg: { arrivalTerminal: 'Terminal 5' },
   },
   {
     name: 'multi-stop booked end to end (arrival from the continuation)',
@@ -212,8 +241,9 @@ describe('the server picks the leg this device matched, from the codes it regist
     // Same arrival half: the client's `undefined` (= the leg itself) is the server's `leg`.
     const clientArrival = pick.arrivalLeg === undefined ? pick.leg : pick.arrivalLeg;
     expect(sel!.arrivalLeg).toBe(clientArrival);
+    // The client tuple also carries the arrival terminal, which the Lambda never reads.
     expect(lambda.tupleFromLeg(sel!.leg, sel!.arrivalLeg)).toEqual(
-      tupleFromLeg(pick.leg, pick.arrivalLeg)
+      revisionProjection(tupleFromLeg(pick.leg, pick.arrivalLeg))
     );
     expect(serverRev(sel!)).toBe(spec.rev);
     expect(serverRev(sel!)).toBe(

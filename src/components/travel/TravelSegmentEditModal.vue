@@ -106,6 +106,7 @@ const arrivalDayOffset = ref(0);
 /** 0 → +1 → +2 → 0. One tap cycles, so the control keeps its original footprint. */
 const MAX_ARRIVAL_OFFSET = 2;
 const terminal = ref('');
+const arrivalTerminal = ref('');
 const cruiseLine = ref('');
 const shipName = ref('');
 const departurePort = ref('');
@@ -165,6 +166,7 @@ function buildPayload() {
     // Shadow for pre-update clients, which only understand the boolean.
     arrivesNextDay: arrivalDayOffset.value >= 1,
     terminal: terminal.value,
+    arrivalTerminal: arrivalTerminal.value,
     cruiseLine: cruiseLine.value,
     shipName: shipName.value,
     departurePort: departurePort.value,
@@ -222,6 +224,7 @@ const { isSubmitting, formDiff } = useFormModal<VacationTravelSegment, SegmentPa
         seg.arrivesNextDay ?? false
       );
       terminal.value = seg.terminal ?? '';
+      arrivalTerminal.value = seg.arrivalTerminal ?? '';
       cruiseLine.value = seg.cruiseLine ?? '';
       shipName.value = seg.shipName ?? '';
       departurePort.value = seg.departurePort ?? '';
@@ -259,6 +262,7 @@ const { isSubmitting, formDiff } = useFormModal<VacationTravelSegment, SegmentPa
       arrivalTime.value = '';
       arrivalDayOffset.value = 0;
       terminal.value = '';
+      arrivalTerminal.value = '';
       cruiseLine.value = '';
       shipName.value = '';
       departurePort.value = '';
@@ -793,12 +797,20 @@ async function handleSave() {
                 />
               </FormFieldGroup>
             </div>
-            <FormFieldGroup :label="t('vacation.field.terminal')">
-              <BaseInput
-                v-model="terminal"
-                :placeholder="t('vacation.field.terminalPlaceholder')"
-              />
-            </FormFieldGroup>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <FormFieldGroup :label="t('vacation.field.departureTerminal')">
+                <BaseInput
+                  v-model="terminal"
+                  :placeholder="t('vacation.field.terminalPlaceholder')"
+                />
+              </FormFieldGroup>
+              <FormFieldGroup :label="t('vacation.field.arrivalTerminal')">
+                <BaseInput
+                  v-model="arrivalTerminal"
+                  :placeholder="t('vacation.field.terminalPlaceholder')"
+                />
+              </FormFieldGroup>
+            </div>
             <TravelReminderHint :type="segment?.type" />
           </div>
         </div>

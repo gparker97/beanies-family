@@ -217,7 +217,7 @@ describe('TimelineSegmentCard', () => {
       {
         flight: FLIGHT,
         detailRows: [
-          { label: 'segmentRow.terminal', value: '3', check: 'conflict' },
+          { label: 'vacation.field.departureTerminal', value: '3', check: 'conflict' },
           { label: 'segmentRow.from', value: 'SIN', check: 'confirmed' },
         ],
       },
@@ -227,6 +227,74 @@ describe('TimelineSegmentCard', () => {
       'flightChecks.chip.conflict'
     );
     expect(w.find('.live-pill[data-status="confirmed"]').exists()).toBe(true);
+  });
+
+  it("a flight's two fallback terminal rows render apart, each with its own check", () => {
+    const w = mountCard(
+      {
+        flight: FLIGHT,
+        detailRows: [
+          {
+            label: 'vacation.field.departureTerminal',
+            value: '3',
+            bandField: 'terminal',
+            check: 'confirmed',
+          },
+          {
+            label: 'vacation.field.arrivalTerminal',
+            value: '2',
+            bandField: 'arrivalTerminal',
+            check: 'changed',
+          },
+        ],
+      },
+      { verification: { state: 'changed', checkedAt: 1, applied: false }, nowMs: 2 }
+    );
+    expect(w.text()).toContain('vacation.field.departureTerminal');
+    expect(w.text()).toContain('vacation.field.arrivalTerminal');
+    expect(w.findAll('.live-pill').map((p) => p.attributes('data-status'))).toEqual([
+      'confirmed',
+      'changed',
+    ]);
+  });
+
+  it("hands the band each side's terminal check (bandChecks) beside the cell checks", () => {
+    const tuple = {
+      departureDate: '2026-07-01',
+      departureTime: '07:15',
+      terminal: '3',
+      arrivalTerminal: '2',
+    };
+    const w = mountCard(
+      {
+        flight: FLIGHT,
+        timing: {
+          band: {
+            start: {
+              captionKey: 'segmentRow.departs',
+              date: '2026-07-01',
+              time: '07:15',
+              place: { code: 'SIN', terminal: '3' },
+            },
+          },
+          phase: 'future',
+          isOngoingSpan: false,
+        },
+      },
+      {
+        verification: {
+          state: 'verified',
+          checkedAt: 1,
+          mine: tuple,
+          provider: { ...tuple, arrivalTerminal: '5' },
+        },
+        nowMs: 2,
+      }
+    );
+    expect(w.findComponent({ name: 'SegmentWhenBand' }).props('checks')).toMatchObject({
+      start: 'confirmed',
+      startPlace: 'confirmed',
+    });
   });
 
   it('draws the "live" pill on a live row', () => {

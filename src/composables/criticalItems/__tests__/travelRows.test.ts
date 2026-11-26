@@ -29,6 +29,8 @@ function occ(over: Partial<TravelSegmentOccurrence> = {}): TravelSegmentOccurren
     tripAssigneeIds: ['mum', 'dad', 'kid', 'kid2'],
     airline: 'Singapore Airlines (SQ)',
     flightNumber: 'SQ318',
+    departureAirport: 'Singapore (SIN)',
+    arrivalAirport: 'LHR',
     schedule: { departureDate: '2026-12-13', departureTime: '17:00', terminal: '2' },
     ...over,
   };
@@ -61,7 +63,7 @@ describe('plain departure row', () => {
       id: 'travel-departure:seg-1',
       type: 'travel',
       message: 'Everyone flies at 5pm today',
-      caption: 'SQ318 · Terminal 2 · Checked 12 min ago',
+      caption: 'SQ318 · SIN Terminal 2 · Checked 12 min ago',
       time: '17:00',
       route: { path: '/travel', query: { vacation: 'vac-1' } },
     });
@@ -72,7 +74,49 @@ describe('plain departure row', () => {
       [occ()],
       ctx(mum, { verificationFor: () => verified({ gate: 'B12' }) })
     );
-    expect(row!.caption).toBe('SQ318 · Terminal 2 · Checked 12 min ago · Gate B12');
+    expect(row!.caption).toBe('SQ318 · SIN Terminal 2 · Checked 12 min ago · Gate B12');
+  });
+
+  it('names both places with their terminals: "SIN Terminal 3 → LHR Terminal 2"', () => {
+    const schedule = { departureDate: '2026-12-13', terminal: 'T3', arrivalTerminal: '2' };
+    const [row] = buildTravelBriefingRows([occ({ schedule })], ctx(mum));
+    expect(row!.caption).toBe('SQ318 · SIN Terminal 3 → LHR Terminal 2 · Not checked live');
+  });
+
+  it('a lone arrival terminal is still tied to its airport', () => {
+    const [row] = buildTravelBriefingRows([occ({ schedule: { arrivalTerminal: '2' } })], ctx(mum));
+    expect(row!.caption).toBe('SQ318 · LHR Terminal 2 · Not checked live');
+  });
+
+  it('omits a terminal whose airport is not entered, never showing it bare', () => {
+    const schedule = { terminal: '3', arrivalTerminal: '2' };
+    const [row] = buildTravelBriefingRows(
+      [occ({ departureAirport: undefined, schedule })],
+      ctx(mum)
+    );
+    expect(row!.caption).toBe('SQ318 · LHR Terminal 2 · Not checked live');
+    const [none] = buildTravelBriefingRows(
+      [occ({ departureAirport: undefined, arrivalAirport: undefined, schedule })],
+      ctx(mum)
+    );
+    expect(none!.caption).toBe('SQ318 · Not checked live');
+  });
+
+  it("a cruise's caption keeps its one terminal, unchanged", () => {
+    const [row] = buildTravelBriefingRows(
+      [
+        occ({
+          transportType: 'cruise',
+          airline: undefined,
+          flightNumber: undefined,
+          departureAirport: undefined,
+          arrivalAirport: undefined,
+          schedule: { terminal: '2' },
+        }),
+      ],
+      ctx(mum)
+    );
+    expect(row!.caption).toBe('Terminal 2 · Not checked live');
   });
 
   it('says "Not checked live" for a train, and uses the leaves verb', () => {

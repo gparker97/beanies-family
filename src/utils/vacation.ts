@@ -460,6 +460,10 @@ export interface WhenCell {
   date?: string;
   /** arrival lands the next calendar day (flight/train/ferry) */
   nextDay?: boolean;
+  /** Flights only: the airport (`airportCode`, absent when none is entered) and this side's raw
+   *  terminal. Present on every rendered cell when EITHER side's terminal is known, so the
+   *  side that has none can say so; absent on all cells when neither is (`buildWhenBand`). */
+  place?: { code?: string; terminal?: string };
 }
 
 export interface WhenBand {
@@ -482,6 +486,9 @@ interface TimingCellSpec {
   timeFields?: string[];
   /** boolean model field that, when true, flags a next-day arrival */
   nextDayField?: string;
+  /** Flights only: the airport + terminal fields the cell's place line reads. Set together. */
+  airportField?: string;
+  terminalField?: string;
 }
 interface TimingSpec {
   start: TimingCellSpec;
@@ -492,26 +499,32 @@ interface TimingSpec {
   spanning?: boolean;
 }
 
+/** The departs → arrives cells flights, trains and ferries share (never a multi-day span). */
+const DEPARTS: TimingCellSpec = {
+  captionKey: 'segmentRow.departs',
+  dateFields: ['departureDate'],
+  timeFields: ['departureTime'],
+};
+const ARRIVES: TimingCellSpec = {
+  captionKey: 'segmentRow.arrives',
+  dateFields: ['arrivalDate'],
+  // borrow the departure date for display when arrival lands the same day —
+  // but only decorate an arrival cell that already exists (has a time)
+  fallbackDateFields: ['departureDate'],
+  timeFields: ['arrivalTime'],
+  nextDayField: 'arrivesNextDay',
+};
+
 /** The one place per-kind date/time knowledge lives (see SIDE_FIELDS precedent).
  *  Keyed by a resolved timing key (`resolveTimingKey`), not the raw segment type. */
 const SEGMENT_TIMING: Record<string, TimingSpec> = {
-  // flights + train + ferry: departs → arrives, same-day (never a multi-day span)
-  flightlike: {
-    start: {
-      captionKey: 'segmentRow.departs',
-      dateFields: ['departureDate'],
-      timeFields: ['departureTime'],
-    },
-    second: {
-      captionKey: 'segmentRow.arrives',
-      dateFields: ['arrivalDate'],
-      // borrow the departure date for display when arrival lands the same day —
-      // but only decorate an arrival cell that already exists (has a time)
-      fallbackDateFields: ['departureDate'],
-      timeFields: ['arrivalTime'],
-      nextDayField: 'arrivesNextDay',
-    },
+  // flights: the shared cells, each with its own airport + terminal place line
+  flight: {
+    start: { ...DEPARTS, airportField: 'departureAirport', terminalField: 'terminal' },
+    second: { ...ARRIVES, airportField: 'arrivalAirport', terminalField: 'arrivalTerminal' },
   },
+  // train + ferry: the same departs → arrives shape, no place line
+  flightlike: { start: DEPARTS, second: ARRIVES },
   cruise: {
     start: {
       captionKey: 'segmentRow.embark',
@@ -572,7 +585,7 @@ export function resolveTimingKey(
 ): string {
   if (kind === 'accommodation') return 'accommodation';
   if (kind === 'transportation') return type === 'rental_car' ? 'rental_car' : 'transport';
-  if (type?.startsWith('flight')) return 'flightlike';
+  if (type?.startsWith('flight')) return 'flight';
   if (type === 'cruise') return 'cruise';
   if (type === 'car') return 'car';
   if (type === 'activity') return 'activity';
@@ -654,6 +667,12 @@ export function classifySegmentPhase(
  * `null` when the start cell has neither a date nor a time. A kind with a
  * `second` cell but no second value degrades to a single-cell band. Raw values —
  * `SegmentWhenBand.vue` does the formatting.
+ *
+ * A flight's place lines are all-or-nothing across the RENDERED cells: when none of them has
+ * a terminal, `place` is stripped from all (the band is as it was before terminals); otherwise
+ * each rendered cell keeps its place (an empty terminal reads "not known yet") and its
+ * terminal field is consumed, so the detail row for it drops. A terminal whose cell is not
+ * rendered (a one-cell band) is not consumed and keeps its labelled row.
  */
 export function buildWhenBand(
   kind: 'travel' | 'accommodation' | 'transportation',
@@ -673,17 +692,31 @@ export function buildWhenBand(
     const shown = readField(rec, [...cell.dateFields, ...(cell.fallbackDateFields ?? [])]);
     if (shown.field) consumed.push(shown.field);
     if (tm.field) consumed.push(tm.field);
-    return {
+    const built: WhenCell = {
       captionKey: cell.captionKey,
       date: shown.value ? extractDatePart(shown.value) : undefined,
       time: tm.value,
       nextDay: cell.nextDayField ? rec[cell.nextDayField] === true : undefined,
     };
+    if (cell.airportField && cell.terminalField) {
+      const airport = readField(rec, [cell.airportField]).value;
+      const terminal = readField(rec, [cell.terminalField]).value?.trim();
+      built.place = { code: airportCode(airport) || undefined, terminal: terminal || undefined };
+    }
+    return built;
   };
 
   const start = buildCell(spec.start);
   if (!start) return null;
   const end = spec.second ? buildCell(spec.second) : null;
+  const rendered: [WhenCell, TimingCellSpec][] = [[start, spec.start]];
+  if (end && spec.second) rendered.push([end, spec.second]);
+  // Either terminal known: every rendered place line shows; neither: none does.
+  const anyTerminal = rendered.some(([c]) => !!c.place?.terminal);
+  for (const [c, cell] of rendered) {
+    if (!anyTerminal) delete c.place;
+    else if (c.place && cell.terminalField) consumed.push(cell.terminalField);
+  }
   return { band: end ? { start, end } : { start }, consumed };
 }
 
@@ -1694,7 +1727,11 @@ export interface TravelSegmentOccurrence {
   /** Booking fields the live-flight surfaces (briefing row, bell, OS notice) name the flight by. */
   airline?: string;
   flightNumber?: string;
-  /** The segment's current schedule (departure terminal included), on the DEPARTURE occurrence
+  /** The airports as the booking holds them, so a surface can tie each terminal to its place
+   *  ("SIN Terminal 3 → LHR Terminal 2"); read through `airportCode`. */
+  departureAirport?: string;
+  arrivalAirport?: string;
+  /** The segment's current schedule (both terminals included), on the DEPARTURE occurrence
    *  only: the "now" half of a change sentence ("SQ318 now leaves at 18:30 from Terminal 3"). */
   schedule?: ScheduleTuple;
   /** #143: the segment's synced live-check state (`pickLiveState`), the one recipe the
@@ -1782,6 +1819,8 @@ export function extractSegmentOccurrences(
       tripAssigneeIds,
       airline: seg.airline,
       flightNumber: seg.flightNumber,
+      departureAirport: seg.departureAirport,
+      arrivalAirport: seg.arrivalAirport,
       schedule: side.kind === 'departure' ? tupleFromSegment(seg) : undefined,
       live: pickLiveState(seg),
     });

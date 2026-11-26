@@ -7,8 +7,14 @@ import { mount } from '@vue/test-utils';
 import SegmentWhenBand from '../SegmentWhenBand.vue';
 import type { WhenBand } from '@/utils/vacation';
 
+// Keys echo back, except the templates the place line fills (so the test reads its output).
+const EN = new Map([
+  ['travel.band.from', 'from {code}'],
+  ['travel.band.at', 'at {code}'],
+  ['flightChecks.terminal', 'Terminal {terminal}'],
+]);
 vi.mock('@/composables/useTranslation', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({ t: (k: string) => EN.get(k) ?? k }),
 }));
 
 const BAND: WhenBand = {
@@ -73,5 +79,104 @@ describe('SegmentWhenBand', () => {
       props: { band: BAND, was: { departureTime: '18:30:00' } },
     });
     expect(w.findAll('s')).toHaveLength(0);
+  });
+
+  describe("the place line (a flight's airports and terminals)", () => {
+    const PLACED: WhenBand = {
+      start: { ...BAND.start, place: { code: 'SIN', terminal: '3' } },
+      end: { ...BAND.end!, place: { code: 'LHR', terminal: 'T2' } },
+    };
+
+    it('shows each airport with its own terminal under its cell', () => {
+      const w = mount(SegmentWhenBand, { props: { band: PLACED } });
+      const [start, end] = w.findAll('.when-cell');
+      expect(start!.get('.when-place-cap').text()).toBe('from SIN');
+      expect(start!.get('.when-place-term').text()).toBe('Terminal 3');
+      expect(end!.get('.when-place-cap').text()).toBe('at LHR');
+      expect(end!.get('.when-place-term').text()).toBe('Terminal 2');
+      expect(w.findAll('.when-place-unknown')).toHaveLength(0);
+    });
+
+    it('a named terminal is shown as written', () => {
+      const w = mount(SegmentWhenBand, {
+        props: {
+          band: { ...PLACED, end: { ...PLACED.end!, place: { code: 'LAX', terminal: 'TBIT' } } },
+        },
+      });
+      expect(w.findAll('.when-place-term')[1]!.text()).toBe('TBIT');
+    });
+
+    it('the side with no terminal says it is not known yet', () => {
+      const w = mount(SegmentWhenBand, {
+        props: { band: { ...PLACED, end: { ...PLACED.end!, place: { code: 'LHR' } } } },
+      });
+      const end = w.findAll('.when-cell')[1]!;
+      expect(end.get('.when-place-cap').text()).toBe('at LHR');
+      expect(end.find('.when-place-term').exists()).toBe(false);
+      expect(end.get('.when-place-unknown').text()).toBe('travel.band.terminalUnknown');
+    });
+
+    it('with no airport code, the terminal stands alone under its cell', () => {
+      const w = mount(SegmentWhenBand, {
+        props: { band: { ...PLACED, start: { ...PLACED.start, place: { terminal: '3' } } } },
+      });
+      const start = w.findAll('.when-cell')[0]!;
+      expect(start.find('.when-place-cap').exists()).toBe(false);
+      expect(start.get('.when-place-term').text()).toBe('Terminal 3');
+    });
+
+    it('no place on the band (neither terminal known, or not a flight): no place line', () => {
+      expect(
+        mount(SegmentWhenBand, { props: { band: BAND } })
+          .find('.when-place')
+          .exists()
+      ).toBe(false);
+    });
+
+    it("each terminal carries its own side's check", () => {
+      const w = mount(SegmentWhenBand, {
+        props: { band: PLACED, checks: { startPlace: 'confirmed', endPlace: 'changed' } },
+      });
+      const [start, end] = w.findAll('.when-cell');
+      expect(start!.get('.when-place-term .live-pill').attributes('data-status')).toBe('confirmed');
+      expect(end!.get('.when-place-term .live-pill').attributes('data-status')).toBe('changed');
+      // the date lines carry nothing: their own checks were not given
+      expect(w.findAll('.when-sub .live-pill')).toHaveLength(0);
+    });
+
+    it('strikes a moved terminal on its own line under the live one', () => {
+      const w = mount(SegmentWhenBand, {
+        props: { band: PLACED, was: { arrivalTerminal: '5' } },
+      });
+      const [start, end] = w.findAll('.when-cell');
+      expect(end!.get('.when-place-term').classes()).toContain('is-live');
+      expect(end!.get('.when-place .when-was-line s.when-was').text()).toBe('Terminal 5');
+      expect(start!.find('.when-place .when-was').exists()).toBe(false);
+      expect(end!.get('.when-big').classes()).not.toContain('is-live');
+    });
+
+    it('a was-terminal equal to the live one in another spelling is not struck', () => {
+      const w = mount(SegmentWhenBand, {
+        props: { band: PLACED, was: { terminal: 'Terminal 3', arrivalTerminal: '2' } },
+      });
+      expect(w.findAll('s')).toHaveLength(0);
+      expect(w.findAll('.is-live')).toHaveLength(0);
+    });
+  });
+
+  it('a single-cell band renders one cell and no arrow, as before', () => {
+    const w = mount(SegmentWhenBand, { props: { band: { start: BAND.start } } });
+    expect(w.findAll('.when-cell')).toHaveLength(1);
+    expect(w.find('.when-arrow').exists()).toBe(false);
+    expect(w.get('.when-band').classes()).toContain('when-band--single');
+  });
+
+  it('two cells keep the arrow between them and the "+1 day" mark on the arrival', () => {
+    const w = mount(SegmentWhenBand, { props: { band: BAND } });
+    expect(w.get('.when-band').element.children).toHaveLength(3);
+    expect(w.get('.when-band').element.children[1]!.classList).toContain('when-arrow');
+    const [start, end] = w.findAll('.when-cell');
+    expect(start!.find('.when-nextday').exists()).toBe(false);
+    expect(end!.get('.when-nextday').text()).toBe('travel.timeline.nextDay');
   });
 });

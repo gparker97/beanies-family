@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { FlightLeg } from '@/types/flightStatus';
+import type { FlightLeg, ScheduleTuple } from '@/types/flightStatus';
+import type { SegmentLiveState, VacationTravelSegment } from '@/types/models';
+import { liveNoticeId } from '@/utils/notifications/travel';
 import {
+  FIELD_KIND,
+  LIVE_STATE_FIELDS,
+  REVISION_FIELDS,
+  TUPLE_FIELDS,
+  arrivalTerminalRecord,
+  classifyDiff,
   diffTuple,
   normaliseTerminal,
   parseUtcMs,
@@ -15,7 +23,7 @@ import {
 
 function leg(
   dep: { local: string; terminal?: string; iata?: string },
-  arr: { local: string; iata?: string }
+  arr: { local: string; iata?: string; terminal?: string }
 ): FlightLeg {
   return {
     number: 'SQ 318',
@@ -28,9 +36,32 @@ function leg(
       terminal: dep.terminal,
       quality: [],
     },
-    arrival: { iata: arr.iata ?? 'LHR', scheduledLocal: arr.local, quality: [] },
+    arrival: {
+      iata: arr.iata ?? 'LHR',
+      scheduledLocal: arr.local,
+      terminal: arr.terminal,
+      quality: [],
+    },
   };
 }
+
+describe('the field lists', () => {
+  it('REVISION_FIELDS is the frozen five, in revision order (a persisted format)', () => {
+    expect([...REVISION_FIELDS]).toEqual([
+      'departureDate',
+      'departureTime',
+      'terminal',
+      'arrivalDate',
+      'arrivalTime',
+    ]);
+  });
+
+  it('TUPLE_FIELDS is the five plus the arrival terminal, and every field has a kind', () => {
+    expect([...TUPLE_FIELDS]).toEqual([...REVISION_FIELDS, 'arrivalTerminal']);
+    expect(Object.keys(FIELD_KIND).sort()).toEqual([...TUPLE_FIELDS].sort());
+    expect(FIELD_KIND.arrivalTerminal).toBe('terminal');
+  });
+});
 
 describe('parseUtcMs', () => {
   it('reads a value that names its zone', () => {
@@ -95,6 +126,7 @@ describe('tupleFromSegment', () => {
         terminal: ' Terminal 2 ',
         arrivalDate: '2026-12-14',
         arrivalTime: '05:40:00',
+        arrivalTerminal: ' 5 ',
       })
     ).toEqual({
       departureDate: '2026-12-13',
@@ -102,7 +134,9 @@ describe('tupleFromSegment', () => {
       terminal: 'Terminal 2',
       arrivalDate: '2026-12-14',
       arrivalTime: '05:40',
+      arrivalTerminal: '5',
     });
+    expect('arrivalTerminal' in tupleFromSegment({ arrivalTerminal: '  ' })).toBe(false);
   });
 
   it('derives a missing arrival date from arrivesNextDay (legacy segments)', () => {
@@ -124,7 +158,7 @@ describe('tupleFromLeg', () => {
     { local: '2026-12-14 05:40+00:00' }
   );
 
-  it('splits departure and arrival local times and keeps the raw terminal', () => {
+  it('splits departure and arrival local times and keeps the raw terminals', () => {
     expect(tupleFromLeg(l1)).toEqual({
       departureDate: '2026-12-13',
       departureTime: '23:05',
@@ -132,20 +166,35 @@ describe('tupleFromLeg', () => {
       arrivalDate: '2026-12-14',
       arrivalTime: '05:40',
     });
-  });
-
-  it('takes the arrival half from a later sector of a multi-stop number', () => {
-    const l2 = leg(
-      { local: '2026-12-14 08:00+01:00', iata: 'FRA' },
-      { local: '2026-12-14 11:10-05:00', iata: 'JFK' }
+    const withArrival = leg(
+      { local: '2026-12-13 23:05+08:00', terminal: '3' },
+      { local: '2026-12-14 05:40+00:00', terminal: ' T2 ' }
     );
-    expect(tupleFromLeg(l1, l2)).toMatchObject({ arrivalDate: '2026-12-14', arrivalTime: '11:10' });
+    expect(tupleFromLeg(withArrival).arrivalTerminal).toBe('T2');
   });
 
-  it('leaves the arrival half undefined when arrivalLeg is null', () => {
-    const t = tupleFromLeg(l1, null);
+  it('takes the arrival half, terminal included, from a later sector of a multi-stop number', () => {
+    const l2 = leg(
+      { local: '2026-12-14 08:00+01:00', iata: 'FRA', terminal: '1' },
+      { local: '2026-12-14 11:10-05:00', iata: 'JFK', terminal: '4' }
+    );
+    expect(tupleFromLeg(l1, l2)).toMatchObject({
+      terminal: '3',
+      arrivalDate: '2026-12-14',
+      arrivalTime: '11:10',
+      arrivalTerminal: '4',
+    });
+  });
+
+  it('leaves the arrival half (and its terminal) undefined when arrivalLeg is null', () => {
+    const withArrival = leg(
+      { local: '2026-12-13 23:05+08:00', terminal: '3' },
+      { local: '2026-12-14 05:40+00:00', terminal: '2' }
+    );
+    const t = tupleFromLeg(withArrival, null);
     expect(t.arrivalDate).toBeUndefined();
     expect(t.arrivalTime).toBeUndefined();
+    expect(t.arrivalTerminal).toBeUndefined();
     expect(t.departureTime).toBe('23:05');
   });
 
@@ -160,6 +209,10 @@ describe('tupleFromWas', () => {
     expect(
       tupleFromWas({ departureTime: '17:00', terminal: '2', at: '2026-12-10T00:00:00Z' })
     ).toEqual({ departureTime: '17:00', terminal: '2' });
+    expect(tupleFromWas({ arrivalTerminal: '2', at: '2026-12-10T00:00:00Z' })).toEqual({
+      arrivalTerminal: '2',
+    });
+    expect(tupleFromWas({ at: '2026-12-10T00:00:00Z' })).toEqual({});
     expect(tupleFromWas(undefined)).toBeUndefined();
   });
 });
@@ -180,16 +233,18 @@ describe('tuplesEqual', () => {
     ).toBe(true);
   });
 
-  it.each(['departureDate', 'departureTime', 'terminal', 'arrivalDate', 'arrivalTime'] as const)(
-    'a different %s is a difference',
-    (field) => {
-      const changed = {
-        ...mine,
-        [field]: field.endsWith('Date') ? '2026-12-15' : field === 'terminal' ? '2' : '18:30',
-      };
-      expect(tuplesEqual(mine, changed)).toBe(false);
+  it.each(TUPLE_FIELDS)('a different %s is a difference', (field) => {
+    const other = { date: '2026-12-15', time: '18:30', terminal: '9' }[FIELD_KIND[field]];
+    expect(tuplesEqual({ ...mine, arrivalTerminal: '2' }, { ...mine, [field]: other })).toBe(false);
+  });
+
+  it('both terminals compare across spellings (never a date comparison)', () => {
+    for (const f of ['terminal', 'arrivalTerminal'] as const) {
+      expect(tuplesEqual({ [f]: 'T2' }, { [f]: 'Terminal 2' })).toBe(true);
+      expect(diffTuple({ [f]: '2' }, { [f]: 't 2' })).toEqual({ changed: [], filled: [] });
+      expect(diffTuple({ [f]: '2' }, { [f]: '3' }).changed).toEqual([f]);
     }
-  );
+  });
 
   it('skips a field the provider leaves undefined (never erases the family terminal)', () => {
     const { terminal: _t, arrivalDate: _d, arrivalTime: _a, ...provider } = mine;
@@ -290,6 +345,36 @@ describe('revisionOf', () => {
     expect(after).not.toBe(before);
   });
 
+  it('ignores the arrival terminal: byte-identical with or without it', () => {
+    const tuples: ScheduleTuple[] = [
+      {},
+      { departureDate: '2026-12-13', departureTime: '18:30' },
+      {
+        departureDate: '2026-12-13',
+        departureTime: '18:30',
+        terminal: 'Terminal 3',
+        arrivalDate: '2026-12-14',
+        arrivalTime: '00:40',
+      },
+      { arrivalDate: '2026-12-14', arrivalTime: '6:40' },
+    ];
+    for (const tuple of tuples) {
+      for (const arrivalTerminal of ['2', 'T5', 'Tom Bradley', '']) {
+        expect(revisionOf({ ...tuple, arrivalTerminal })).toBe(revisionOf(tuple));
+      }
+    }
+    expect(
+      revisionOf({
+        departureDate: '2026-12-13',
+        departureTime: '18:30',
+        terminal: '3',
+        arrivalDate: '2026-12-14',
+        arrivalTime: '00:40',
+        arrivalTerminal: '2',
+      })
+    ).toBe('2026-12-13|18:30|3|2026-12-14|00:40');
+  });
+
   it('the leg and the segment holding the same schedule share one revision', () => {
     const l = leg(
       { local: '2026-12-13 23:05+08:00', terminal: '3' },
@@ -311,10 +396,11 @@ describe('pickLiveState', () => {
     expect(pickLiveState({})).toBeUndefined();
   });
 
-  it('copies exactly the four live fields, liveWas by value', () => {
-    const liveWas = { departureTime: '17:00', at: '2026-12-10T00:00:00Z' };
+  it('copies exactly the five live fields, liveWas by value', () => {
+    const liveWas = { departureTime: '17:00', arrivalTerminal: '2', at: '2026-12-10T00:00:00Z' };
     const seg = {
       liveRevision: 'r',
+      liveArrivalTerminal: '3',
       liveWas,
       liveAppliedAt: '2026-12-10T00:00:00Z',
       liveCancelledAt: '2026-12-11T00:00:00Z',
@@ -323,10 +409,216 @@ describe('pickLiveState', () => {
     const out = pickLiveState(seg);
     expect(out).toEqual({
       liveRevision: 'r',
+      liveArrivalTerminal: '3',
       liveWas,
       liveAppliedAt: '2026-12-10T00:00:00Z',
       liveCancelledAt: '2026-12-11T00:00:00Z',
     });
     expect(out!.liveWas).not.toBe(liveWas);
+    expect(Object.keys(out!).sort()).toEqual([...LIVE_STATE_FIELDS].sort());
+  });
+
+  it('a segment holding only the arrival terminal record is not empty', () => {
+    expect(pickLiveState({ liveArrivalTerminal: '2' })).toEqual({ liveArrivalTerminal: '2' });
+  });
+
+  it("the occurrence's live state gives the segment's own notice id (bell, OS, dismiss key)", () => {
+    const seg: SegmentLiveState = {
+      liveRevision: '2026-12-13|17:00|2|2026-12-13|23:10',
+      liveArrivalTerminal: '3',
+      liveWas: { arrivalTerminal: '2', at: '2026-12-12T08:48:00.000Z' },
+      liveAppliedAt: '2026-12-12T08:48:00.000Z',
+    };
+    const id = liveNoticeId('seg-1', seg);
+    expect(id).toBe('travel-change:seg-1:2026-12-13|17:00|2|2026-12-13|23:10~3');
+    expect(liveNoticeId('seg-1', pickLiveState(seg))).toBe(id);
+  });
+});
+
+describe('classifyDiff: which differences the plan still owes the airline', () => {
+  /** The booked flight, as `makeFlight()` holds it. */
+  const plan = {
+    departureDate: '2026-12-13',
+    departureTime: '17:00',
+    terminal: 'Terminal 2',
+    arrivalDate: '2026-12-13',
+    arrivalTime: '23:10',
+  };
+  const REV = revisionOf(plan);
+  const seg = (over: Partial<VacationTravelSegment> = {}) => ({
+    airline: 'Singapore Airlines (SQ)',
+    flightNumber: 'SQ318',
+    ...plan,
+    ...over,
+  });
+  /** The record of SQ318's arrival terminal on the booked day. */
+  const rec = (terminal: string) => `SQ318|2026-12-13|${terminal}`;
+
+  it('a first answer owes every difference: a move is changed, a value the plan lacks is filled', () => {
+    expect(classifyDiff(seg(), { ...plan, departureTime: '18:30', arrivalTerminal: '2' })).toEqual({
+      changed: ['departureTime'],
+      filled: ['arrivalTerminal'],
+      contested: [],
+    });
+  });
+
+  it('an existing flight with a 5-part revision and no arrival terminal owes only the fill', () => {
+    expect(classifyDiff(seg({ liveRevision: REV }), { ...plan, arrivalTerminal: '2' })).toEqual({
+      changed: [],
+      filled: ['arrivalTerminal'],
+      contested: [],
+    });
+  });
+
+  it('(a) a Conflict over a hand-edited time still takes its first arrival terminal', () => {
+    expect(
+      classifyDiff(seg({ liveRevision: REV, departureTime: '19:00' }), {
+        ...plan,
+        arrivalTerminal: '2',
+      })
+    ).toEqual({ changed: [], filled: ['arrivalTerminal'], contested: ['departureTime'] });
+  });
+
+  it('(b) the airline dropping its arrival terminal owes nothing', () => {
+    expect(
+      classifyDiff(
+        seg({ liveRevision: REV, arrivalTerminal: '2', liveArrivalTerminal: rec('2') }),
+        plan
+      )
+    ).toEqual({ changed: [], filled: [], contested: [] });
+  });
+
+  it('(c) a reverted arrival terminal stays contested when the departure time later moves', () => {
+    expect(
+      classifyDiff(
+        seg({ liveRevision: REV, arrivalTerminal: '2', liveArrivalTerminal: rec('3') }),
+        {
+          ...plan,
+          departureTime: '18:30',
+          arrivalTerminal: 'T3',
+        }
+      )
+    ).toEqual({ changed: ['departureTime'], filled: [], contested: ['arrivalTerminal'] });
+  });
+
+  it('a moved arrival terminal is owed until it is recorded, whatever the revision says', () => {
+    const recorded = seg({
+      liveRevision: REV,
+      arrivalTerminal: '2',
+      liveArrivalTerminal: rec('2'),
+    });
+    expect(classifyDiff(recorded, { ...plan, arrivalTerminal: '3' })).toEqual({
+      changed: ['arrivalTerminal'],
+      filled: [],
+      contested: [],
+    });
+    expect(
+      classifyDiff(
+        { ...recorded, arrivalTerminal: '3', liveArrivalTerminal: rec('3') },
+        {
+          ...plan,
+          arrivalTerminal: 'Terminal 3',
+        }
+      )
+    ).toEqual({ changed: [], filled: [], contested: [] });
+  });
+
+  it('a hand edit of a recorded arrival terminal is the Conflict', () => {
+    expect(
+      classifyDiff(
+        seg({ liveRevision: REV, arrivalTerminal: '5', liveArrivalTerminal: rec('2') }),
+        {
+          ...plan,
+          arrivalTerminal: '2',
+        }
+      )
+    ).toEqual({ changed: [], filled: [], contested: ['arrivalTerminal'] });
+  });
+
+  it('for the five revision fields it is the old rule: owed exactly when the revision differs', () => {
+    const provider = { ...plan, departureTime: '18:30', terminal: '3' };
+    const owed = classifyDiff(seg(), provider);
+    expect(owed).toEqual({ changed: ['departureTime', 'terminal'], filled: [], contested: [] });
+    const acted = classifyDiff(seg({ liveRevision: revisionOf(provider) }), provider);
+    expect(acted).toEqual({ changed: [], filled: [], contested: ['departureTime', 'terminal'] });
+  });
+});
+
+describe('arrivalTerminalRecord: the arrival terminal, scoped to the flight', () => {
+  const flight = { airline: 'Singapore Airlines (SQ)', flightNumber: 'SQ 0318' };
+
+  it("the segment's number, the airline's day and the terminal key", () => {
+    expect(
+      arrivalTerminalRecord(flight, { departureDate: '2026-12-13', arrivalTerminal: 'Terminal 2' })
+    ).toBe('SQ318|2026-12-13|2');
+    expect(
+      arrivalTerminalRecord(flight, { departureDate: '2026-12-13', arrivalTerminal: 'T2' })
+    ).toBe(arrivalTerminalRecord(flight, { departureDate: '2026-12-13', arrivalTerminal: '2' }));
+    expect(arrivalTerminalRecord({}, { departureDate: '2026-12-13', arrivalTerminal: '2' })).toBe(
+      '|2026-12-13|2'
+    );
+  });
+
+  it('a new number or day is a new record', () => {
+    const base = arrivalTerminalRecord(flight, {
+      departureDate: '2026-12-13',
+      arrivalTerminal: '2',
+    });
+    expect(
+      arrivalTerminalRecord(
+        { ...flight, flightNumber: 'SQ322' },
+        { departureDate: '2026-12-13', arrivalTerminal: '2' }
+      )
+    ).not.toBe(base);
+    expect(
+      arrivalTerminalRecord(flight, { departureDate: '2026-12-14', arrivalTerminal: '2' })
+    ).not.toBe(base);
+  });
+
+  it('undefined with no terminal key, or no departure day', () => {
+    for (const arrivalTerminal of [undefined, '', 'Terminal']) {
+      expect(
+        arrivalTerminalRecord(flight, { departureDate: '2026-12-13', arrivalTerminal })
+      ).toBeUndefined();
+    }
+    expect(arrivalTerminalRecord(flight, { arrivalTerminal: '2' })).toBeUndefined();
+  });
+});
+
+describe('tupleFromLeg: an arrival terminal with no key is not stated', () => {
+  const terminals = (dep: string, arr: string) =>
+    tupleFromLeg(
+      leg(
+        { local: '2026-12-13 17:00+08:00', terminal: dep },
+        { local: '2026-12-13 23:10+00:00', terminal: arr }
+      )
+    );
+
+  it('the bare word "Terminal" on arrival is read as no arrival terminal', () => {
+    expect(terminals('2', 'Terminal').arrivalTerminal).toBeUndefined();
+    expect(terminals('2', ' terminal ').arrivalTerminal).toBeUndefined();
+    expect(terminals('2', 'T2').arrivalTerminal).toBe('T2');
+  });
+
+  it('so an untouched plan with none owes and contests nothing', () => {
+    const plan = {
+      airline: 'Singapore Airlines (SQ)',
+      flightNumber: 'SQ318',
+      departureDate: '2026-12-13',
+      departureTime: '17:00',
+      terminal: '2',
+      arrivalDate: '2026-12-13',
+      arrivalTime: '23:10',
+    };
+    const provider = terminals('2', 'Terminal');
+    expect(classifyDiff({ ...plan, liveRevision: revisionOf(provider) }, provider)).toEqual({
+      changed: [],
+      filled: [],
+      contested: [],
+    });
+  });
+
+  it('the departure terminal is read as written (it is part of the revision)', () => {
+    expect(terminals('Terminal', '2').terminal).toBe('Terminal');
   });
 });

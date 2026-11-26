@@ -1,9 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { buildTravelKeyValue, travelDetailRows } from '@/composables/useVacationTimeline';
-import type { VacationTravelSegment } from '@/types/models';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { setActivePinia, createPinia } from 'pinia';
+import { computed, ref } from 'vue';
+import {
+  buildTravelKeyValue,
+  travelDetailRows,
+  useVacationTimeline,
+} from '@/composables/useVacationTimeline';
+import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 
-// Locks the `terminal` field display (#30 follow-up): terminal is key info and must surface
-// both on the collapsed summary line AND in the expanded dropdown details, for flights + cruises.
+// Locks the terminal display (#30 follow-up; departure + arrival terminals 2026-11-26): a
+// terminal is key info and must surface on the collapsed summary line AND in the expanded
+// card, for flights + cruises. A flight's terminal is never shown bare: the summary ties it to
+// its airport, and the card shows it in the band's place line, or as a labelled row when the
+// band cannot (undated, one-cell band).
 
 function flight(overrides: Partial<VacationTravelSegment> = {}): VacationTravelSegment {
   return {
@@ -39,18 +48,43 @@ function cruise(overrides: Partial<VacationTravelSegment> = {}): VacationTravelS
 
 describe('terminal display', () => {
   describe('collapsed summary — buildTravelKeyValue', () => {
-    it('appends the flight terminal when present', () => {
-      expect(buildTravelKeyValue(flight({ terminal: 'Terminal 1' }))).toContain('Terminal 1');
+    it('ties each flight terminal to its airport: "SIN T3 → PVG T2"', () => {
+      expect(buildTravelKeyValue(flight({ terminal: '3', arrivalTerminal: 'Terminal 2' }))).toBe(
+        'MU 5678 · 6 jun · 9am · SIN T3 → PVG T2'
+      );
     });
 
-    it('appends the cruise terminal when present', () => {
-      expect(buildTravelKeyValue(cruise({ terminal: 'Cruise Terminal A' }))).toContain(
-        'Cruise Terminal A'
+    it('shows only the known side, never a bare terminal', () => {
+      const dep = buildTravelKeyValue(flight({ terminal: 'T1' }));
+      expect(dep).toContain('SIN T1');
+      expect(dep).not.toContain('→ PVG');
+      const arr = buildTravelKeyValue(flight({ arrivalTerminal: '2' }));
+      expect(arr).toContain('PVG T2');
+      expect(arr).not.toContain('SIN');
+    });
+
+    it('keeps a named terminal as written', () => {
+      expect(
+        buildTravelKeyValue(flight({ arrivalAirport: 'LAX', arrivalTerminal: 'TBIT' }))
+      ).toContain('LAX TBIT');
+    });
+
+    it('omits a terminal whose airport is not entered', () => {
+      const summary = buildTravelKeyValue(
+        flight({ departureAirport: undefined, terminal: '3', arrivalTerminal: '2' })
+      );
+      expect(summary).toContain('PVG T2');
+      expect(summary).not.toMatch(/T3|→/);
+    });
+
+    it('appends the cruise terminal as before', () => {
+      expect(buildTravelKeyValue(cruise({ terminal: 'Cruise Terminal A' }))).toBe(
+        'Wonder of the Seas · 1 jul – 8 jul · Cruise Terminal A'
       );
     });
 
     it('omits the terminal segment when absent', () => {
-      expect(buildTravelKeyValue(flight())).not.toContain('Terminal');
+      expect(buildTravelKeyValue(flight())).not.toMatch(/T\d|Terminal|→/);
     });
 
     it('shows the departure time but not the arrival time (space is at a premium)', () => {
@@ -66,26 +100,111 @@ describe('terminal display', () => {
     // unchanged so the row assertions stay readable.
     const t = ((k: string) => k) as unknown as Parameters<typeof travelDetailRows>[1];
 
-    it('adds a read-only terminal row for flights', () => {
-      const row = travelDetailRows(flight({ terminal: 'Terminal 2' }), t).find(
-        (r) => r.label === 'segmentRow.terminal'
-      );
-      expect(row).toEqual({ label: 'segmentRow.terminal', value: 'Terminal 2' });
-      // read-only: no inline-edit field binding
-      expect(row?.field).toBeUndefined();
+    it('adds two labelled, read-only terminal rows for flights', () => {
+      const rows = travelDetailRows(flight({ terminal: 'Terminal 3', arrivalTerminal: '2' }), t);
+      expect(rows.find((r) => r.label === 'vacation.field.departureTerminal')).toEqual({
+        label: 'vacation.field.departureTerminal',
+        value: 'Terminal 3',
+        bandField: 'terminal',
+        check: undefined,
+      });
+      expect(rows.find((r) => r.label === 'vacation.field.arrivalTerminal')).toEqual({
+        label: 'vacation.field.arrivalTerminal',
+        value: '2',
+        bandField: 'arrivalTerminal',
+        check: undefined,
+      });
+      // read-only: no inline-edit field binding, and no unlabelled "Terminal" row
+      expect(rows.some((r) => r.label === 'segmentRow.terminal')).toBe(false);
+      expect(rows.filter((r) => r.bandField).every((r) => r.field === undefined)).toBe(true);
     });
 
-    it('adds a read-only terminal row for cruises', () => {
+    it('pushes each terminal row only when its value exists', () => {
+      const rows = travelDetailRows(flight({ arrivalTerminal: '2' }), t);
+      expect(rows.map((r) => r.bandField).filter(Boolean)).toEqual(['arrivalTerminal']);
+    });
+
+    it('adds a read-only terminal row for cruises, unchanged', () => {
       const row = travelDetailRows(cruise({ terminal: 'Cruise Terminal A' }), t).find(
         (r) => r.label === 'segmentRow.terminal'
       );
       expect(row).toEqual({ label: 'segmentRow.terminal', value: 'Cruise Terminal A' });
     });
 
-    it('omits the terminal row when absent', () => {
-      expect(travelDetailRows(flight(), t).some((r) => r.label === 'segmentRow.terminal')).toBe(
-        false
+    it('omits the terminal rows when absent', () => {
+      expect(travelDetailRows(flight(), t).some((r) => /erminal/.test(r.label))).toBe(false);
+    });
+  });
+
+  describe("the band is the terminals' home; the labelled rows are its fallback", () => {
+    beforeEach(() => setActivePinia(createPinia()));
+
+    const itemFor = (seg: VacationTravelSegment) => {
+      const vacation = {
+        id: 'trip-1',
+        name: 'Test trip',
+        assigneeIds: [],
+        ideas: [],
+        travelSegments: [seg],
+        accommodations: [],
+        transportation: [],
+      } as unknown as FamilyVacation;
+      const { timelineItems } = useVacationTimeline(
+        computed(() => vacation),
+        ref('2026-06-01')
       );
+      return timelineItems.value[0]!;
+    };
+    const terminalRows = (seg: VacationTravelSegment) =>
+      itemFor(seg)
+        .detailRows.filter((r) => r.bandField)
+        .map((r) => r.bandField);
+
+    it('drops both terminal rows when the band shows them', () => {
+      const seg = flight({ terminal: '3', arrivalTerminal: '2' });
+      expect(itemFor(seg).timing?.band.end?.place).toEqual({ code: 'PVG', terminal: '2' });
+      expect(terminalRows(seg)).toEqual([]);
+    });
+
+    it('drops a known terminal while the other side reads "not known yet" in the band', () => {
+      const seg = flight({ terminal: '3' });
+      expect(itemFor(seg).timing?.band.end?.place).toEqual({ code: 'PVG' });
+      expect(terminalRows(seg)).toEqual([]);
+    });
+
+    it('an undated flight has no band and keeps both labelled rows', () => {
+      const seg = flight({
+        terminal: '3',
+        arrivalTerminal: '2',
+        departureDate: undefined,
+        departureTime: undefined,
+        arrivalTime: undefined,
+        sortDate: undefined,
+      });
+      const item = itemFor(seg);
+      expect(item.timing).toBeUndefined();
+      expect(terminalRows(seg)).toEqual(['terminal', 'arrivalTerminal']);
+    });
+
+    it('a one-cell band keeps only the "Arrival Terminal" row', () => {
+      const seg = flight({ terminal: '3', arrivalTerminal: '2', arrivalTime: undefined });
+      const item = itemFor(seg);
+      expect(item.timing?.band.end).toBeUndefined();
+      expect(item.timing?.band.start.place).toEqual({ code: 'SIN', terminal: '3' });
+      expect(terminalRows(seg)).toEqual(['arrivalTerminal']);
+    });
+
+    it('a one-cell band with only the arrival terminal shows no place line and keeps its row', () => {
+      const seg = flight({ arrivalTerminal: '2', arrivalTime: undefined });
+      const item = itemFor(seg);
+      expect(item.timing?.band.start.place).toBeUndefined();
+      expect(terminalRows(seg)).toEqual(['arrivalTerminal']);
+    });
+
+    it('a cruise keeps its Terminal row beside its band', () => {
+      const item = itemFor(cruise({ terminal: 'Cruise Terminal A' }));
+      expect(item.timing?.band.start.place).toBeUndefined();
+      expect(item.detailRows.some((r) => r.value === 'Cruise Terminal A')).toBe(true);
     });
   });
 });

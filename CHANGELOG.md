@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-11-26
 
+### Added
+
+- A flight in Travel Plans now shows its departure terminal and its arrival terminal separately, each under its own airport, so one is never mistaken for the other. Live flight checks fill in and keep both current, and magic beans read both from a booking.
+
 ### Changed
 
 - The Android and iOS apps now ask anyone on a version older than 1.7 to update (a prompt that can be dismissed).

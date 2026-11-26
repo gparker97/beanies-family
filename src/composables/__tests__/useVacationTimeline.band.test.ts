@@ -26,6 +26,20 @@ function makeVacation(): FamilyVacation {
         departureDate: '2026-08-01',
         departureTime: '09:15',
         arrivalTime: '17:30',
+        terminal: '1',
+        arrivalTerminal: '3',
+      },
+      {
+        id: 'train',
+        type: 'train',
+        title: 'Tokyo → Kyoto',
+        status: 'booked',
+        operator: 'JR Central',
+        departureAirport: 'Tokyo',
+        terminal: '9',
+        departureDate: '2026-08-07',
+        departureTime: '08:00',
+        arrivalTime: '10:15',
       },
     ],
     accommodations: [
@@ -71,6 +85,21 @@ describe('useVacationTimeline — when-band + phase', () => {
     expect(fields).not.toContain('arrivalTime');
     // non-date rows survive (flight # stays inline-editable)
     expect(fields).toContain('flightNumber');
+  });
+
+  it('flight: each cell carries its airport + terminal place line, and the terminal rows drop', () => {
+    const flight = run().by('flight-past');
+    expect(flight.timing?.band.start.place).toEqual({ code: 'SIN', terminal: '1' });
+    expect(flight.timing?.band.end?.place).toEqual({ code: 'NRT', terminal: '3' });
+    expect(flight.detailRows.some((r) => r.bandField)).toBe(false);
+  });
+
+  it('train: the band is unchanged (no place line), whatever fields it carries', () => {
+    const train = run().by('train');
+    expect(train.timing?.band).toEqual({
+      start: { captionKey: 'segmentRow.departs', date: '2026-08-07', time: '08:00' },
+      end: { captionKey: 'segmentRow.arrives', date: '2026-08-07', time: '10:15', nextDay: false },
+    });
   });
 
   it('a fully-past flight is phase "past", not ongoing', () => {

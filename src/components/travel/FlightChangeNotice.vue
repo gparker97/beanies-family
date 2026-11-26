@@ -37,6 +37,7 @@ import {
   changedByLine,
   checkedAgo,
   conflictSentence,
+  joinSentences,
 } from '@/utils/flightStatus/copy';
 
 const props = defineProps<{
@@ -143,11 +144,9 @@ const view = computed<{
       );
       const ref = props.segment.bookingReference?.trim();
       const still = ref ? fillTemplate(t('travel.live.bookingStillHere'), { ref }) : '';
-      // Chinese sentences end on a full-width stop and are not space-separated.
-      const sep = /[。！？]$/.test(lead) ? '' : ' ';
       return {
         tone: 'red',
-        lead: still ? `${lead}${sep}${still}` : lead,
+        lead: joinSentences(lead, still),
         note,
         meta: v.checkedAt !== undefined ? checkedAgo(t, v.checkedAt, props.nowMs) : '',
         action: null,

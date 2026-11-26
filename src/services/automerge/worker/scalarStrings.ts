@@ -267,6 +267,7 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'pinHash',
   'accountEmail',
   // hashes and tokens, machine-written and replaced whole
+  'liveArrivalTerminal', // a live check's arrival-terminal record ("SQ318|2026-12-13|2")
   'fingerprint',
   'importFingerprint',
   'lastPushedHash',
@@ -331,6 +332,7 @@ export const TEXT_FIELDS: ReadonlySet<string> = new Set([
   'operator',
   'route',
   'terminal',
+  'arrivalTerminal',
   'departureStation',
   'arrivalStation',
   'roomType',

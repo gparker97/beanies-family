@@ -11460,6 +11460,8 @@ const STRING_DEFS = {
   'vacation.field.departurePort': { en: 'Departure Port', beanie: 'departure port' },
   'vacation.field.cabinNumber': { en: 'Cabin Number', beanie: 'cabin number' },
   'vacation.field.terminal': { en: 'Terminal', beanie: 'terminal' },
+  'vacation.field.departureTerminal': { en: 'Departure Terminal', beanie: 'departure terminal' },
+  'vacation.field.arrivalTerminal': { en: 'Arrival Terminal', beanie: 'arrival terminal' },
   'vacation.field.terminalPlaceholder': {
     en: 'e.g. Terminal 1',
     beanie: 'e.g. terminal 1',
@@ -11890,6 +11892,13 @@ const STRING_DEFS = {
   'travel.timeline.stayingNow': { en: 'Staying now', beanie: 'staying now' },
   'travel.timeline.until': { en: 'until {date}', beanie: 'until {date}' },
   'travel.timeline.nextDay': { en: '+1 day', beanie: '+1 day' },
+  // A flight's "when" band: the place line under each cell ("from SIN" · "Terminal 3").
+  'travel.band.from': { en: 'from {code}', beanie: 'from {code}' },
+  'travel.band.at': { en: 'at {code}', beanie: 'at {code}' },
+  'travel.band.terminalUnknown': {
+    en: 'Terminal not known yet',
+    beanie: 'terminal not known yet',
+  },
 
   // PWA re-install notice (shown to users bounced in from the pre-cutover PWA shell)
   'pwaReinstall.title': { en: 'Quick Re-install Needed', beanie: 'quick re-install needed' },
@@ -15987,6 +15996,7 @@ const STRING_DEFS = {
   // Live flight checks (#143). Changes to a booked plan are an important surface: the beanie
   // values keep the real nouns (flight, plan, airline). Built by utils/flightStatus/copy.ts.
   'flightChecks.terminal': { en: 'Terminal {terminal}', beanie: 'terminal {terminal}' },
+  'flightChecks.place': { en: '{code} {terminal}', beanie: '{code} {terminal}' },
   'flightChecks.theAirline': { en: 'the airline', beanie: 'the airline' },
   'flightChecks.change.leaves': {
     en: '{flight} now leaves at {time}.',
@@ -16016,6 +16026,14 @@ const STRING_DEFS = {
     en: '{flight} now lands on {date} at {time}.',
     beanie: '{flight} now lands on {date} at {time}.',
   },
+  'flightChecks.change.arrivesTerminal': {
+    en: '{flight} now arrives at {terminal}.',
+    beanie: '{flight} now arrives at {terminal}.',
+  },
+  'flightChecks.change.arrivalTerminalMoved': {
+    en: "{flight}'s arrival terminal changed.",
+    beanie: "{flight}'s arrival terminal changed.",
+  },
   'flightChecks.change.updated': {
     en: 'Your plan has been updated.',
     beanie: 'your plan has been updated.',
@@ -16042,6 +16060,14 @@ const STRING_DEFS = {
   },
   'flightChecks.was.landing': { en: 'Was landing at {time}', beanie: 'was landing at {time}' },
   'flightChecks.was.landingOn': { en: 'Was landing on {date}', beanie: 'was landing on {date}' },
+  'flightChecks.was.arrivalTerminal': {
+    en: 'Was arriving at {terminal}',
+    beanie: 'was arriving at {terminal}',
+  },
+  'flightChecks.was.andArrivalTerminal': {
+    en: '{was}, arriving at {terminal}',
+    beanie: '{was}, arriving at {terminal}',
+  },
   'flightChecks.note.was': {
     en: 'Changed on {date}: {was}',
     beanie: 'changed on {date}: {was}',
@@ -16064,6 +16090,8 @@ const STRING_DEFS = {
   },
   'flightChecks.field.arrivalDate': { en: 'Arrival date {value}', beanie: 'arrival date {value}' },
   'flightChecks.field.arrivalTime': { en: 'Arrival time {value}', beanie: 'arrival time {value}' },
+  'flightChecks.field.terminal': { en: 'Departure {value}', beanie: 'departure {value}' },
+  'flightChecks.field.arrivalTerminal': { en: 'Arrival {value}', beanie: 'arrival {value}' },
   'flightChecks.notice.changedBy': {
     en: '{was}. Changed by {airline} · checked {ago}.',
     beanie: '{was}. changed by {airline} · checked {ago}.',
@@ -16124,6 +16152,10 @@ const STRING_DEFS = {
     beanie: 'your plan says {mine}. {airline} says {theirs}.',
   },
   'travel.live.phrase.fromTerminal': { en: 'from {terminal}', beanie: 'from {terminal}' },
+  'travel.live.phrase.arrivingAt': {
+    en: 'arriving at {terminal}',
+    beanie: 'arriving at {terminal}',
+  },
   'travel.live.phrase.onDate': { en: 'on {date}', beanie: 'on {date}' },
   'travel.live.phrase.landingAt': { en: 'landing at {time}', beanie: 'landing at {time}' },
   'travel.live.phrase.landingOn': { en: 'landing on {date}', beanie: 'landing on {date}' },

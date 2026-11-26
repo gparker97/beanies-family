@@ -22,6 +22,7 @@ import {
   resolveTripTarget,
   overrideTripTarget,
   travelSegmentLabels,
+  buildWhenBand,
   type SupportedTravelType,
   type TravelSegmentOccurrence,
 } from '../vacation';
@@ -128,6 +129,22 @@ describe('extractSegmentOccurrences', () => {
       date: '2026-07-08',
       time: undefined,
     });
+  });
+
+  it('carries both airports, and both terminals on the departure schedule', () => {
+    const out = extractSegmentOccurrences(
+      'vac-1',
+      flightSeg({ terminal: 'T1', arrivalTerminal: ' 4 ' }),
+      0,
+      []
+    );
+    expect(out[0]).toMatchObject({
+      departureAirport: 'SFO',
+      arrivalAirport: 'JFK',
+      schedule: { terminal: 'T1', arrivalTerminal: '4' },
+    });
+    expect(out[1]).toMatchObject({ departureAirport: 'SFO', arrivalAirport: 'JFK' });
+    expect(out[1]!.schedule).toBeUndefined();
   });
 
   it('propagates pending status through occurrences', () => {
@@ -239,6 +256,76 @@ describe('extractSegmentOccurrences', () => {
   it('passes through segmentIndex unchanged', () => {
     const out = extractSegmentOccurrences('vac-1', flightSeg(), 7, []);
     expect(out.every((o) => o.segmentIndex === 7)).toBe(true);
+  });
+});
+
+describe("buildWhenBand — a flight's place line (departure + arrival terminals)", () => {
+  const band = (over: Partial<VacationTravelSegment> = {}) =>
+    buildWhenBand('travel', flightSeg(over))!;
+
+  it('puts each airport and its own terminal under its cell, and consumes both', () => {
+    const out = band({ departureAirport: 'Singapore (SIN)', terminal: '3', arrivalTerminal: 'T2' });
+    expect(out.band.start.place).toEqual({ code: 'SIN', terminal: '3' });
+    expect(out.band.end?.place).toEqual({ code: 'JFK', terminal: 'T2' });
+    expect(out.consumed).toEqual(expect.arrayContaining(['terminal', 'arrivalTerminal']));
+  });
+
+  it('one terminal known: both cells keep a place line, the other side has no terminal', () => {
+    const out = band({ terminal: '3' });
+    expect(out.band.start.place).toEqual({ code: 'SFO', terminal: '3' });
+    expect(out.band.end?.place).toEqual({ code: 'JFK' });
+    expect(out.consumed).toEqual(expect.arrayContaining(['terminal', 'arrivalTerminal']));
+  });
+
+  it('neither terminal known: no place line at all, nothing consumed for it', () => {
+    const out = band();
+    expect(out.band.start.place).toBeUndefined();
+    expect(out.band.end?.place).toBeUndefined();
+    expect(out.consumed).not.toContain('terminal');
+    expect(out.consumed).not.toContain('arrivalTerminal');
+  });
+
+  it('a blank terminal counts as none', () => {
+    expect(band({ terminal: '  ' }).band.start.place).toBeUndefined();
+  });
+
+  it('no airport entered: the place line has a terminal and no code', () => {
+    const out = band({ departureAirport: undefined, terminal: '3' });
+    expect(out.band.start.place).toEqual({ terminal: '3' });
+  });
+
+  it("a one-cell band consumes only the rendered cell's terminal", () => {
+    const out = band({
+      terminal: '3',
+      arrivalTerminal: '2',
+      arrivalDate: undefined,
+      arrivalTime: undefined,
+    });
+    expect(out.band.end).toBeUndefined();
+    expect(out.band.start.place).toEqual({ code: 'SFO', terminal: '3' });
+    expect(out.consumed).toContain('terminal');
+    expect(out.consumed).not.toContain('arrivalTerminal');
+  });
+
+  it('a one-cell band whose only terminal is the arrival one shows no place line', () => {
+    const out = band({ arrivalTerminal: '2', arrivalDate: undefined, arrivalTime: undefined });
+    expect(out.band.start.place).toBeUndefined();
+    expect(out.consumed).not.toContain('arrivalTerminal');
+  });
+
+  it('train, ferry and cruise bands never carry a place line', () => {
+    for (const type of ['train', 'ferry'] as const) {
+      const out = band({ type, terminal: '3', arrivalTerminal: '2' });
+      expect(out.band.start.place).toBeUndefined();
+      expect(out.band.end?.place).toBeUndefined();
+      expect(out.consumed).not.toContain('terminal');
+    }
+    const cruise = buildWhenBand(
+      'travel',
+      flightSeg({ type: 'cruise', terminal: 'A', embarkationDate: '2026-07-01' })
+    )!;
+    expect(cruise.band.start.place).toBeUndefined();
+    expect(cruise.consumed).not.toContain('terminal');
   });
 });
 

@@ -12,11 +12,18 @@
  */
 import type { LanguageCode } from '@/types/models';
 import type { FlightVerification, ScheduleTuple } from '@/types/flightStatus';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { TranslateFn } from '@/utils/format';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort, formatTime12 } from '@/utils/date';
 import { carriedCode } from '@/utils/travelCodes';
-import { diffTuple, normaliseTerminal, type TupleField } from './schedule';
+import {
+  FIELD_KIND,
+  REVISION_FIELDS,
+  diffTuple,
+  normaliseTerminal,
+  type TupleField,
+} from './schedule';
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -53,10 +60,74 @@ export function localYmd(ms: number): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-/** "Terminal 3" from any spelling ("3", "T3", "terminal 3"); '' for none. */
+/** "Terminal 3" from any spelling ("3", "T3", "terminal 3"); '' for none. Prints the
+ *  comparison key, so only for sentences whose verb says which end it is; the band and the
+ *  summary line use `planTerminal`. Unchanged: the Lambda's push copy restates it. */
 export function terminalLabel(t: TranslateFn, raw: string | undefined): string {
   const id = normaliseTerminal(raw);
   return id ? fillTemplate(t('flightChecks.terminal'), { terminal: id }) : '';
+}
+
+/** A terminal written as a short designator once normalised: "3", "2E", "B". */
+const SHORT_DESIGNATOR = /^(?:\d{1,2}[A-Z]?|[A-Z])$/;
+
+/** The one rule behind `planTerminal` and `placeTerminalShort`: a short designator is written
+ *  by `designated`, any other name exactly as the plan holds it; '' for none. */
+function displayTerminal(raw: string | undefined, designated: (id: string) => string): string {
+  const v = raw?.trim();
+  const id = normaliseTerminal(v);
+  if (!v || !id) return '';
+  return SHORT_DESIGNATOR.test(id) ? designated(id) : v;
+}
+
+/**
+ * The one DISPLAY formatter for a terminal the plan holds: "Terminal 3" for a short designator
+ * in any spelling ("3", "T3", "Terminal 3"); a named terminal as written ("TBIT", "Tom
+ * Bradley", "International"), because `normaliseTerminal` is a comparison key that would
+ * mangle it ("BIT", "OMBRADLEY"). '' for none. The summary line's short form ("T3") is
+ * `placeTerminalShort`.
+ */
+export function planTerminal(t: TranslateFn, raw: string | undefined): string {
+  return displayTerminal(raw, (id) => fillTemplate(t('flightChecks.terminal'), { terminal: id }));
+}
+
+/**
+ * "LHR Terminal 2": a terminal tied to its airport. `code` is `airportCode(airport)`. '' when
+ * the terminal is empty, and also when the code is: a one-line surface omits a terminal it
+ * cannot attach to a place, and never shows it bare.
+ */
+export function placeTerminal(
+  t: TranslateFn,
+  code: string | undefined,
+  terminal: string | undefined
+): string {
+  const place = code?.trim();
+  const value = planTerminal(t, terminal);
+  return place && value
+    ? fillTemplate(t('flightChecks.place'), { code: place, terminal: value })
+    : '';
+}
+
+/** "LHR T2", the summary line's form of `placeTerminal`, with the same '' rules. The ONE
+ *  short form of a terminal ("T3"; a named terminal as written). */
+export function placeTerminalShort(code: string | undefined, terminal: string | undefined): string {
+  const place = code?.trim();
+  const value = displayTerminal(terminal, (id) => `T${id}`);
+  return place && value ? `${place} ${value}` : '';
+}
+
+/** "SIN T3 → LHR T2": the known parts, in order, with the empty ones dropped. */
+export function terminalRoute(parts: readonly (string | undefined)[]): string {
+  return parts.filter((p): p is string => !!p).join(' → ');
+}
+
+/** Two sentences as one line. Chinese sentences end on a full-width stop and are not
+ *  space-separated; an empty side is dropped. */
+export function joinSentences(a: string, b: string): string {
+  if (!a) return b;
+  if (!b) return a;
+  const sep = /[。！？]$/.test(a) ? '' : ' ';
+  return `${a}${sep}${b}`;
 }
 
 /** The airline's display name, or "the airline" when neither the leg nor the booking has one.
@@ -72,8 +143,12 @@ export function airlineName(t: TranslateFn, name: string | undefined): string {
  *
  * `now` is the schedule as applied, `was` the prior values (`liveWas`: the CHANGED fields
  * only). The departure date is named only when it changed; an arrival-only change says when
- * it now lands. `updated: false` drops "Your plan has been updated." for a change this device
- * has not written (the caller says so instead).
+ * it now lands. A moved arrival terminal says "SQ318 now arrives at Terminal 2.": as the lead
+ * when it is the only moved field, else after the lead (whose branches, over the five
+ * revision fields, the Lambda's push copy restates); left out when the plan holds no arrival
+ * terminal to name (an arrival-only change then leads "SQ318's arrival terminal changed.",
+ * never a departure sentence). `updated: false` drops "Your plan has
+ * been updated." for a change this device has not written (the caller says so instead).
  */
 export function changeSentence(
   t: TranslateFn,
@@ -88,8 +163,26 @@ export function changeSentence(
     was.departureTime !== undefined ||
     was.terminal !== undefined;
   const terminal = terminalLabel(t, now.terminal);
+  // The arrival sentence has no Lambda twin, so it uses the display formatter, and it is left
+  // out when the plan no longer holds an arrival terminal (cleared after the change).
+  const arrivalTerminal = planTerminal(t, now.arrivalTerminal);
+  const arrives =
+    was.arrivalTerminal !== undefined && arrivalTerminal
+      ? fillTemplate(t('flightChecks.change.arrivesTerminal'), {
+          flight,
+          terminal: arrivalTerminal,
+        })
+      : '';
+  // Decided by what moved, not by what can be printed: an arrival-only change never falls into
+  // the departure sentences, even when its arrival sentence is left out.
+  const arrivalOnly =
+    was.arrivalTerminal !== undefined && !REVISION_FIELDS.some((f) => was[f] !== undefined);
   let lead: string;
-  if (!departureMoved && (was.arrivalDate !== undefined || was.arrivalTime !== undefined)) {
+  if (arrivalOnly) {
+    // Cleared after the change: still name the flight, so the sentence (also the bell and
+    // notification title) never reads "Your plan has been updated." alone.
+    lead = arrives || fillTemplate(t('flightChecks.change.arrivalTerminalMoved'), { flight });
+  } else if (!departureMoved && (was.arrivalDate !== undefined || was.arrivalTime !== undefined)) {
     lead =
       was.arrivalDate !== undefined
         ? fillTemplate(t('flightChecks.change.landsOn'), {
@@ -119,10 +212,8 @@ export function changeSentence(
       terminal,
     });
   }
-  if (!updated) return lead;
-  // Chinese sentences end on a full-width stop and are not space-separated.
-  const sep = /[。！？]$/.test(lead) ? '' : ' ';
-  return `${lead}${sep}${t('flightChecks.change.updated')}`;
+  if (!arrivalOnly) lead = joinSentences(lead, arrives);
+  return updated ? joinSentences(lead, t('flightChecks.change.updated')) : lead;
 }
 
 /** "Singapore Airlines cancelled SQ318 on 13 Dec. This flight is now pending." */
@@ -144,9 +235,21 @@ export function cancelSentence(
 
 /**
  * The prior values, as a phrase: "Was 5pm from Terminal 2", "Was 13 Dec at 5pm",
- * "Was from Terminal 2", "Was landing at 11:10pm". '' when `was` holds nothing.
+ * "Was from Terminal 2", "Was landing at 11:10pm", "Was arriving at Terminal 2", and a moved
+ * arrival terminal after any of the others: "Was 5pm, arriving at Terminal 2". '' when `was`
+ * holds nothing.
  */
 export function wasLine(t: TranslateFn, was: ScheduleTuple, lang?: LanguageCode): string {
+  const base = departureWasLine(t, was, lang);
+  const arrival = planTerminal(t, was.arrivalTerminal);
+  if (!arrival) return base;
+  return base
+    ? fillTemplate(t('flightChecks.was.andArrivalTerminal'), { was: base, terminal: arrival })
+    : fillTemplate(t('flightChecks.was.arrivalTerminal'), { terminal: arrival });
+}
+
+/** `wasLine` over the five revision fields. */
+function departureWasLine(t: TranslateFn, was: ScheduleTuple, lang?: LanguageCode): string {
   const terminal = terminalLabel(t, was.terminal);
   const time = was.departureTime !== undefined ? clockTime(was.departureTime) : undefined;
   const date = was.departureDate !== undefined ? shortDate(was.departureDate, lang) : '';
@@ -205,16 +308,37 @@ export function changedByLine(
   });
 }
 
-const FIELD_KEY = {
+/** The labelled value a fill names: "Departure time 6:30pm", "Arrival Terminal 2". Total, so
+ *  a new field fails to compile until it has one (a bare terminal reads as either end). */
+const FIELD_KEY: Record<TupleField, UIStringKey> = {
   departureDate: 'flightChecks.field.departureDate',
   departureTime: 'flightChecks.field.departureTime',
+  terminal: 'flightChecks.field.terminal',
   arrivalDate: 'flightChecks.field.arrivalDate',
   arrivalTime: 'flightChecks.field.arrivalTime',
-} as const;
+  arrivalTerminal: 'flightChecks.field.arrivalTerminal',
+};
+
+/** One field's value as the notes line writes it, by its `FIELD_KIND`. */
+function fieldValue(
+  t: TranslateFn,
+  f: TupleField,
+  raw: string | undefined,
+  lang?: LanguageCode
+): string {
+  switch (FIELD_KIND[f]) {
+    case 'date':
+      return shortDate(raw, lang);
+    case 'time':
+      return clockTime(raw);
+    case 'terminal':
+      return planTerminal(t, raw);
+  }
+}
 
 /**
  * The notes line a QUIET FILL appends (the airline published a value the segment never had):
- * "Terminal 3 added from Singapore Airlines, 12 Dec". `airline` is a display name.
+ * "Departure Terminal 3 added from Singapore Airlines, 12 Dec". `airline` is a display name.
  */
 export function fillNoteLine(
   t: TranslateFn,
@@ -226,10 +350,8 @@ export function fillNoteLine(
 ): string {
   const what = fields
     .map((f) => {
-      if (f === 'terminal') return terminalLabel(t, provider.terminal);
-      const raw = provider[f] ?? '';
-      const value = f.endsWith('Date') ? shortDate(raw, lang) : clockTime(raw);
-      return fillTemplate(t(FIELD_KEY[f]), { value });
+      const value = fieldValue(t, f, provider[f], lang);
+      return value ? fillTemplate(t(FIELD_KEY[f]), { value }) : '';
     })
     .filter((s) => s.length > 0)
     .join(', ');
@@ -255,8 +377,8 @@ export function cancelNoteLine(
 
 /**
  * One side of a Conflict as a short schedule phrase, naming only `fields`:
- * "5pm from Terminal 2 on 13 Dec", "landing at 12:40am". A field this side does not have
- * reads "not set".
+ * "5pm from Terminal 2 on 13 Dec", "landing at 12:40am", "arriving at Terminal 2". A field
+ * this side does not have reads "not set".
  */
 function schedulePhrase(
   t: TranslateFn,
@@ -297,6 +419,10 @@ function schedulePhrase(
         date: shortDate(tuple.arrivalDate, lang) || notSet,
       })
     );
+  }
+  if (has('arrivalTerminal')) {
+    const terminal = planTerminal(t, tuple.arrivalTerminal);
+    parts.push(terminal ? fillTemplate(t('travel.live.phrase.arrivingAt'), { terminal }) : notSet);
   }
   return parts.join(' ');
 }
@@ -451,14 +577,19 @@ export function fieldCheck(
   return fields.every((f) => v.provider[f] !== undefined) ? 'confirmed' : undefined;
 }
 
-/** The checks on the two cells of a flight's "when" band (departs, arrives). */
+/** The checks on the two cells of a flight's "when" band (departs, arrives), and on the
+ *  terminal each cell's place line shows (departure, arrival). */
 export function bandChecks(v: FlightVerification | undefined): {
   start?: FieldCheck;
   end?: FieldCheck;
+  startPlace?: FieldCheck;
+  endPlace?: FieldCheck;
 } {
   return {
     start: fieldCheck(v, ['departureDate', 'departureTime']),
     end: fieldCheck(v, ['arrivalDate', 'arrivalTime']),
+    startPlace: fieldCheck(v, ['terminal']),
+    endPlace: fieldCheck(v, ['arrivalTerminal']),
   };
 }
 

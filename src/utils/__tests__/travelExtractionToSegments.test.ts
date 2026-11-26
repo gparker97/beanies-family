@@ -144,6 +144,26 @@ describe('travelExtractionToSegments', () => {
     expect(seg.notes).not.toContain('departureAirport');
   });
 
+  it('maps arrivalTerminal on a flight, beside the departure terminal', () => {
+    const r = result([
+      draft({
+        type: 'flight_outbound',
+        fields: { terminal: 'Terminal 1', arrivalTerminal: 'Terminal 2' },
+      }),
+    ]);
+    const seg = travelExtractionToSegments(r).buckets.travelSegments[0];
+    expect(seg.terminal).toBe('Terminal 1');
+    expect(seg.arrivalTerminal).toBe('Terminal 2');
+    expect(seg.notes).toBeUndefined();
+  });
+
+  it.each(['train', 'cruise'])('folds arrivalTerminal into notes for a %s', (type) => {
+    const r = result([draft({ type, fields: { arrivalTerminal: 'Terminal 2' } })]);
+    const seg = travelExtractionToSegments(r).buckets.travelSegments[0];
+    expect(seg.arrivalTerminal).toBeUndefined();
+    expect(seg.notes).toContain('Arrival terminal: Terminal 2');
+  });
+
   it('coerces an unknown type to the safe per-kind default', () => {
     const r = result([draft({ kind: 'accommodation', type: 'bogus', title: 'Somewhere' })]);
     expect(travelExtractionToSegments(r).buckets.accommodations[0].type).toBe('hotel');

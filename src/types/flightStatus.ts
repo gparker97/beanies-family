@@ -81,9 +81,11 @@ export interface FlightLeg {
 
 /**
  * The comparable schedule of one flight: wall-clock local to each airport, never converted
- * through the device zone. `terminal` is the departure terminal (arrival terminal is not stored
- * on a segment). On a PROVIDER tuple a field may be undefined (no published terminal, an
- * unmatched multi-stop arrival half); such a field is never compared and never written.
+ * through the device zone. `terminal` is the departure terminal, `arrivalTerminal` the arrival
+ * one (the segment's own `arrivalTerminal`; the provider's from the arrival leg). Only the first
+ * five fields make up the persisted revision (`REVISION_FIELDS`). On a PROVIDER tuple a field may
+ * be undefined (no published terminal, an unmatched multi-stop arrival half); such a field is
+ * never compared and never written.
  */
 export interface ScheduleTuple {
   departureDate?: string;
@@ -91,6 +93,7 @@ export interface ScheduleTuple {
   terminal?: string;
   arrivalDate?: string;
   arrivalTime?: string;
+  arrivalTerminal?: string;
 }
 
 /** The latest provider answer for one segment, held in the per-device cache. Never synced. */
