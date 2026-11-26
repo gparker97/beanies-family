@@ -4,12 +4,15 @@ import type { SegmentLiveState, VacationTravelSegment } from '@/types/models';
 import { liveNoticeId } from '@/utils/notifications/travel';
 import {
   FIELD_KIND,
+  LIVE_FIELD_ROLE,
   LIVE_STATE_FIELDS,
   REVISION_FIELDS,
   TUPLE_FIELDS,
   arrivalTerminalRecord,
+  changeNoticeRevision,
   classifyDiff,
   diffTuple,
+  liveRecordOf,
   normaliseTerminal,
   parseUtcMs,
   pickLiveState,
@@ -435,6 +438,58 @@ describe('pickLiveState', () => {
   });
 });
 
+describe('liveRecordOf: the plan record a cached answer must have been seen beside', () => {
+  const full: SegmentLiveState = {
+    liveRevision: '2026-12-13|17:00|2|2026-12-13|23:10',
+    liveArrivalTerminal: 'SQ318|2026-12-13|3',
+    liveWas: { departureTime: '16:00', at: '2026-12-10T00:00:00.000Z' },
+    liveAppliedAt: '2026-12-10T00:00:00.000Z',
+    liveCancelledAt: '2026-12-11T00:00:00.000Z',
+  };
+
+  it('classifies every live field, and liveWas is the only detail', () => {
+    expect(Object.keys(LIVE_FIELD_ROLE).sort()).toEqual([...LIVE_STATE_FIELDS].sort());
+    expect(LIVE_STATE_FIELDS.filter((f) => LIVE_FIELD_ROLE[f] === 'detail')).toEqual(['liveWas']);
+  });
+
+  it('joins the record fields in LIVE_STATE_FIELDS order with §, empty for an absent one', () => {
+    expect(liveRecordOf(full)).toBe(
+      [full.liveRevision, full.liveArrivalTerminal, full.liveAppliedAt, full.liveCancelledAt].join(
+        '§'
+      )
+    );
+    expect(liveRecordOf({})).toBe('§§§');
+    expect(liveRecordOf({ liveArrivalTerminal: 'SQ318|2026-12-13|3' })).toBe(
+      '§SQ318|2026-12-13|3§§'
+    );
+    // Not a segment field: ignored.
+    expect(liveRecordOf({ ...full, title: 'x' } as SegmentLiveState)).toBe(liveRecordOf(full));
+  });
+
+  it('a change to any record field alone changes it; a change to liveWas alone never does', () => {
+    for (const f of LIVE_STATE_FIELDS) {
+      if (f === 'liveWas') continue;
+      expect(liveRecordOf({ ...full, [f]: `${full[f] as string}x` })).not.toBe(liveRecordOf(full));
+      expect(liveRecordOf({ ...full, [f]: undefined })).not.toBe(liveRecordOf(full));
+    }
+    for (const liveWas of [
+      undefined,
+      { at: '2027-01-01T00:00:00.000Z' },
+      { terminal: '9', at: 'x' },
+    ]) {
+      expect(liveRecordOf({ ...full, liveWas })).toBe(liveRecordOf(full));
+    }
+  });
+
+  it('a record that goes away and comes back (cancel, reinstate, cancel again) is a new record', () => {
+    const cancelRev = `${full.liveRevision}|cancelled`;
+    const first = { liveRevision: cancelRev, liveCancelledAt: '2026-12-11T00:00:00.000Z' };
+    const reinstated = { ...first, liveRevision: full.liveRevision };
+    const again = { liveRevision: cancelRev, liveCancelledAt: '2026-12-12T00:00:00.000Z' };
+    expect(new Set([first, reinstated, again].map(liveRecordOf)).size).toBe(3);
+  });
+});
+
 describe('classifyDiff: which differences the plan still owes the airline', () => {
   /** The booked flight, as `makeFlight()` holds it. */
   const plan = {
@@ -541,6 +596,18 @@ describe('classifyDiff: which differences the plan still owes the airline', () =
     expect(owed).toEqual({ changed: ['departureTime', 'terminal'], filled: [], contested: [] });
     const acted = classifyDiff(seg({ liveRevision: revisionOf(provider) }), provider);
     expect(acted).toEqual({ changed: [], filled: [], contested: ['departureTime', 'terminal'] });
+  });
+});
+
+describe('changeNoticeRevision', () => {
+  const REV = '2026-12-13|17:00|2|2026-12-13|23:10';
+
+  it('is the revision, plus the arrival terminal only when it moved', () => {
+    expect(changeNoticeRevision(REV, '3', undefined)).toBe(REV);
+    const departureOnly: ScheduleTuple = { departureTime: '17:00' };
+    expect(changeNoticeRevision(REV, '3', departureOnly)).toBe(REV);
+    expect(changeNoticeRevision(REV, '3', { arrivalTerminal: '2' })).toBe(`${REV}~3`);
+    expect(changeNoticeRevision(REV, undefined, { arrivalTerminal: '2' })).toBe(`${REV}~`);
   });
 });
 

@@ -7,11 +7,10 @@
  * Pure: the translator comes first (the `copy.ts` convention) and nothing is logged.
  */
 import type { LanguageCode, SegmentLiveState } from '@/types/models';
-import type { ScheduleTuple } from '@/types/flightStatus';
 import type { TranslateFn } from '@/utils/format';
 import { flightCode, type TravelSegmentOccurrence } from '@/utils/vacation';
 import { cancelSentence, changeSentence, wasLine } from './copy';
-import { REVISION_FIELDS, tupleFromWas } from './schedule';
+import { REVISION_FIELDS, changeNoticeRevision, tupleFromWas } from './schedule';
 import { isCancelRevision } from './verify';
 
 /** An airline change stays "news" on the briefing for this long after it was applied. */
@@ -21,8 +20,11 @@ export interface OccurrenceNotice {
   kind: 'changed' | 'cancelled';
   /**
    * The identity the notice is keyed on (the bell and OS ids, the briefing row id). A change:
-   * `liveRevision` (never `liveAppliedAt`: devices differ by seconds), plus the arrival
-   * terminal when it moved (`changeNoticeRevision`). A cancellation:
+   * `liveWas.noticeRev`, frozen when the change was written (`noticeRevAfterWrite`), so a later
+   * quiet fill never moves it and each successive change has its own; for a change written
+   * without one (before the field, or by an older build), `liveRevision` (never
+   * `liveAppliedAt`: devices differ by seconds), plus the arrival terminal when it moved
+   * (`changeNoticeRevision`). A cancellation:
    * `liveRevision@liveCancelledAt`, because cancel → reinstate → cancel again reproduces the
    * same cancel revision, and only the stamp (written once, by the device that recorded it,
    * then synced) tells the second cancellation from the first.
@@ -94,27 +96,15 @@ export function occurrenceNotice(
 }
 
 /**
- * A change notice's identity: the revision, plus `~<arrival terminal record>` only when the
- * arrival terminal moved (`was.arrivalTerminal` is set). A quiet arrival-terminal fill
- * therefore changes no existing notice id, while a moved arrival terminal (the revision
- * unchanged) is a new notice. `record` is `liveArrivalTerminal`'s form (`arrivalTerminalRecord`;
- * a caller holding a provider answer builds it from that), appended as is, so the id is the
- * same before the change is written (the store's `noticeKey`) and after (`noticeRevision`).
- */
-export function changeNoticeRevision(
-  revision: string,
-  record: string | undefined,
-  was: Pick<ScheduleTuple, 'arrivalTerminal'> | undefined
-): string {
-  return was?.arrivalTerminal !== undefined ? `${revision}~${record ?? ''}` : revision;
-}
-
-/**
  * The identity of the notice a segment's synced live fields carry right now (see
  * `OccurrenceNotice.revision` for the keying rules), or null when there is nothing to tell.
  * The one place that rule lives: the bell/OS ids, the briefing row and the device-side
- * dismissal (`flightStatusStore.dismissNotice`) all key on it, so a new airline revision is
- * a new notice everywhere at once.
+ * dismissal (`flightStatusStore.dismissNotice`) all key on it, so a new airline change is
+ * a new notice everywhere at once. A change's id is the `noticeRev` its write froze into
+ * `liveWas` when it is a non-empty string, and otherwise derived from the live record as it
+ * was before that field existed, so a notice recorded earlier keeps the id it already has.
+ * The store's `noticeKey` names an unwritten change by the same builder
+ * (`noticeRevAfterWrite`), so one change has one id before and after its write.
  */
 export function noticeRevision(
   live: SegmentLiveState | undefined
@@ -132,9 +122,13 @@ export function noticeRevision(
   const appliedMs = parseMs(live.liveAppliedAt);
   const was = tupleFromWas(live.liveWas);
   if (appliedMs === null || !was || !live.liveRevision) return null;
+  const frozen: unknown = live.liveWas?.noticeRev;
   return {
     kind: 'changed',
-    revision: changeNoticeRevision(live.liveRevision, live.liveArrivalTerminal, was),
+    revision:
+      typeof frozen === 'string' && frozen !== ''
+        ? frozen
+        : changeNoticeRevision(live.liveRevision, live.liveArrivalTerminal, was),
     pushable: REVISION_FIELDS.some((f) => was[f] !== undefined),
     atMs: appliedMs,
   };

@@ -155,6 +155,7 @@ describe('pickFlightRefresh', () => {
     minIntervalMs: INTERVAL_DAY_MS,
     backoffUntil: 0,
     entryDone: false,
+    superseded: false,
   };
 
   it('fetches a flight never checked, and a stale one', () => {
@@ -250,6 +251,72 @@ describe('pickFlightRefresh', () => {
     expect(pickFlightRefresh({ ...base, lastCheckedAt: NOW - 5_000 })).toEqual({
       action: 'skip',
       reason: 'fresh',
+    });
+  });
+
+  describe('superseded (a cached answer that would write over a record this device has not seen)', () => {
+    const sup = { ...base, superseded: true };
+
+    it('every device gate, the flight gates and the backoff still hold', () => {
+      for (const [reason, over] of [
+        ['halted', { halted: true }],
+        ['unentitled', { entitled: false, enabled: false }],
+        ['disabled', { enabled: false }],
+        ['not_configured', { configured: false }],
+        ['offline', { online: false }],
+        ['no_flight_number', { hasFlightNumber: false }],
+        ['past', { past: true, inWindow: false }],
+        ['backoff', { backoffUntil: NOW + 1 }],
+        ['backoff', { backoffUntil: NOW + 1, inWindow: false, entryDone: true }],
+      ] as const) {
+        expect(pickFlightRefresh({ ...sup, ...over })).toEqual({ action: 'skip', reason });
+      }
+    });
+
+    it('in the window it fetches, even with a fresh lastCheckedAt (manual or not)', () => {
+      for (const over of [
+        {},
+        { lastCheckedAt: NOW - 5_000 },
+        { lastCheckedAt: NOW - 5_000, manual: true },
+        { lastCheckedAt: null },
+        { entryDone: true },
+      ]) {
+        expect(pickFlightRefresh({ ...sup, ...over })).toEqual({
+          action: 'fetch',
+          reason: 'superseded',
+        });
+      }
+    });
+
+    it('out of the window it passes the entry stamp; with no stamp yet it is the entry check', () => {
+      const far = { ...sup, inWindow: false };
+      expect(pickFlightRefresh({ ...far, entryDone: true })).toEqual({
+        action: 'fetch',
+        reason: 'superseded',
+      });
+      expect(pickFlightRefresh({ ...far, entryDone: true, lastCheckedAt: NOW - 1_000 })).toEqual({
+        action: 'fetch',
+        reason: 'superseded',
+      });
+      expect(pickFlightRefresh({ ...far, entryDone: false })).toEqual({
+        action: 'fetch',
+        reason: 'entry',
+      });
+    });
+
+    it('superseded: false changes no decision (the existing cases above run with it)', () => {
+      const cases: Array<Partial<FlightRefreshInput>> = [
+        {},
+        { lastCheckedAt: NOW - 5_000 },
+        { inWindow: false },
+        { inWindow: false, entryDone: true },
+      ];
+      const { superseded: _s, ...withoutKey } = base;
+      for (const over of cases) {
+        expect(pickFlightRefresh({ ...base, ...over })).toEqual(
+          pickFlightRefresh({ ...(withoutKey as FlightRefreshInput), ...over })
+        );
+      }
     });
   });
 });

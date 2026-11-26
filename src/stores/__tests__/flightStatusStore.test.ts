@@ -13,7 +13,13 @@ import { createPinia, setActivePinia } from 'pinia';
 import { reactive, ref } from 'vue';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 import type { FlightLeg } from '@/types/flightStatus';
-import { makeFlight, makeLeg, t } from '@/utils/flightStatus/__tests__/fixtures';
+import {
+  makeCheck,
+  makeFlight,
+  makeLeg,
+  t,
+  withArrival,
+} from '@/utils/flightStatus/__tests__/fixtures';
 import { DEV_DAILY_FETCH_CAP, takeDevFetchTokens } from '@/services/flightStatus/devFetchBudget';
 
 const NOW = Date.parse('2026-12-12T09:00:00Z');
@@ -33,9 +39,38 @@ const h = vi.hoisted(() => ({
   tokenChanged: null as (() => void) | null,
   poll: null as (() => unknown) | null,
   writeResult: 'saved' as 'saved' | 'missing' | 'failed',
+  /** Per trailing single-flight created (one per store), the kinds its runs started with. */
+  runKinds: [] as unknown[][],
 }));
 
 vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
+// A pass-through that records each run a store's single flight starts: earlier tests' stores
+// keep their installed watches (a detached scope), so the shared log cannot tell runs apart.
+vi.mock('@/utils/trailingSingleFlight', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/utils/trailingSingleFlight')>();
+  return {
+    ...real,
+    createTrailingSingleFlight: <A, R>(
+      run: (args: A) => Promise<R>,
+      ...rest: Parameters<typeof real.createTrailingSingleFlight<A, R>> extends [
+        unknown,
+        ...infer T,
+      ]
+        ? T
+        : never
+    ) => {
+      const kinds: unknown[] = [];
+      h.runKinds.push(kinds);
+      return real.createTrailingSingleFlight<A, R>(
+        (args) => {
+          kinds.push(args);
+          return run(args);
+        },
+        ...rest
+      );
+    },
+  };
+});
 vi.mock('@/services/flightStatus/flightStatusApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/flightStatus/flightStatusApi')>()),
   fetchFlightLegs: h.fetchFlightLegs,
@@ -121,12 +156,25 @@ vi.mock('@/stores/vacationStore', () => ({
 
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { FlightStatusApiError } from '@/services/flightStatus/flightStatusApi';
-import { readFlightStatusCache } from '@/services/flightStatus/flightStatusCache';
+import {
+  emptyFlightStatusCache,
+  readFlightStatusCache,
+  writeFlightStatusCache,
+} from '@/services/flightStatus/flightStatusCache';
 import { pushToken as osPushToken } from '@/services/native/pushRegistration';
 import { CHANGE_NOTICE_DELAY_MS, liveNoticeId } from '@/utils/notifications/travel';
-import { revisionOf, tupleFromLeg } from '@/utils/flightStatus/schedule';
-import { cancelRevisionOf } from '@/utils/flightStatus/verify';
-import { MAX_FETCHES_PER_RUN, useFlightStatusStore } from '../flightStatusStore';
+import {
+  liveRecordOf,
+  revisionOf,
+  tupleFromLeg,
+  tupleFromSegment,
+} from '@/utils/flightStatus/schedule';
+import { cancelRevisionOf, isCancelRevision, isSuperseded } from '@/utils/flightStatus/verify';
+import {
+  MAX_FETCHES_PER_RUN,
+  SEGMENT_CHANGE_DEBOUNCE_MS,
+  useFlightStatusStore,
+} from '../flightStatusStore';
 
 /** The airline moved SQ318 to 18:30 from Terminal 3. */
 const moved = makeLeg({
@@ -162,6 +210,26 @@ const answer = (legs: FlightLeg[]) => ({
 });
 const segment = (id = 'seg-1') =>
   vacationsState.vacations[0]!.travelSegments.find((s) => s.id === id)!;
+
+/** The revision a device that applied `moved` records. */
+const MOVED_REV = revisionOf(tupleFromLeg(moved));
+/** The revision of the booked flight as the airline runs it (`makeLeg()`). */
+const LEG_REV = revisionOf(tupleFromLeg(makeLeg({})));
+
+/** Another device wrote to the plan; it reaches this device by sync. By default that device
+ *  applied the airline's change to `moved`; `over` is the write when it did something else. */
+function syncChangeIn(over?: Partial<VacationTravelSegment>, id = 'seg-1'): void {
+  Object.assign(
+    segment(id),
+    over ?? {
+      departureTime: '18:30',
+      terminal: '3',
+      liveRevision: MOVED_REV,
+      liveWas: { departureTime: '17:00', terminal: 'Terminal 2', at: new Date(NOW).toISOString() },
+      liveAppliedAt: new Date(NOW).toISOString(),
+    }
+  );
+}
 const events = (message: string) =>
   h.logEvent.mock.calls.map((c) => c[0]).filter((e) => e.message === message);
 
@@ -254,16 +322,16 @@ describe('run → check → apply', () => {
     expect(updateSegment).toHaveBeenCalledTimes(1);
   });
 
-  it('an airline change found while the stores hold a snapshot is written once they are authoritative, from the cache', async () => {
+  it('nothing is asked while the stores hold a snapshot; the first run after authority asks and writes the change once', async () => {
     __setStoresAuthoritativeForTesting(false);
     h.fetchFlightLegs.mockResolvedValue(answer([moved]));
     const store = useFlightStatusStore();
     await store.run('open');
-    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
-    expect(updateSegment).not.toHaveBeenCalled(); // never a write onto a snapshot copy
+    expect(h.fetchFlightLegs).not.toHaveBeenCalled(); // the run is held on a snapshot
+    expect(updateSegment).not.toHaveBeenCalled();
 
     __setStoresAuthoritativeForTesting(true);
-    await store.run('tick'); // the answer is fresh: an owed write, retried from the cache
+    await store.run('segment-changed');
     expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
     expect(updateSegment).toHaveBeenCalledTimes(1);
     expect(segment()).toMatchObject({ departureTime: '18:30', terminal: '3' });
@@ -1434,6 +1502,32 @@ describe('"Check now" (a manual check)', () => {
     expect(events('flight manual check').at(-1)?.context.detail).toBe('not_due:offline');
     online.value = true;
   });
+
+  it('keeps a tap made while the stores hold a snapshot and honours it on the run after authority', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    vi.setSystemTime(NOW + 10 * MIN); // past the manual floor: a tap would start a check
+    __setStoresAuthoritativeForTesting(false);
+    const runs = h.runKinds.at(-1)!;
+    // The tap is kept, not refused with a reason that is not true.
+    expect(store.checkNow(['seg-1'])).toBe('started');
+    await settle();
+    expect(runs).toEqual([]); // no request('manual'): that run would be held
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(events('flight manual check').map((e) => e.context)).toEqual([
+      { action: 'manual_check', kind: 'manual', count: 0, detail: 'held' },
+    ]);
+    // A held run does not consume the tap.
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    // The run that follows authority honours it: asked on the manual floor, once.
+    __setStoresAuthoritativeForTesting(true);
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('triggers', () => {
@@ -1454,6 +1548,8 @@ describe('triggers', () => {
       'tick',
       'online',
     ]);
+    // Its installed watches outlive the test: quiet them for the tests that follow.
+    await store.haltForSignOut();
   });
 });
 
@@ -1474,7 +1570,6 @@ describe('privacy', () => {
 });
 
 describe('flight alerts (Phase 2): the reconcile', () => {
-  const LEG_REV = revisionOf(tupleFromLeg(makeLeg({})));
   const body = (over: object = {}) => ({
     flight: 'SQ318',
     date: '2026-12-13',
@@ -1660,6 +1755,8 @@ describe('flight alerts (Phase 2): the reconcile', () => {
     expect(h.subscribeAlert).toHaveBeenLastCalledWith(body({ token: 'tok-2' }));
     expect(readFlightStatusCache('fam-1')?.pushToken).toBe('tok-2');
     expect(store.alerts['seg-1']).toBeDefined();
+    // Its installed watches outlive the test: quiet them for the tests that follow.
+    await store.haltForSignOut();
   });
 
   it('a rejected alert token is logged, never offered again this session, and its flights leave', async () => {
@@ -1744,7 +1841,6 @@ describe('flight alerts (Phase 2): the reconcile', () => {
 });
 
 describe('flight alerts (Phase 2): one notice per revision', () => {
-  const MOVED_REV = revisionOf(tupleFromLeg(moved));
   const noticeId = () => liveNoticeId('seg-1', segment())!;
   /** The reminder builder's own rule: a notice fires only when fireAt is still ahead. */
   const fires = (stamp: number) => stamp + CHANGE_NOTICE_DELAY_MS > Date.now();
@@ -1752,18 +1848,6 @@ describe('flight alerts (Phase 2): one notice per revision', () => {
   beforeEach(() => {
     h.platform = 'ios';
   });
-
-  /** Another device applied the airline's change; it reaches this device by sync. */
-  function syncChangeIn(): void {
-    const seg = segment();
-    Object.assign(seg, {
-      departureTime: '18:30',
-      terminal: '3',
-      liveRevision: MOVED_REV,
-      liveWas: { departureTime: '17:00', terminal: 'Terminal 2', at: new Date(NOW).toISOString() },
-      liveAppliedAt: new Date(NOW).toISOString(),
-    });
-  }
 
   it('a registration with the old rev pre-dates the stamp: no local notice, logged', async () => {
     h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
@@ -1872,11 +1956,6 @@ describe('trackUrlFor: the FlightAware link around the day of travel', () => {
 });
 
 describe('the arrival terminal (read from the arrival leg, beside the frozen revision)', () => {
-  const withArrival = (leg: FlightLeg, terminal: string): FlightLeg => ({
-    ...leg,
-    arrival: { ...leg.arrival, terminal },
-  });
-  const LEG_REV = revisionOf(tupleFromLeg(makeLeg({})));
   /** The `liveArrivalTerminal` record of SQ318's arrival terminal on the booked day. */
   const REC = (terminal: string) => `SQ318|2026-12-13|${terminal}`;
   /** A flight whose arrival terminal the airline already published, and the plan took. */
@@ -2108,7 +2187,6 @@ describe('the arrival terminal (read from the arrival leg, beside the frozen rev
   });
 
   describe('push suppression honours pushable', () => {
-    const MOVED_REV = revisionOf(tupleFromLeg(moved));
     const fires = (stamp: number) => stamp + CHANGE_NOTICE_DELAY_MS > Date.now();
 
     beforeEach(() => {
@@ -2127,7 +2205,7 @@ describe('the arrival terminal (read from the arrival leg, beside the frozen rev
 
     it('an arrival-terminal-only notice is never pre-dated by a lagging registration', async () => {
       const store = await laggingRegistration();
-      Object.assign(segment(), {
+      syncChangeIn({
         departureTime: '18:30',
         terminal: '3',
         arrivalTerminal: '3',
@@ -2142,7 +2220,7 @@ describe('the arrival terminal (read from the arrival leg, beside the frozen rev
 
     it('a notice that also moved the departure is pre-dated as before', async () => {
       const store = await laggingRegistration();
-      Object.assign(segment(), {
+      syncChangeIn({
         departureTime: '18:30',
         terminal: '3',
         arrivalTerminal: '3',
@@ -2157,7 +2235,7 @@ describe('the arrival terminal (read from the arrival leg, beside the frozen rev
 
     it('a cancellation is pre-dated as before', async () => {
       const store = await laggingRegistration();
-      Object.assign(segment(), {
+      syncChangeIn({
         status: 'pending',
         liveRevision: cancelRevisionOf(tupleFromLeg(makeLeg({}))),
         liveCancelledAt: new Date(NOW).toISOString(),
@@ -2165,5 +2243,901 @@ describe('the arrival terminal (read from the arrival leg, beside the frozen rev
       expect(fires(store.noticeFirstSeen(liveNoticeId('seg-1', segment())!, 'seg-1'))).toBe(false);
       expect(events('notice suppressed')).toHaveLength(1);
     });
+  });
+});
+
+describe('two devices: a cached answer is never written over a record this device has not seen', () => {
+  const ISO = (ms: number) => new Date(ms).toISOString();
+  /** The airline moved SQ318 again, to 19:00 from Terminal 3: the newest answer. */
+  const movedAgain = makeLeg({
+    dep: {
+      scheduledLocal: '2026-12-13 19:00+08:00',
+      scheduledUtc: '2026-12-13 11:00Z',
+      terminal: '3',
+    },
+  });
+  /** Another device applied `movedAgain` over the plan's 18:30 (R2 to R3). */
+  const syncMovedAgain = () =>
+    syncChangeIn({
+      departureTime: '19:00',
+      terminal: '3',
+      liveRevision: revisionOf(tupleFromLeg(movedAgain)),
+      liveWas: { departureTime: '18:30', at: ISO(NOW + MIN) },
+      liveAppliedAt: ISO(NOW + MIN),
+    });
+  const superseded = () => events('flight superseded check').map((e) => e.context);
+  /** The runs held because the stores were not authoritative yet. */
+  const held = () =>
+    events('flight check run')
+      .map((e) => e.context)
+      .filter((c) => c.detail === 'not_authoritative');
+  const FAR = '2027-06-10';
+  const far = (over: Partial<VacationTravelSegment> = {}) =>
+    makeFlight({ departureDate: FAR, arrivalDate: FAR, ...over });
+  const farLeg = (terminal = '2') =>
+    makeLeg({
+      dep: { scheduledLocal: `${FAR} 17:00+08:00`, scheduledUtc: `${FAR} 09:00Z`, terminal },
+      arr: { scheduledLocal: `${FAR} 23:10+00:00`, scheduledUtc: `${FAR} 23:10Z` },
+    });
+  /** This device applied `leg` itself, so its cached answer remembers the record it left
+   *  (`applied`, the segment as the document holds it); the next session's stores then load a
+   *  snapshot that still shows `booking` without it, where that answer reads as superseded.
+   *  Returns the new session's store, its run log and the applied segment. */
+  async function coldStartOnLaggingSnapshot(booking: VacationTravelSegment, leg: FlightLeg) {
+    vacationsState.vacations = [trip([booking])];
+    h.fetchFlightLegs.mockResolvedValue(answer([leg]));
+    await useFlightStatusStore().run('segment-changed');
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    const applied = { ...segment() };
+    __setStoresAuthoritativeForTesting(false);
+    vacationsState.vacations = [trip([booking])];
+    setActivePinia(createPinia());
+    const store = useFlightStatusStore();
+    const runs = h.runKinds.at(-1)!;
+    expect(isSuperseded(segment(), store.checks['seg-1']!)).toBe(true);
+    return { store, runs, applied };
+  }
+
+  it('in the window: the stale answer is not written, the card shows the synced state, one refetch applies the fresh answer', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')?.state).toBe('verified');
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf({}));
+
+    syncChangeIn(); // another device applied the move to 18:30
+    // This device's 17:00 answer would write over a record it has not seen: set aside, and
+    // the card shows what the other device wrote.
+    const shown = store.verificationFor('seg-1')!;
+    expect(shown).toMatchObject({ state: 'changed', was: { departureTime: '17:00' } });
+    expect(shown.provider).toBeUndefined();
+    expect(shown.live).toBeUndefined();
+
+    h.fetchFlightLegs.mockResolvedValue(answer([movedAgain]));
+    await store.run('segment-changed'); // the cached answer is minutes old: fetched anyway
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(superseded()).toEqual([
+      { action: 'superseded_check', kind: 'segment-changed', count: 1 },
+    ]);
+    expect(events('flight change write retried')).toHaveLength(0);
+    // The fresh answer is applied, once; the stale 17:00 never was.
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(updateSegment.mock.calls[0]![2]).toMatchObject({ departureTime: '19:00' });
+    expect(segment()).toMatchObject({ departureTime: '19:00', terminal: '3' });
+    expect(events('flight change applied')).toHaveLength(1);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf(segment()));
+
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(superseded()).toHaveLength(1);
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stale cancelled answer against a plan another device reinstated: no flip, no new cancellation id', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({ status: 'Canceled' })]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    const cancelledAt = segment().liveCancelledAt;
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf(segment()));
+
+    syncChangeIn({ liveRevision: LEG_REV }); // the other device's reinstatement
+    // Not cancelled any more, and this device's answer is set aside: "Checking...".
+    expect(store.verificationFor('seg-1')).toEqual({
+      state: 'unavailable',
+      mine: tupleFromSegment(segment()),
+    });
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(isCancelRevision(segment().liveRevision)).toBe(false);
+    expect(segment().liveCancelledAt).toBe(cancelledAt);
+    expect(store.verificationFor('seg-1')?.state).toBe('verified');
+  });
+
+  it('a stale running answer against a plan another device cancelled: no flip', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const cancelRev = cancelRevisionOf(tupleFromLeg(makeLeg({})));
+    syncChangeIn({ status: 'pending', liveRevision: cancelRev, liveCancelledAt: ISO(NOW) });
+    expect(store.verificationFor('seg-1')).toEqual({
+      state: 'cancelled',
+      mine: tupleFromSegment(segment()),
+    });
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({ status: 'Canceled' })]));
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(updateSegment).not.toHaveBeenCalled();
+    expect(segment()).toMatchObject({
+      status: 'pending',
+      liveRevision: cancelRev,
+      liveCancelledAt: ISO(NOW),
+    });
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'cancelled', applied: true });
+  });
+
+  it('a record that goes away and comes back (cancel, reinstate, cancel again) still supersedes', async () => {
+    const cancelRev = cancelRevisionOf(tupleFromLeg(makeLeg({})));
+    // The other device recorded the cancellation; this view-only device then holds a running
+    // answer it may not write (the reinstatement).
+    syncChangeIn({ status: 'pending', liveRevision: cancelRev, liveCancelledAt: ISO(NOW) });
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(updateSegment).not.toHaveBeenCalled();
+    // The other device reinstates, then the airline cancels again: the same cancel revision.
+    syncChangeIn({ liveRevision: LEG_REV });
+    syncChangeIn({ liveRevision: cancelRev, liveCancelledAt: ISO(NOW + MIN) });
+    canEdit.value = true;
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({ status: 'Canceled' })]));
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(superseded()).toHaveLength(1);
+    expect(updateSegment).not.toHaveBeenCalled();
+    expect(segment()).toMatchObject({ liveRevision: cancelRev, liveCancelledAt: ISO(NOW + MIN) });
+  });
+
+  it('a foreign write of the same answer this device holds causes no fetch', async () => {
+    // A view-only device holds the move; another device writes it.
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+    syncChangeIn();
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(events('flight check run').at(-1)?.context.detail).toBe('fresh=1');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+
+    // Two devices that applied the same answer before syncing: the merge keeps the other's
+    // liveAppliedAt. The remembered record differs, but the answer owes nothing.
+    canEdit.value = true;
+    syncChangeIn({ liveAppliedAt: ISO(NOW + 1_000) });
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(superseded()).toHaveLength(0);
+    expect(updateSegment).not.toHaveBeenCalled();
+  });
+
+  it("this device's own apply, recording take and its Undo never supersede its own check", async () => {
+    const REC2 = 'SQ318|2026-12-13|2';
+    // Own apply: the plan took the airline's arrival terminal 2.
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(makeLeg({}), '2')]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(segment()).toMatchObject({ arrivalTerminal: '2', liveArrivalTerminal: REC2 });
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf(segment()));
+    // The family types 5 by hand; the airline moves the departure; this device may not write.
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, arrivalTerminal: '5' }));
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(moved, '2')]));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    canEdit.value = true;
+    const fetches = h.fetchFlightLegs.mock.calls.length;
+
+    // A recording take with an Undo (it replaced the hand-typed 5).
+    const out = await store.takeAirline('seg-1');
+    expect(out.result).toBe('saved');
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf(segment()));
+    expect(store.verificationFor('seg-1')?.provider).toBeDefined();
+    // Its Undo restores the earlier live keys: still this device's own record.
+    expect(await out.undo!()).toBe('saved');
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf(segment()));
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+
+    // The restored record owes the announced change again: written from the cache with no
+    // fetch, and the hand-typed arrival terminal the Undo restored stays (it is contested).
+    const writes = updateSegment.mock.calls.length;
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(fetches);
+    expect(superseded()).toHaveLength(0);
+    expect(updateSegment).toHaveBeenCalledTimes(writes + 1);
+    expect(segment()).toMatchObject({ departureTime: '18:30', arrivalTerminal: '5' });
+  });
+
+  it('"Put it back" while superseded never advances the remembered record: the stale answer is never written', async () => {
+    // This device holds the booked 17:00; another device recorded 18:30, then 19:00.
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    syncChangeIn();
+    syncMovedAgain();
+    expect(await store.revert('seg-1')).toBe('saved'); // back to 18:30: 17:00 still owes
+    expect(segment().departureTime).toBe('18:30');
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf({}));
+    expect(store.verificationFor('seg-1')?.provider).toBeUndefined();
+
+    h.fetchFlightLegs.mockResolvedValue(answer([movedAgain]));
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(superseded()).toHaveLength(1);
+    // The revert is the only write; the fresh answer's record is the plan's, a Conflict.
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(segment().departureTime).toBe('18:30');
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+  });
+
+  it('"Put it back" to exactly the stale values: it owes nothing, so it is usable, writes nothing and is replaced at the next fetch', async () => {
+    // This device applied 18:30 itself; another device then recorded 19:00.
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const held = store.checks['seg-1']!.planRecord;
+    syncMovedAgain();
+    expect(store.verificationFor('seg-1')?.provider).toBeUndefined();
+    expect(await store.revert('seg-1')).toBe('saved'); // back to 18:30, the stale answer's
+    expect(store.checks['seg-1']?.planRecord).toBe(held);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(updateSegment).toHaveBeenCalledTimes(2); // the apply and the revert
+    h.fetchFlightLegs.mockResolvedValue(answer([movedAgain]));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf(segment()));
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+  });
+
+  it('an Undo while superseded never advances the remembered record either', async () => {
+    const REC2 = 'SQ318|2026-12-13|2';
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(makeLeg({}), '2')]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, arrivalTerminal: '5' }));
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(moved, '2')]));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    canEdit.value = true;
+    const out = await store.takeAirline('seg-1');
+    const held = store.checks['seg-1']!.planRecord;
+    // Another device then records the airline's next move, and the person taps Undo.
+    syncMovedAgain();
+    expect(store.verificationFor('seg-1')?.provider).toBeUndefined();
+    const writes = updateSegment.mock.calls.length;
+    expect(await out.undo!()).toBe('saved');
+    // Back to the record before the take: the quiet fill recorded no revision.
+    expect(segment().liveRevision).toBeUndefined();
+    expect(segment().liveArrivalTerminal).toBe(REC2);
+    expect(store.checks['seg-1']?.planRecord).toBe(held);
+    // The stale 18:30 owes against the restored record and stays set aside: never written.
+    expect(store.verificationFor('seg-1')?.provider).toBeUndefined();
+    h.fetchFlightLegs.mockResolvedValue(answer([withArrival(movedAgain, '2')]));
+    await store.run('segment-changed');
+    expect(superseded()).toHaveLength(1);
+    const later = updateSegment.mock.calls.slice(writes + 1).map((c) => c[2]);
+    expect(
+      later.every((p) => (p as Partial<VacationTravelSegment>).departureTime !== '18:30')
+    ).toBe(true);
+  });
+
+  it('a foreign write that lands while the request is in flight: the answer is not written; one refetch, then nothing more', async () => {
+    let land!: (v: unknown) => void;
+    h.fetchFlightLegs.mockImplementationOnce(() => new Promise((r) => (land = r)));
+    const store = useFlightStatusStore();
+    const first = store.run('open');
+    await settle();
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    syncChangeIn();
+    syncMovedAgain(); // the other device's newer answer syncs in first
+    land(answer([moved])); // then this device's slower, older one
+    await first;
+    expect(updateSegment).not.toHaveBeenCalled();
+    expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf({}));
+    expect(store.verificationFor('seg-1')?.provider).toBeUndefined();
+
+    h.fetchFlightLegs.mockResolvedValue(answer([movedAgain]));
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(updateSegment).not.toHaveBeenCalled(); // found already applied
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(superseded()).toHaveLength(1);
+  });
+
+  it('an answer set aside mid-request is logged as a superseded apply skip; a usable one never is', async () => {
+    const skipped = () => events('flight change not written').map((e) => e.context);
+    let land!: (v: unknown) => void;
+    h.fetchFlightLegs.mockImplementationOnce(() => new Promise((r) => (land = r)));
+    const store = useFlightStatusStore();
+    const first = store.run('open');
+    await settle();
+    syncChangeIn();
+    syncMovedAgain();
+    land(answer([moved]));
+    await first;
+    expect(updateSegment).not.toHaveBeenCalled();
+    expect(skipped()).toEqual([{ action: 'apply_skipped', detail: 'superseded' }]);
+
+    // The refetch is current: found already applied, and nothing more is logged.
+    h.fetchFlightLegs.mockResolvedValue(answer([movedAgain]));
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+    expect(skipped()).toHaveLength(1);
+  });
+
+  describe('before the stores are authoritative (a cold start on a snapshot)', () => {
+    it('a run of every kind is held: nothing fetched, written, dropped, stamped, retried or registered; one hold event per run', async () => {
+      h.platform = 'ios';
+      const QUESTION_FAR = 'SQ318|2027-06-10|SIN|LHR';
+      // seg-1: a fresh in-window answer that owes a write (an owed retry, an alert to register);
+      // seg-2: far out, never asked (an entry check); seg-3: far out, asked, with an answer that
+      // owes a write and remembers no record (superseded: dropped and refetched).
+      const initial = {
+        ...emptyFlightStatusCache('fam-1'),
+        checks: {
+          'seg-1': makeCheck(moved),
+          'seg-3': makeCheck(farLeg('3'), {
+            segmentId: 'seg-3',
+            date: FAR,
+            planRecord: undefined,
+          }),
+        },
+        entryChecked: { 'seg-3': QUESTION_FAR },
+      };
+      writeFlightStatusCache(initial);
+      vacationsState.vacations = [trip([makeFlight(), far({ id: 'seg-2' }), far({ id: 'seg-3' })])];
+      __setStoresAuthoritativeForTesting(false);
+      const store = useFlightStatusStore();
+      const kinds = [
+        'open',
+        'tick',
+        'foreground',
+        'online',
+        'segment-changed',
+        'push-token',
+        'manual',
+      ] as const;
+      for (const kind of kinds) await store.run(kind);
+      await settle();
+
+      expect(h.fetchFlightLegs).not.toHaveBeenCalled();
+      expect(updateSegment).not.toHaveBeenCalled();
+      expect(store.checks).toEqual(initial.checks);
+      expect(readFlightStatusCache('fam-1')?.checks).toEqual(initial.checks);
+      expect(readFlightStatusCache('fam-1')?.entryChecked).toEqual(initial.entryChecked);
+      expect(events('flight change write retried')).toHaveLength(0);
+      expect(superseded()).toHaveLength(0);
+      expect(events('flight entry check')).toHaveLength(0);
+      expect(events('flight change not written')).toHaveLength(0);
+      expect(h.ensurePushToken).not.toHaveBeenCalled();
+      expect(h.subscribeAlert).not.toHaveBeenCalled();
+      expect(h.unsubscribeAlert).not.toHaveBeenCalled();
+      expect(store.alerts).toEqual({});
+      expect(events('flight check run').map((e) => e.context)).toEqual(
+        kinds.map((kind) => ({ action: 'run', kind, count: 3, detail: 'not_authoritative' }))
+      );
+
+      // The same state, authoritative: each of those would have happened.
+      h.fetchFlightLegs.mockResolvedValue(answer([]));
+      __setStoresAuthoritativeForTesting(true);
+      await store.run('segment-changed');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2); // seg-2's entry, seg-3's refetch
+      expect(events('flight entry check')).toHaveLength(1);
+      expect(superseded()).toHaveLength(1);
+      expect(store.checks['seg-3']).not.toEqual(initial.checks['seg-3']); // replaced
+      expect(events('flight change write retried')).toHaveLength(1);
+      expect(updateSegment).toHaveBeenCalledTimes(1);
+      expect(h.subscribeAlert).toHaveBeenCalled();
+      expect(held()).toHaveLength(kinds.length);
+    });
+
+    it('an answer that remembers the record the document holds (R2) while the snapshot lags (R1): kept, usable, not asked again', async () => {
+      // Fake timers before any trigger, so no store's debounce outlives this test.
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      vi.setSystemTime(NOW);
+      const { store, runs, applied } = await coldStartOnLaggingSnapshot(makeFlight(), moved);
+      store.setup();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runs).toEqual(['open']);
+      expect(held()).toEqual([
+        { action: 'run', kind: 'open', count: 1, detail: 'not_authoritative' },
+      ]);
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1); // the first session's
+
+      // The stores reload from the document, which carries this device's own apply.
+      vacationsState.vacations = [trip([applied])];
+      __setStoresAuthoritativeForTesting(true);
+      await vi.advanceTimersByTimeAsync(SEGMENT_CHANGE_DEBOUNCE_MS);
+      expect(runs).toEqual(['open', 'segment-changed']);
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1); // the answer is fresh: not asked
+      expect(events('flight check run').at(-1)?.context.detail).toBe('fresh=1');
+      expect(superseded()).toHaveLength(0);
+      expect(events('flight change not written')).toHaveLength(0);
+      expect(store.checks['seg-1']?.leg).toEqual(moved);
+      expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf(segment()));
+      expect(isSuperseded(segment(), store.checks['seg-1']!)).toBe(false);
+      expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+      expect(store.verificationFor('seg-1')?.provider).toBeDefined();
+      expect(updateSegment).toHaveBeenCalledTimes(1); // the first session's
+
+      // Its installed watches outlive the test: quiet them for the tests that follow.
+      vi.useRealTimers();
+      await store.haltForSignOut();
+    });
+
+    it("in the window, an answer another device's newer record supersedes: not asked before authority; one refetch after; nothing stale written", async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      vi.setSystemTime(NOW);
+      const { store, runs, applied } = await coldStartOnLaggingSnapshot(makeFlight(), moved);
+      store.setup();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runs).toEqual(['open']);
+      expect(held()).toHaveLength(1);
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+      expect(superseded()).toHaveLength(0);
+      expect(events('flight change not written')).toHaveLength(0);
+      expect(store.checks['seg-1']?.leg).toEqual(moved);
+      expect(updateSegment).toHaveBeenCalledTimes(1);
+
+      // The document carries this device's apply and, after it, another device's.
+      vacationsState.vacations = [trip([applied])];
+      syncMovedAgain();
+      h.fetchFlightLegs.mockResolvedValue(answer([movedAgain]));
+      __setStoresAuthoritativeForTesting(true);
+      await vi.advanceTimersByTimeAsync(SEGMENT_CHANGE_DEBOUNCE_MS);
+      expect(runs).toEqual(['open', 'segment-changed']);
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(superseded()).toEqual([
+        { action: 'superseded_check', kind: 'segment-changed', count: 1 },
+      ]);
+      expect(updateSegment).toHaveBeenCalledTimes(1); // found already applied
+      expect(segment()).toMatchObject({ departureTime: '19:00', terminal: '3' });
+      expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+
+      vi.useRealTimers();
+      await store.haltForSignOut();
+    });
+
+    it("a stale in-window answer: not asked before authority; after, one fetch stamped with the document's record, its change written in that run", async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      vi.setSystemTime(NOW);
+      const { store, runs, applied } = await coldStartOnLaggingSnapshot(makeFlight(), moved);
+      vi.setSystemTime(NOW + LATER); // the cached answer is past its interval
+      store.setup();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runs).toEqual(['open']);
+      expect(held()).toHaveLength(1);
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+
+      vacationsState.vacations = [trip([applied])];
+      const asked = liveRecordOf(applied);
+      let atWrite: string | undefined;
+      const write = updateSegment.getMockImplementation()!;
+      updateSegment.mockImplementationOnce(async (vacationId, segmentId, patch) => {
+        atWrite = store.checks['seg-1']?.planRecord;
+        return write(vacationId, segmentId, patch);
+      });
+      h.fetchFlightLegs.mockResolvedValue(answer([movedAgain]));
+      __setStoresAuthoritativeForTesting(true);
+      await vi.advanceTimersByTimeAsync(SEGMENT_CHANGE_DEBOUNCE_MS);
+      expect(runs).toEqual(['open', 'segment-changed']);
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(superseded()).toHaveLength(0);
+      expect(events('flight change not written')).toHaveLength(0);
+      expect(updateSegment).toHaveBeenCalledTimes(2);
+      expect(updateSegment.mock.calls[1]![2]).toMatchObject({ departureTime: '19:00' });
+      // Stored beside the document's record (not the snapshot's), then advanced by this
+      // device's own write.
+      expect(atWrite).toBe(asked);
+      expect(asked).not.toBe(liveRecordOf(makeFlight()));
+      expect(store.checks['seg-1']?.planRecord).toBe(liveRecordOf(segment()));
+
+      await store.run('tick');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(updateSegment).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+      await store.haltForSignOut();
+    });
+  });
+
+  it('a superseded check handed straight to the owed retry writes nothing', async () => {
+    h.writeResult = 'failed';
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    h.writeResult = 'saved';
+    // Another device's write lands after this run decided the retry and before the retry
+    // reaches `applyIfDue` (its log is the last step between the two).
+    h.logEvent.mockImplementation((e: { context?: { action?: string } }) => {
+      if (e.context?.action === 'apply_retry') {
+        syncChangeIn();
+        syncMovedAgain();
+      }
+    });
+    await store.run('tick');
+    expect(events('flight change write retried')).toHaveLength(1);
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(segment().departureTime).toBe('19:00');
+  });
+
+  it('a pre-build check (no planRecord) that owes a write refetches once before writing; one that owes nothing is untouched', async () => {
+    const { planRecord: _drop, ...owes } = makeCheck(moved);
+    writeFlightStatusCache({ ...emptyFlightStatusCache('fam-1'), checks: { 'seg-1': owes } });
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(superseded()).toEqual([{ action: 'superseded_check', kind: 'open', count: 1 }]);
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(h.fetchFlightLegs.mock.invocationCallOrder[0]!).toBeLessThan(
+      updateSegment.mock.invocationCallOrder[0]!
+    );
+
+    setActivePinia(createPinia());
+    vacationsState.vacations = [trip([makeFlight()])];
+    const { planRecord: _drop2, ...owesNothing } = makeCheck(makeLeg({}));
+    writeFlightStatusCache({
+      ...emptyFlightStatusCache('fam-1'),
+      checks: { 'seg-1': owesNothing },
+    });
+    const other = useFlightStatusStore();
+    await other.run('open');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(other.checks['seg-1']).toEqual(owesNothing);
+    expect(other.verificationFor('seg-1')?.state).toBe('verified');
+  });
+
+  it('"Update with airline data" on a superseded check is refused, and says why', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    syncChangeIn();
+    expect((await store.takeAirline('seg-1')).result).toBe('missing');
+    expect(updateSegment).not.toHaveBeenCalled();
+    expect(events('flight airline refused')[0]?.context).toEqual({
+      action: 'take_airline',
+      detail: 'superseded',
+    });
+  });
+
+  it('in the window a failed refetch keeps the stale check: alerts stay registered, nothing is written, retried after the backoff', async () => {
+    h.platform = 'ios';
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.alerts['seg-1']).toMatchObject({ flight: 'SQ318', rev: LEG_REV });
+    syncChangeIn();
+    h.fetchFlightLegs.mockRejectedValue(new FlightStatusApiError('http_5xx', 'down', 503));
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(store.checks['seg-1']?.leg).not.toBeNull();
+    expect(readFlightStatusCache('fam-1')?.checks['seg-1']).toBeDefined();
+    expect(updateSegment).not.toHaveBeenCalled();
+    // The registration follows the plan's revision exactly as for any check: never dropped.
+    expect(h.unsubscribeAlert).not.toHaveBeenCalled();
+    expect(store.alerts['seg-1']).toEqual({
+      flight: 'SQ318',
+      date: '2026-12-13',
+      dep: 'SIN',
+      arr: 'LHR',
+      rev: MOVED_REV,
+      confirmed: true,
+    });
+
+    vi.setSystemTime(NOW + MIN);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(events('flight check run').at(-1)?.context.detail).toBe('backoff=1');
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    vi.setSystemTime(NOW + 6 * MIN);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(3);
+    expect(superseded()).toHaveLength(2);
+    expect(updateSegment).not.toHaveBeenCalled();
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+    expect(h.unsubscribeAlert).not.toHaveBeenCalled();
+  });
+
+  it('a synced change to any record key alone requests one segment-changed run after the debounce; liveWas alone none', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(NOW);
+    h.fetchFlightLegs.mockResolvedValue(answer([]));
+    const store = useFlightStatusStore();
+    const mine = h.runKinds.at(-1)!;
+    store.setup();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mine).toEqual(['open']);
+    const runs = () => mine.filter((k) => k === 'segment-changed').length;
+    expect(runs()).toBe(0);
+    const writes: Array<Partial<VacationTravelSegment>> = [
+      { liveRevision: MOVED_REV },
+      { liveArrivalTerminal: 'SQ318|2026-12-13|3' },
+      { liveAppliedAt: ISO(NOW + 1) },
+      { liveCancelledAt: ISO(NOW + 2) },
+    ];
+    let expected = 0;
+    for (const over of writes) {
+      syncChangeIn(over);
+      await vi.advanceTimersByTimeAsync(SEGMENT_CHANGE_DEBOUNCE_MS - 1);
+      expect(runs()).toBe(expected);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(runs()).toBe(++expected);
+    }
+    syncChangeIn({ liveWas: { departureTime: '16:00', at: ISO(NOW) } });
+    await vi.advanceTimersByTimeAsync(3 * SEGMENT_CHANGE_DEBOUNCE_MS);
+    expect(runs()).toBe(expected);
+    expect(mine).toHaveLength(1 + writes.length);
+    // Its installed watches outlive the test: quiet them for the tests that follow.
+    vi.useRealTimers();
+    await store.haltForSignOut();
+  });
+
+  describe('out of the window', () => {
+    /** Another device applied the airline's move to Terminal 3. */
+    const syncFarMove = () =>
+      syncChangeIn({
+        terminal: '3',
+        liveRevision: revisionOf(tupleFromLeg(farLeg('3'))),
+        liveWas: { terminal: 'Terminal 2', at: ISO(NOW) },
+        liveAppliedAt: ISO(NOW),
+      });
+
+    beforeEach(() => {
+      vacationsState.vacations = [trip([far()])];
+    });
+
+    it('one refetch past the entry stamp; the fresh answer is found already applied; asked once', async () => {
+      h.fetchFlightLegs.mockResolvedValue(answer([farLeg('2')]));
+      const store = useFlightStatusStore();
+      await store.run('segment-changed');
+      syncFarMove();
+      expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed' });
+      expect(store.verificationFor('seg-1')?.provider).toBeUndefined();
+      h.fetchFlightLegs.mockResolvedValue(answer([farLeg('3')]));
+      await store.run('segment-changed');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(superseded()).toEqual([
+        { action: 'superseded_check', kind: 'segment-changed', count: 1 },
+      ]);
+      expect(events('flight entry check')).toHaveLength(1);
+      expect(updateSegment).not.toHaveBeenCalled();
+      expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+      await store.run('tick');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(events('flight check run').at(-1)?.context.detail).toBe('out_of_window=1');
+    });
+
+    it('a refetch that fails is not asked again: the stale answer was set aside when it was issued', async () => {
+      h.fetchFlightLegs.mockResolvedValue(answer([farLeg('2')]));
+      const store = useFlightStatusStore();
+      await store.run('segment-changed');
+      syncFarMove();
+      h.fetchFlightLegs.mockRejectedValue(new FlightStatusApiError('http_5xx', 'down', 503));
+      await store.run('segment-changed');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(store.checks['seg-1']).toBeUndefined();
+      expect(readFlightStatusCache('fam-1')?.checks['seg-1']).toBeUndefined();
+      expect(events('flight check failed')).toHaveLength(1);
+      vi.setSystemTime(NOW + 2 * 60 * MIN); // past the backoff
+      await store.run('tick');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(events('flight check run').at(-1)?.context.detail).toBe('out_of_window=1');
+      expect(updateSegment).not.toHaveBeenCalled();
+      expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed' });
+    });
+
+    it('before the stores are authoritative: the run is held, the answer is kept and nothing is written; once they are, a superseded answer is asked once', async () => {
+      // Fake timers before any trigger, so no installed watch's debounce fires in this test.
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      vi.setSystemTime(NOW);
+      const { store } = await coldStartOnLaggingSnapshot(far(), farLeg('3'));
+      await store.run('open');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+      expect(held()).toEqual([
+        { action: 'run', kind: 'open', count: 1, detail: 'not_authoritative' },
+      ]);
+      expect(superseded()).toHaveLength(0);
+      expect(events('flight change not written')).toHaveLength(0);
+      expect(store.checks['seg-1']?.leg).toEqual(farLeg('3')); // not set aside
+      expect(updateSegment).toHaveBeenCalledTimes(1);
+
+      // The document is at the snapshot's record: the plan was put back elsewhere, so the
+      // remembered terminal-3 answer would write over a record this device has not seen.
+      __setStoresAuthoritativeForTesting(true);
+      h.fetchFlightLegs.mockResolvedValue(answer([farLeg('2')]));
+      await store.run('segment-changed');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(superseded()).toEqual([
+        { action: 'superseded_check', kind: 'segment-changed', count: 1 },
+      ]);
+      expect(updateSegment).toHaveBeenCalledTimes(1);
+      expect(store.verificationFor('seg-1')?.state).toBe('verified');
+      await store.run('tick');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    });
+
+    it("before authority, an entry stamp for the document's question while the snapshot shows an older one: nothing asked or dropped; after, nothing asked", async () => {
+      const LGW = 'London Gatwick (LGW)';
+      const base = farLeg('2');
+      const toGatwick = { ...base, arrival: { ...base.arrival, iata: 'LGW' } };
+      const check = makeCheck(toGatwick, { date: FAR });
+      const stamped = { 'seg-1': 'SQ318|2027-06-10|SIN|LGW' };
+      writeFlightStatusCache({
+        ...emptyFlightStatusCache('fam-1'),
+        checks: { 'seg-1': check },
+        entryChecked: stamped,
+      });
+      // The snapshot still shows the booking to Heathrow (`beforeEach`): an older question.
+      __setStoresAuthoritativeForTesting(false);
+      const store = useFlightStatusStore();
+      await store.run('open');
+      expect(h.fetchFlightLegs).not.toHaveBeenCalled();
+      expect(held()).toHaveLength(1);
+      expect(events('flight entry check')).toHaveLength(0);
+      expect(store.checks['seg-1']).toEqual(check);
+      expect(readFlightStatusCache('fam-1')?.checks['seg-1']).toEqual(check);
+      expect(readFlightStatusCache('fam-1')?.entryChecked).toEqual(stamped);
+
+      vacationsState.vacations = [trip([far({ arrivalAirport: LGW })])];
+      __setStoresAuthoritativeForTesting(true);
+      await store.run('segment-changed');
+      expect(h.fetchFlightLegs).not.toHaveBeenCalled(); // the stamp matches the question
+      expect(events('flight check run').at(-1)?.context.detail).toBe('out_of_window=1');
+      expect(events('flight entry check')).toHaveLength(0);
+      expect(store.checks['seg-1']).toEqual(check);
+      expect(updateSegment).not.toHaveBeenCalled();
+    });
+
+    it('a changed question still goes as one entry fetch', async () => {
+      h.fetchFlightLegs.mockResolvedValue(answer([farLeg('2')]));
+      const store = useFlightStatusStore();
+      await store.run('segment-changed');
+      syncFarMove();
+      syncChangeIn({ arrivalAirport: 'London Gatwick (LGW)' });
+      h.fetchFlightLegs.mockResolvedValue(answer([farLeg('3')]));
+      await store.run('segment-changed');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(events('flight entry check')).toHaveLength(2);
+      expect(superseded()).toHaveLength(0);
+      await store.run('tick');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+      expect(updateSegment).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('a change notice keeps one id from the moment it is recorded (liveWas.noticeRev)', () => {
+  /** The airline moved the time; no departure terminal published yet. */
+  const timeOnly = makeLeg({
+    dep: {
+      scheduledLocal: '2026-12-13 18:30+08:00',
+      scheduledUtc: '2026-12-13 10:30Z',
+      terminal: undefined,
+    },
+  });
+  const withTerminals = (dep: string, arr?: string): FlightLeg => ({
+    ...timeOnly,
+    departure: { ...timeOnly.departure, terminal: dep },
+    arrival: { ...timeOnly.arrival, ...(arr ? { terminal: arr } : {}) },
+  });
+  const REC = (terminal: string) => `SQ318|2026-12-13|${terminal}`;
+
+  it('after a time change is applied and dismissed, a later quiet fill of either terminal keeps the id and the fold', async () => {
+    vacationsState.vacations = [trip([makeFlight({ terminal: undefined })])];
+    h.fetchFlightLegs.mockResolvedValue(answer([timeOnly]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(segment().departureTime).toBe('18:30');
+    const id = liveNoticeId('seg-1', segment())!;
+    expect(id).toBe(`travel-change:seg-1:${revisionOf(tupleFromLeg(timeOnly))}`);
+    const stamp = store.noticeFirstSeen(id, 'seg-1');
+    expect(store.dismissNotice('seg-1')).toBe(true);
+
+    // The airline publishes the departure terminal: a quiet fill that moves liveRevision.
+    vi.setSystemTime(NOW + LATER);
+    h.fetchFlightLegs.mockResolvedValue(answer([withTerminals('3')]));
+    await store.run('tick');
+    expect(updateSegment).toHaveBeenCalledTimes(2);
+    expect(segment().terminal).toBe('3');
+    expect(segment().liveRevision).toBe(revisionOf(tupleFromLeg(withTerminals('3'))));
+    expect(liveNoticeId('seg-1', segment())).toBe(id);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', dismissed: true });
+
+    // Then the arrival terminal: another quiet fill, which moves liveArrivalTerminal.
+    vi.setSystemTime(NOW + 2 * LATER);
+    h.fetchFlightLegs.mockResolvedValue(answer([withTerminals('3', '2')]));
+    await store.run('tick');
+    expect(updateSegment).toHaveBeenCalledTimes(3);
+    expect(segment().liveArrivalTerminal).toBe(REC('2'));
+    expect(liveNoticeId('seg-1', segment())).toBe(id);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', dismissed: true });
+    // The same notice: no second notification is scheduled for it.
+    expect(store.noticeFirstSeen(id, 'seg-1')).toBe(stamp);
+  });
+
+  it('a second change on a view-only device has its own id, the same before and after the write', async () => {
+    // Another device (an older build: no noticeRev) applied the first change.
+    syncChangeIn();
+    expect(liveNoticeId('seg-1', segment())).toBe(`travel-change:seg-1:${MOVED_REV}`);
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([nextDay]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(updateSegment).not.toHaveBeenCalled();
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+    expect(store.dismissNotice('seg-1')).toBe(true);
+
+    canEdit.value = true;
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    const second = `${revisionOf(tupleFromLeg(nextDay))}#2`;
+    expect(segment().liveWas?.noticeRev).toBe(second);
+    expect(liveNoticeId('seg-1', segment())).toBe(`travel-change:seg-1:${second}`);
+    expect(store.verificationFor('seg-1')).toMatchObject({
+      state: 'changed',
+      applied: true,
+      dismissed: true,
+    });
+  });
+
+  it('Undo of a recording take restores the earlier noticeRev, so the earlier notice returns under its own id', async () => {
+    const at = new Date(NOW - 60 * MIN).toISOString();
+    // An earlier change is recorded; the family then set its own arrival terminal by hand.
+    vacationsState.vacations = [
+      trip([
+        makeFlight({
+          arrivalTerminal: '5',
+          liveRevision: LEG_REV,
+          liveArrivalTerminal: REC('2'),
+          liveWas: { departureTime: '16:00', at, noticeRev: LEG_REV },
+          liveAppliedAt: at,
+        }),
+      ]),
+    ];
+    const earlierId = `travel-change:seg-1:${LEG_REV}`;
+    expect(liveNoticeId('seg-1', segment())).toBe(earlierId);
+    // The airline moves the time; this member may not write it yet.
+    canEdit.value = false;
+    const leg: FlightLeg = { ...moved, arrival: { ...moved.arrival, terminal: '2' } };
+    h.fetchFlightLegs.mockResolvedValue(answer([leg]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+    canEdit.value = true;
+
+    const out = await store.takeAirline('seg-1');
+    expect(out.result).toBe('saved');
+    expect(out.undo).toBeTypeOf('function');
+    expect(segment().liveWas?.noticeRev).toBe(`${MOVED_REV}#2`);
+    expect(liveNoticeId('seg-1', segment())).toBe(`travel-change:seg-1:${MOVED_REV}#2`);
+
+    expect(await out.undo!()).toBe('saved');
+    expect(segment().liveWas).toEqual({ departureTime: '16:00', at, noticeRev: LEG_REV });
+    expect(liveNoticeId('seg-1', segment())).toBe(earlierId);
   });
 });

@@ -8,6 +8,7 @@ import FlightChangeNotice from '../FlightChangeNotice.vue';
 import type { FlightVerification } from '@/types/flightStatus';
 import type { FlightRef } from '@/composables/useVacationTimeline';
 import { UI_STRINGS } from '@/services/translation/uiStrings';
+import { withDiff } from '@/utils/flightStatus/__tests__/fixtures';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
@@ -112,6 +113,31 @@ describe('FlightChangeNotice', () => {
     await w.get('[data-testid="flight-use-airline"]').trigger('click');
     expect(w.emitted('take-airline')).toHaveLength(1);
     expect(w.emitted('revert')).toBeUndefined();
+  });
+
+  it('conflict: names only the values in dispute (`diff.contested`), never a pending fill', () => {
+    // The family cleared the departure terminal the plan had taken; the airline has since
+    // published an arrival terminal, a quiet fill this device has not written yet.
+    const w = mountNotice(
+      withDiff(
+        {
+          state: 'conflict',
+          checkedAt: NOW,
+          mine: { departureDate: '2026-12-13', departureTime: '17:00' },
+          provider: {
+            departureDate: '2026-12-13',
+            departureTime: '17:00',
+            terminal: '3',
+            arrivalTerminal: '2',
+          },
+        },
+        { revision: true, arrivalTerminal: false }
+      )
+    );
+    expect(w.text()).toContain(
+      'Your plan says not set on 13 Dec. Singapore Airlines says from Terminal 3.'
+    );
+    expect(w.text()).not.toContain('Terminal 2');
   });
 
   it('conflict after a re-booking the airline still lists as cancelled', () => {

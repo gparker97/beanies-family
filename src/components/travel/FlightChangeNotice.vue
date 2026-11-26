@@ -126,7 +126,12 @@ const view = computed<{
         tone: 'orange',
         lead: conflictSentence(
           t,
-          { mine: v.mine ?? {}, provider: v.provider ?? {}, airline: airline.value },
+          {
+            mine: v.mine ?? {},
+            provider: v.provider ?? {},
+            airline: airline.value,
+            contested: v.diff?.contested,
+          },
           lang.value
         ),
         note: '',

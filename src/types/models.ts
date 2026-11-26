@@ -2108,6 +2108,12 @@ export interface VacationTravelSegment {
     arrivalTerminal?: string;
     /** ISO */
     at: string;
+    /** The change notice's identity, frozen when the change is written (`noticeRevAfterWrite`
+     *  in `utils/flightStatus/verify.ts`, the one builder), so a later quiet fill never moves
+     *  it. Absent on a change written before this field existed (the id is then derived from
+     *  the live record, `noticeRevision`). Machine-written; not a schedule field, so
+     *  `tupleFromWas` and "Put it back" ignore it. */
+    noticeRev?: string;
   };
   /** ISO; drives the change notice and the struck-out band until departure. */
   liveAppliedAt?: string;

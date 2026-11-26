@@ -121,6 +121,15 @@ export interface FlightCheck {
   miss?: 'no_coverage' | 'no_match';
   /** "BA12" when the provider answered the marketing number with the operating flight. */
   operatedAs?: string;
+  /**
+   * The plan's live record (`liveRecordOf`) this device had seen when it ASKED (read before the
+   * request is awaited), advanced by the store's own writes while the check is current
+   * (`writeSegment`). A different record on the segment was written by another device: an answer
+   * that would write over it is superseded (`isSuperseded`) and asked again, never written.
+   * Absent on a check cached before this field existed, which reads as "not seen". Optional,
+   * so the cache stays `v: 1` and its guard (`isCheck`) is unchanged.
+   */
+  planRecord?: string;
 }
 
 /** Why a flight shows `unavailable`. `before_window` carries `opensAt`. A verification with
@@ -187,6 +196,17 @@ export interface FlightVerification {
   provider?: ScheduleTuple;
   /** The segment's own schedule. */
   mine?: ScheduleTuple;
+  /**
+   * What happened to each differing field, against the plan's record (`classifyDiff`): owed and
+   * held a different value (`changed`), owed and held none (`filled`, a quiet fill), or the
+   * family's own edit of an answer already recorded (`contested`). Set on every verification
+   * built from a running provider leg, so a value's pill (`fieldCheck`) describes that value.
+   */
+  diff?: {
+    changed: (keyof ScheduleTuple)[];
+    filled: (keyof ScheduleTuple)[];
+    contested: (keyof ScheduleTuple)[];
+  };
 }
 
 /** Every way a flight-status call can fail on the client. `not_configured` never enters the

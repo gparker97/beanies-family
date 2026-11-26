@@ -15,6 +15,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import TimelineSegmentCard from '../TimelineSegmentCard.vue';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
 import type { FlightVerification } from '@/types/flightStatus';
+import { withDiff } from '@/utils/flightStatus/__tests__/fixtures';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -282,12 +283,12 @@ describe('TimelineSegmentCard', () => {
         },
       },
       {
-        verification: {
+        verification: withDiff({
           state: 'verified',
           checkedAt: 1,
           mine: tuple,
           provider: { ...tuple, arrivalTerminal: '5' },
-        },
+        }),
         nowMs: 2,
       }
     );

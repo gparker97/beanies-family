@@ -44,8 +44,10 @@ import {
   REVISION_FIELDS,
   TUPLE_FIELDS,
   arrivalTerminalRecord,
+  changeNoticeRevision,
   classifyDiff,
   diffTuple,
+  liveRecordOf,
   revisionOf,
   splitLocal,
   tupleFromLeg,
@@ -88,15 +90,19 @@ export interface PatchCopy {
 }
 
 /**
- * The cached check, when it still answers THIS segment's question; else undefined (treated as
- * no check everywhere: `deriveVerification`, the store's refresh decision, "Update with airline
- * data"). It must have queried the segment's current flight number, AND be about the
- * segment's current day: the day it queried (`check.date`) or the matched leg's own local
- * departure day. A hand edit to another day therefore drops it and the next run fetches the
- * new day; an apply writes the leg's day, and "Put it back" restores the queried day, so
- * neither drops it (no refetch loop, and the Conflict stays visible).
+ * The cached check, when it answers THIS segment's flight on its day; else undefined. It must
+ * have queried the segment's current flight number, AND be about the segment's current day:
+ * the day it queried (`check.date`) or the matched leg's own local departure day. A hand edit
+ * to another day therefore drops it and the next run fetches the new day; an apply writes the
+ * leg's day, and "Put it back" restores the queried day, so neither drops it (no refetch loop,
+ * and the Conflict stays visible).
+ *
+ * The plain match, superseded or not. Read only where the answer is neither shown nor written:
+ * timing (`flightTiming`, so the card and the run agree on the window from the leg's real
+ * instants), the track link and alert registration (`desiredAlerts`). Everything that shows or
+ * writes the answer reads `usableCheck`.
  */
-export function usableCheck(
+export function matchingCheck(
   seg: Pick<VacationTravelSegment, 'airline' | 'flightNumber' | 'departureDate'>,
   check: FlightCheck | undefined
 ): FlightCheck | undefined {
@@ -107,6 +113,39 @@ export function usableCheck(
   if (check.date === day) return check;
   const legDay = check.leg ? splitLocal(check.leg.departure.scheduledLocal)?.date : undefined;
   return legDay === day ? check : undefined;
+}
+
+/**
+ * Would this cached answer write over a plan record this device has not seen beside it? True
+ * when the check has a leg, the segment's live record (`liveRecordOf`) is not the one the check
+ * remembers (`planRecord`: another device wrote it, or the check predates the field), AND the
+ * answer would write (`shouldApply`). Such an answer is set aside and asked again, once, never
+ * written: the other device may hold a newer one. An answer that owes nothing is never
+ * superseded (the normal case: the other device applied the answer this device holds).
+ *
+ * The records are compared for EQUALITY only. Nothing here orders two timestamps, reads a
+ * clock, or relies on the server's answers arriving in order.
+ */
+export function isSuperseded(seg: VacationTravelSegment, check: FlightCheck): boolean {
+  return (
+    check.leg !== null &&
+    check.planRecord !== liveRecordOf(seg) &&
+    shouldApply(seg, check.leg, check.arrivalLeg)
+  );
+}
+
+/**
+ * The cached check, when it still answers THIS segment's question (`matchingCheck`) and is not
+ * superseded (`isSuperseded`); else undefined, treated as no answer everywhere that shows or
+ * writes one: `deriveVerification`, the store's refresh decision and owed writes, "Update with
+ * airline data".
+ */
+export function usableCheck(
+  seg: VacationTravelSegment,
+  check: FlightCheck | undefined
+): FlightCheck | undefined {
+  const matching = matchingCheck(seg, check);
+  return matching && !isSuperseded(seg, matching) ? matching : undefined;
 }
 
 /** The provider's schedule as cached: `arrivalLeg` absent = `leg`, null = no arrival half. */
@@ -150,10 +189,11 @@ function liveInfo(check: FlightCheck, leg: FlightLeg): FlightLiveInfo | undefine
  *
  * A check is ignored (the provider tuple is then unknown) when live checks are off for this
  * device (unentitled, disabled, not configured) or when it is not `usableCheck` for the
- * segment (another flight number, another day). With no usable provider tuple the state falls
- * back to the SYNCED fields alone, so a second device shows what the first applied before its
- * own first fetch: `cancelled` (the cancel marker + `pending`), `changed` (`liveAppliedAt`,
- * not departed, and the segment still differs from `liveWas`), else `unavailable`.
+ * segment (another flight number, another day, or superseded by a record another device
+ * wrote). With no usable provider tuple the state falls back to the SYNCED fields alone, so a
+ * second device shows what the first applied before its own first (or next) fetch: `cancelled`
+ * (the cancel marker + `pending`), `changed` (`liveAppliedAt`, not departed, and the segment
+ * still differs from `liveWas`), else `unavailable`.
  */
 export function deriveVerification(
   seg: VacationTravelSegment,
@@ -203,25 +243,29 @@ export function deriveVerification(
       if (recorded && seg.status !== 'pending') return { ...base, state: 'conflict' };
       return { ...base, state: 'cancelled', applied: recorded };
     }
-    const { changed, filled, contested } = classifyDiff(seg, provider);
+    // Carried on the verification (`diff`), so each value's pill (`fieldCheck`), the Conflict
+    // sentence and the conflict log read what happened to THAT field, never recompute it.
+    const diff = classifyDiff(seg, provider);
+    const { changed, filled, contested } = diff;
+    const answer: FlightVerification = { ...base, diff };
     // Not recorded yet (a failed write, or this member may not edit trips): a real move is
     // `changed` with `applied: false`, never a Conflict the family did not cause, never a tick.
     if (changed.length > 0) {
       // `was` in the `liveWas` shape: the plan's values of the fields the airline moved.
       const planned: ScheduleTuple = {};
       for (const f of changed) planned[f] = mine[f];
-      return { ...base, state: 'changed', applied: false, was: planned };
+      return { ...answer, state: 'changed', applied: false, was: planned };
     }
     // A recorded answer, edited away from by hand (or "Put it back"): the Conflict.
-    if (contested.length > 0) return { ...base, state: 'conflict', applied: false };
+    if (contested.length > 0) return { ...answer, state: 'conflict', applied: false };
     // Nothing differs but values the booking never had (a terminal published later: a quiet
     // fill, never announced). An earlier change this plan carries still reads as that change
     // (its notice, strike-out and "Put it back" stay while the fill is pending); otherwise
     // the chip is `verified`, `applied: false` only while a fill is pending.
     if (seg.liveAppliedAt && !ctx.departed && was) {
-      return { ...base, state: 'changed', applied: true, was };
+      return { ...answer, state: 'changed', applied: true, was };
     }
-    return { ...base, applied: filled.length === 0 };
+    return { ...answer, applied: filled.length === 0 };
   }
 
   // ── No provider tuple: the synced fields alone. ────────────────────────────
@@ -376,8 +420,8 @@ const REVISION_FIELD_SET: ReadonlySet<TupleField> = new Set(REVISION_FIELDS);
  * writes it. Never moved merely because the stored revision differs: an
  * arrival-terminal-only write must keep an existing notice's id (applied at R2, put back, the
  * airline back on R1, then its arrival terminal published or moved: the plan stays on R2).
- * The ONE rule: `planChange` writes it, the store's `noticeKey` names an unwritten change by
- * it, so the notice has one id before and after the write.
+ * The ONE rule: `planChange` writes it, and the change notice's id is built on it
+ * (`noticeRevAfterWrite`), so the id is the same before and after the write.
  */
 export function revisionAfterWrite(
   seg: Parameters<typeof classifyDiff>[0],
@@ -389,6 +433,42 @@ export function revisionAfterWrite(
   return owesRevision || isCancelRevision(seg.liveRevision) || announcesFirst
     ? revisionOf(provider)
     : seg.liveRevision;
+}
+
+/** The occurrence ordinal a change's `noticeRev` ends with (`#3`); anchored, so a revision or
+ *  terminal record holding a `#` elsewhere is never read as one. */
+const NOTICE_ORDINAL = /#(\d+)$/;
+
+/**
+ * The identity of the change notice a running answer's write (`planChange`) announces, as the
+ * write will leave it (the `revisionAfterWrite` contract). `planChange` freezes it into
+ * `liveWas.noticeRev`, and the store's `noticeKey` names an unwritten change by it, so one
+ * change has one id before and after its write and on a device that may not write it; a later
+ * quiet fill writes no `liveWas`, so it never moves.
+ *
+ * The base is the id the change had before this field existed: the revision the write leaves
+ * (`revisionAfterWrite`, else the airline's), plus the airline's arrival terminal record when
+ * the arrival terminal moved (`changeNoticeRevision`, given exactly the `liveWas.arrivalTerminal`
+ * `planChange` writes). Then an occurrence ordinal read from the PLAN, never from a clock: the
+ * change this one replaces (`seg.liveWas`) carries ordinal 1 when its `noticeRev` has no `#N`
+ * (a first change, or one written without the field), so a first change keeps the old format
+ * and each later one is `base#N`. T2, T3, T2, T3 is four ids, and two devices applying from
+ * the same synced plan compute the same one.
+ */
+export function noticeRevAfterWrite(seg: VacationTravelSegment, provider: ScheduleTuple): string {
+  const movedArrival = classifyDiff(seg, provider).changed.includes('arrivalTerminal')
+    ? { arrivalTerminal: tupleFromSegment(seg).arrivalTerminal }
+    : undefined;
+  const base = changeNoticeRevision(
+    revisionAfterWrite(seg, provider) ?? revisionOf(provider),
+    arrivalTerminalRecord(seg, provider),
+    movedArrival
+  );
+  if (!seg.liveWas) return base;
+  const rev: unknown = seg.liveWas.noticeRev;
+  const ordinal = typeof rev === 'string' ? NOTICE_ORDINAL.exec(rev) : null;
+  const prior = ordinal ? Number(ordinal[1]) : 1;
+  return prior === 0 ? base : `${base}#${prior + 1}`;
 }
 
 /**
@@ -414,7 +494,8 @@ function recordAnswer(seg: VacationTravelSegment, provider: ScheduleTuple): Segm
  *  - Cancellation: `status: 'pending'`, `liveCancelledAt`, the cancel revision, a notes line.
  *  - Change (an owed field the segment held differs, `classifyDiff` `changed`): every owed
  *    changed and filled field, the answer recorded (`recordAnswer`), `liveWas` (the prior
- *    values of the changed fields + `at`), `liveAppliedAt`, the notes line "Changed on
+ *    values of the changed fields + `at` + the notice id `noticeRev`, `noticeRevAfterWrite`),
+ *    `liveAppliedAt`, the notes line "Changed on
  *    12 Dec: Was 17:00 from Terminal 2", `arrivesNextDay` re-derived.
  *  - Quiet fill (the airline only published values the segment never had, e.g. a terminal):
  *    those fields, the answer recorded and a notes line; NO `liveWas` and NO `liveAppliedAt`,
@@ -456,6 +537,7 @@ export function planChange(
   if (changed.length > 0) {
     const liveWas: NonNullable<VacationTravelSegment['liveWas']> = { at };
     for (const f of changed) liveWas[f] = mine[f];
+    liveWas.noticeRev = noticeRevAfterWrite(seg, provider);
     return withArrivesNextDay(seg, {
       ...values,
       ...recorded,

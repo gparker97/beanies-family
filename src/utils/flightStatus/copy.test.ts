@@ -32,7 +32,7 @@ import {
   terminalRoute,
   wasLine,
 } from './copy';
-import { t } from './__tests__/fixtures';
+import { t, withDiff, type Recorded } from './__tests__/fixtures';
 
 const zh = (k: UIStringKey): string => ZH_STRINGS[k];
 const MIN = 60_000;
@@ -274,6 +274,28 @@ describe('conflictSentence', () => {
       })
     ).toBe('Your plan says not set. Singapore Airlines says from Terminal 3.');
   });
+
+  it('names only the values in dispute (`contested`), never a value the airline only published', () => {
+    const mine = { departureDate: '2026-11-09', departureTime: '17:00' };
+    const provider = {
+      departureDate: '2026-11-09',
+      departureTime: '17:00',
+      terminal: '3',
+      arrivalTerminal: '2',
+    };
+    // The family cleared the departure terminal the plan had taken; the arrival terminal is a
+    // pending quiet fill.
+    const { diff } = withDiff(
+      { state: 'conflict', mine, provider },
+      { revision: true, arrivalTerminal: false }
+    );
+    expect(diff).toMatchObject({ filled: ['arrivalTerminal'], contested: ['terminal'] });
+    expect(conflictSentence(t, { mine, provider, airline, contested: diff!.contested })).toBe(
+      'Your plan says not set on 9 Nov. Singapore Airlines says from Terminal 3.'
+    );
+    // Unfiltered, the fill would be named as part of the dispute.
+    expect(conflictSentence(t, { mine, provider, airline })).toContain('Terminal 2');
+  });
 });
 
 describe('Chinese', () => {
@@ -300,14 +322,19 @@ describe('fieldCheck / bandChecks / airportCheck', () => {
     arrivalDate: '2026-12-14',
     arrivalTime: '00:40',
   };
-  const v = (over: Partial<FlightVerification> = {}): FlightVerification => ({
-    state: 'verified',
-    checkedAt: 1,
-    mine: plan,
-    provider: { ...plan, terminal: 'T2' },
-    route: { from: 'SIN', to: 'LHR' },
-    ...over,
-  });
+  /** A verification as `deriveVerification` builds it, its `diff` from `withDiff`. */
+  const v = (over: Partial<FlightVerification> = {}, recorded?: Recorded): FlightVerification =>
+    withDiff(
+      {
+        state: 'verified',
+        checkedAt: 1,
+        mine: plan,
+        provider: { ...plan, terminal: 'T2' },
+        route: { from: 'SIN', to: 'LHR' },
+        ...over,
+      },
+      recorded
+    );
 
   it('confirmed for each value the airline states and the plan matches, however old or spelled', () => {
     expect(fieldCheck(v(), ['terminal'])).toBe('confirmed');
@@ -367,10 +394,93 @@ describe('fieldCheck / bandChecks / airportCheck', () => {
     expect(fieldCheck(v({ mine: noTerminal }), ['terminal'])).toBeUndefined();
   });
 
-  it('nothing is marked without a usable answer: unchecked, cancelled, alert, no provider', () => {
+  it('each value says what happened to IT, not the flight: a hand edit under an unwritten change is a Conflict', () => {
+    // The plan took the airline's revision, then the family moved the time by hand; the airline
+    // has since moved the arrival terminal, which this device has not written.
+    const c = v(
+      {
+        state: 'changed',
+        applied: false,
+        mine: { ...plan, departureTime: '19:00', arrivalTerminal: '2' },
+        provider: { ...plan, arrivalTerminal: '3' },
+      },
+      { revision: true, arrivalTerminal: false }
+    );
+    expect(c.diff).toEqual({
+      changed: ['arrivalTerminal'],
+      filled: [],
+      contested: ['departureTime'],
+    });
+    expect(bandChecks(c)).toEqual({
+      start: 'conflict',
+      end: 'confirmed',
+      startPlace: 'confirmed',
+      endPlace: 'changed',
+    });
+    // The other way round: the family's own arrival terminal, the airline's new time.
+    const d = v(
+      {
+        state: 'changed',
+        applied: false,
+        mine: { ...plan, arrivalTerminal: '5' },
+        provider: { ...plan, departureTime: '19:00', arrivalTerminal: '3' },
+      },
+      { revision: false, arrivalTerminal: true }
+    );
+    expect(bandChecks(d)).toMatchObject({ start: 'changed', endPlace: 'conflict' });
+  });
+
+  it('a group reads Conflict when any value in it is contested, a value the plan lacks beside it included', () => {
+    // A band cell: the family moved the time and cleared the date after the answer was taken.
+    const { departureDate: _d, ...noDate } = plan;
+    const cell = v({
+      state: 'conflict',
+      applied: false,
+      mine: { ...noDate, departureTime: '19:00' },
+    });
+    expect(cell.diff?.contested).toEqual(['departureDate', 'departureTime']);
+    expect(bandChecks(cell).start).toBe('conflict');
+    // Contested wins over a pending quiet fill in the same group, and the fill alone has no mark.
+    const mixed = v(
+      {
+        state: 'conflict',
+        applied: false,
+        mine: { ...plan, departureTime: '19:00' },
+        provider: { ...plan, arrivalTerminal: '3' },
+      },
+      { revision: true, arrivalTerminal: false }
+    );
+    expect(mixed.diff).toMatchObject({ filled: ['arrivalTerminal'], contested: ['departureTime'] });
+    expect(fieldCheck(mixed, ['departureTime', 'arrivalTerminal'])).toBe('conflict');
+    expect(fieldCheck(mixed, ['arrivalTerminal'])).toBeUndefined();
+  });
+
+  it('a band cell with an equal time and a date only the airline states reads nothing, under an unwritten change too', () => {
+    const { departureDate: _d, ...noDate } = plan;
+    const c = v({
+      state: 'changed',
+      applied: false,
+      mine: { ...noDate, arrivalTerminal: '2' },
+      provider: { ...plan, arrivalTerminal: '3' },
+    });
+    expect(c.diff).toEqual({
+      changed: ['arrivalTerminal'],
+      filled: ['departureDate'],
+      contested: [],
+    });
+    expect(bandChecks(c)).toEqual({
+      start: undefined,
+      end: 'confirmed',
+      startPlace: 'confirmed',
+      endPlace: 'changed',
+    });
+  });
+
+  it('nothing is marked without a usable answer: unchecked, cancelled, alert, no provider, no diff', () => {
     for (const bad of [
       v({ checkedAt: undefined }),
       v({ provider: undefined }),
+      { ...v(), diff: undefined },
       v({ state: 'cancelled', applied: true }),
       v({ state: 'conflict', live: { status: 'Canceled' } }),
       v({ live: { status: 'Diverted' } }),

@@ -21,7 +21,7 @@ import type { UUID, VacationTravelSegment } from '@/types/models';
 import { isChangeRecipient, type ChangeAudienceMember } from './audience';
 import { normaliseFlightNumber } from './flightNumber';
 import { revisionOf, tupleFromLeg } from './schedule';
-import { cancelRevisionOf, usableCheck } from './verify';
+import { cancelRevisionOf, matchingCheck } from './verify';
 import { flightTiming } from './window';
 
 /** Alert calls (subscribe + unsubscribe) per run at most; the rest wait for the next trigger
@@ -141,7 +141,7 @@ export function desiredAlerts(
     const seg = c.segment;
     const number = normaliseFlightNumber(seg.airline, seg.flightNumber);
     const date = dayOf(seg);
-    const check = usableCheck(seg, checks[seg.id]);
+    const check = matchingCheck(seg, checks[seg.id]);
     const leg = check?.leg;
     const dep = leg?.departure.iata;
     if (!number || !date || !check || !leg || !dep) continue;

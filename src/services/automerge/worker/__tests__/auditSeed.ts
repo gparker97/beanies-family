@@ -206,6 +206,7 @@ const SUPPLEMENT: Record<string, Json[]> = {
             arrivalTime: '23:10',
             arrivalTerminal: 'Terminal 5',
             at: '2026-12-12T08:48:00.000Z',
+            noticeRev: '2026-10-01|17:00|1|2026-10-01|23:10~SQ318|2026-10-01|3#2',
           },
           travellerIds: ['m1'],
           photoIds: ['photo-1'],

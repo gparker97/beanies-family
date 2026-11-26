@@ -10,7 +10,9 @@
  * only (`usableCheck` in `verify.ts`): a check whose flight or date no longer fits the
  * segment (a hand edit to another day) is "no check" here, so the next run fetches the new
  * day. An apply that moves `departureDate` writes the leg's own date, which still fits, so
- * the store's own write is never a refetch.
+ * the store's own write is never a refetch. A SUPERSEDED check (`isSuperseded`: it would
+ * write over a plan record another device wrote) is its own input, `superseded`, never
+ * inferred from a missing check: it is fetched once, in the window or out of it.
  */
 import type { FlightCheck } from '@/types/flightStatus';
 import type { VacationTravelSegment } from '@/types/models';
@@ -239,7 +241,7 @@ export type FlightSkipReason =
 
 export type FlightRefreshDecision =
   | { action: 'skip'; reason: FlightSkipReason }
-  | { action: 'fetch'; reason: 'no-check' | 'stale' | 'entry' };
+  | { action: 'fetch'; reason: 'no-check' | 'stale' | 'entry' | 'superseded' };
 
 export interface FlightRefreshInput {
   /** Sign-out is under way (`haltForSignOut`). */
@@ -258,7 +260,8 @@ export interface FlightRefreshInput {
   inWindow: boolean;
   nowMs: number;
   /** `checkedAt` of this device's last USABLE answer for the flight (`usableCheck`), or null:
-   *  an answer for another flight number or another day counts as none. */
+   *  an answer for another flight number or another day, or a superseded one, counts as none.
+   *  Never read for a superseded flight (`superseded` decides first). */
   lastCheckedAt: number | null;
   /** From `flightTiming` (`minIntervalMs`). */
   minIntervalMs: number;
@@ -270,6 +273,10 @@ export interface FlightRefreshInput {
   /** This device has already issued an out-of-window check for this segment's CURRENT
    *  question (`entryChecked` stamp equals `entryQuestion`). Inert inside the window. */
   entryDone: boolean;
+  /** This device's cached answer for the flight would write over a plan record it has not
+   *  seen beside it (`isSuperseded` in `verify.ts`): asked again once, past the entry stamp and
+   *  the freshness floor, never past a device gate or the failure backoff. */
+  superseded: boolean;
 }
 
 /** The refresh decision for one flight. Skip reasons are checked in `FlightSkipReason` order:
@@ -280,7 +287,13 @@ export interface FlightRefreshInput {
  * typed, not three days before departure. The stamp (`entryDone`) is the only out-of-window
  * gate: not the trigger kind (`segment-changed` also fires on every doc load), not the clock,
  * and not `lastCheckedAt` (a usable `no_match` answer must not block a re-ask once the
- * question changes). The decision lives here so `backoff` and the stamp are one ordering. */
+ * question changes). The decision lives here so `backoff` and the stamp are one ordering.
+ *
+ * A superseded answer (`superseded`) is asked again as `'superseded'`, in the window or out of
+ * it, whatever the stamp or `lastCheckedAt` say (out of the window with no stamp yet it goes as
+ * the `'entry'` it already is). The store sets an out-of-window one aside when it is issued, so
+ * a refetch that fails is not asked again; a fresh answer remembers the record, so one foreign
+ * write costs one fetch. */
 export function pickFlightRefresh(input: FlightRefreshInput): FlightRefreshDecision {
   if (input.halted) return { action: 'skip', reason: 'halted' };
   if (!input.entitled) return { action: 'skip', reason: 'unentitled' };
@@ -289,9 +302,12 @@ export function pickFlightRefresh(input: FlightRefreshInput): FlightRefreshDecis
   if (!input.online) return { action: 'skip', reason: 'offline' };
   if (!input.hasFlightNumber) return { action: 'skip', reason: 'no_flight_number' };
   if (input.past) return { action: 'skip', reason: 'past' };
-  if (!input.inWindow && input.entryDone) return { action: 'skip', reason: 'out_of_window' };
+  if (!input.inWindow && input.entryDone && !input.superseded) {
+    return { action: 'skip', reason: 'out_of_window' };
+  }
   if (input.nowMs < input.backoffUntil) return { action: 'skip', reason: 'backoff' };
-  if (!input.inWindow) return { action: 'fetch', reason: 'entry' };
+  if (!input.inWindow) return { action: 'fetch', reason: input.entryDone ? 'superseded' : 'entry' };
+  if (input.superseded) return { action: 'fetch', reason: 'superseded' };
   if (input.lastCheckedAt === null) return { action: 'fetch', reason: 'no-check' };
   const floor = input.manual
     ? Math.min(input.minIntervalMs, MANUAL_CHECK_FLOOR_MS)

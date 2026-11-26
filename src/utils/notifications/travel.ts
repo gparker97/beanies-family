@@ -3,12 +3,16 @@
  *
  *   travel-departure  one per timed departure, at departure minus the device's travel lead
  *                     (the same moment, and the same id, as the OS reminder);
- *   travel-change     the airline moved a flight: `travel-change:<segmentId>:<liveRevision>`;
+ *   travel-change     the airline moved a flight: `travel-change:<segmentId>:<noticeRev>`, the
+ *                     id frozen into `liveWas.noticeRev` when the change was written (a change
+ *                     written without one: `<liveRevision>`, plus `~<liveArrivalTerminal>` when
+ *                     the arrival terminal moved; `noticeRevision`);
  *   travel-change     (cancellation) `travel-cancel:<segmentId>:<liveRevision>@<liveCancelledAt>`
  *                     (`occurrenceNotice`'s cancel identity), same kind.
  *
- * Exactly one change entry per revision: every id is keyed on the revision, never on
- * `liveAppliedAt`, so two devices that applied the same change a few seconds apart still agree.
+ * Exactly one change entry per airline change: every id is built from the plan (the revision
+ * and an occurrence ordinal), never from `liveAppliedAt`, so two devices that applied the same
+ * change a few seconds apart still agree, and a later quiet fill never moves it.
  * A change replaces nothing in the bell: the departure entry is a reminder, the change a fact.
  *
  * Pure and total (a malformed occurrence is skipped). `deriveNotifications` calls it once.

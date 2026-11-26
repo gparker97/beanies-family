@@ -157,6 +157,27 @@ describe('read / write / clear', () => {
     expect(readFlightStatusCache('fam-1')?.checks['seg-1']?.arrivalLeg).toBeNull();
   });
 
+  it('a check with no, an unknown or a wrong-typed planRecord survives the guard, persist, restore and prune', () => {
+    // The guard is unchanged: `planRecord` is optional and unread there. A wrong-typed value
+    // never equals a live record, so it reads as "not seen" (one refetch replaces it).
+    const { planRecord: _drop, ...preField } = makeCheck(makeLeg({}));
+    for (const planRecord of [undefined, 'rev§§§', 42, { nested: true }, null]) {
+      const check = { ...preField, ...(planRecord === undefined ? {} : { planRecord }) };
+      const r = record({ checks: { 'seg-1': check as never } });
+      expect(writeFlightStatusCache(r)).toEqual({ ok: true });
+      const back = readFlightStatusCache('fam-1');
+      expect(back?.checks['seg-1']).toEqual(check);
+      const pruned = pruneFlightStatusCache(
+        back!,
+        new Set(['seg-1', 'seg-2']),
+        new Set(),
+        check.checkedAt + HOUR
+      );
+      expect(pruned.checks['seg-1']).toEqual(check);
+    }
+    expect(h.logEvent).not.toHaveBeenCalled();
+  });
+
   it('missing is null and logs nothing', () => {
     expect(readFlightStatusCache('fam-1')).toBeNull();
     expect(h.logEvent).not.toHaveBeenCalled();

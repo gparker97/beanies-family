@@ -17,7 +17,7 @@ import {
   type AlertSpec,
 } from '../alerts';
 import { revisionOf, tupleFromLeg } from '../schedule';
-import { CANCELLED_REVISION_SUFFIX } from '../verify';
+import { CANCELLED_REVISION_SUFFIX, isSuperseded, usableCheck } from '../verify';
 import { makeCheck, makeFlight, makeLeg } from './fixtures';
 
 /** Inside SQ318's window (it leaves 2026-12-13 09:00Z). */
@@ -169,6 +169,25 @@ describe('desiredAlerts', () => {
 
   it('does not depend on a push token (none is an input)', () => {
     expect(desiredAlerts.length).toBe(3);
+  });
+
+  it('a superseded check registers exactly as before: same spec, same rev', () => {
+    // Another device applied a move the plan now carries; this device's cached answer (the
+    // booked schedule, never seen beside that record) is superseded, and still the leg it
+    // matched: alert registration reads the plain match (`matchingCheck`).
+    const moved = makeLeg({
+      dep: { scheduledLocal: '2026-12-13 18:30+08:00', scheduledUtc: '2026-12-13 10:30Z' },
+    });
+    const plan = { departureTime: '18:30', liveRevision: revisionOf(tupleFromLeg(moved)) };
+    const held = checks(leg, { planRecord: undefined });
+    expect(isSuperseded(makeFlight(plan), held['seg-1'])).toBe(true);
+    expect(usableCheck(makeFlight(plan), held['seg-1'])).toBeUndefined();
+    expect([...desiredAlerts([candidate(plan)], held, ctx()).values()]).toEqual([
+      spec({ rev: plan.liveRevision }),
+    ]);
+    expect([...desiredAlerts([candidate(plan)], checks(), ctx()).values()]).toEqual([
+      spec({ rev: plan.liveRevision }),
+    ]);
   });
 });
 

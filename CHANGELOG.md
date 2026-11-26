@@ -19,6 +19,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - The Android and iOS apps now ask anyone on a version older than 1.7 to update (a prompt that can be dismissed).
 - Dependency updates, including Capacitor 8.6, chart.js 4.6 and the development tooling.
 
+### Fixed
+
+- Live flight checks no longer flip a flight back to an older answer when two devices are in use, and a dismissed flight change notice now stays dismissed.
+
 ## 2026-11-23
 
 ### Added

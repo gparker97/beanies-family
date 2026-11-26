@@ -309,6 +309,23 @@ export function arrivalTerminalRecord(
 }
 
 /**
+ * A change notice's base identity: the revision, plus `~<arrival terminal record>` only when
+ * the arrival terminal moved (`was.arrivalTerminal` is set). A quiet arrival-terminal fill
+ * therefore changes no existing notice id, while a moved arrival terminal (the revision
+ * unchanged) is a new notice. `record` is `liveArrivalTerminal`'s form (`arrivalTerminalRecord`;
+ * a caller holding a provider answer builds it from that), appended as is. Two callers only:
+ * `noticeRevAfterWrite` (`verify.ts`, the id a change is frozen under) and `noticeRevision`'s
+ * fallback for a change written without one (`occurrenceNotice.ts`).
+ */
+export function changeNoticeRevision(
+  revision: string,
+  record: string | undefined,
+  was: Pick<ScheduleTuple, 'arrivalTerminal'> | undefined
+): string {
+  return was?.arrivalTerminal !== undefined ? `${revision}~${record ?? ''}` : revision;
+}
+
+/**
  * How the airline's answer differs from the plan, split by whether the plan has acted on it.
  * The five `REVISION_FIELDS` are recorded as `liveRevision`, `arrivalTerminal` as
  * `liveArrivalTerminal` (`arrivalTerminalRecord`), each on its own, so a flight sitting in
@@ -378,4 +395,39 @@ export function pickLiveState(seg: SegmentLiveState): SegmentLiveState | undefin
     out[f] = typeof v === 'object' ? { ...v } : v;
   }
   return any ? (out as SegmentLiveState) : undefined;
+}
+
+/**
+ * What each synced live field is to the plan's record (`liveRecordOf`): `'record'` when a
+ * write that changes it is a new record a cached answer must have been seen beside, `'detail'`
+ * when it only describes a record (`liveWas`, the values before a change, written with
+ * `liveAppliedAt`). Total, the `FIELD_KIND` precedent: a new live field fails to compile until
+ * it is classified.
+ */
+export const LIVE_FIELD_ROLE: Record<keyof SegmentLiveState, 'record' | 'detail'> = {
+  liveRevision: 'record',
+  liveArrivalTerminal: 'record',
+  liveWas: 'detail',
+  liveAppliedAt: 'record',
+  liveCancelledAt: 'record',
+};
+
+const RECORD_FIELDS = LIVE_STATE_FIELDS.filter((f) => LIVE_FIELD_ROLE[f] === 'record');
+
+/**
+ * The plan's live record as one string: the `'record'` fields of `LIVE_FIELD_ROLE`, in
+ * `LIVE_STATE_FIELDS` order, joined with `§`, `''` for an absent one. A cached check remembers
+ * the record it was asked beside (`FlightCheck.planRecord`), so a record written by another
+ * device is told apart from one this device has seen (`isSuperseded` in `verify.ts`).
+ *
+ * `liveAppliedAt` and `liveCancelledAt` are in it as OPAQUE identity tokens, compared for
+ * equality only: never ordered, never parsed, never compared with a clock. They are there so a
+ * record that goes away and comes back (cancel, reinstate, cancel again, which reproduces the
+ * same cancel revision) still reads as a new one. Device state only, never persisted in the pod.
+ */
+export function liveRecordOf(seg: SegmentLiveState): string {
+  return RECORD_FIELDS.map((f) => {
+    const v = seg[f];
+    return typeof v === 'string' ? v : '';
+  }).join('§');
 }

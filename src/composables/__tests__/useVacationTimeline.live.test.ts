@@ -9,6 +9,7 @@ import { computed, ref } from 'vue';
 import { travelDetailRows, useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 import type { FlightVerification } from '@/types/flightStatus';
+import { withDiff } from '@/utils/flightStatus/__tests__/fixtures';
 
 const t = (k: string) => k;
 
@@ -67,16 +68,14 @@ describe('travelDetailRows live rows', () => {
 describe('travelDetailRows plan-value checks (terminal, from, to)', () => {
   const rowOf = (rows: ReturnType<typeof travelDetailRows>, label: string) =>
     rows.find((r) => r.label === label);
-  const answer = (
-    terminal: string,
-    over: Partial<FlightVerification> = {}
-  ): FlightVerification => ({
-    state: 'verified',
-    checkedAt: 1,
-    mine: { terminal: 'Terminal 2' },
-    provider: { terminal },
-    ...over,
-  });
+  const answer = (terminal: string, over: Partial<FlightVerification> = {}): FlightVerification =>
+    withDiff({
+      state: 'verified',
+      checkedAt: 1,
+      mine: { terminal: 'Terminal 2' },
+      provider: { terminal },
+      ...over,
+    });
 
   it("marks the flight terminal with what the airline's latest answer says, however old", () => {
     const seg = flight({ terminal: 'Terminal 2' });
@@ -93,9 +92,10 @@ describe('travelDetailRows plan-value checks (terminal, from, to)', () => {
     const check = (v?: FlightVerification) =>
       rowOf(travelDetailRows(seg, t as never, v), 'vacation.field.arrivalTerminal')?.check;
     const arr = (arrivalTerminal: string, over: Partial<FlightVerification> = {}) =>
+      // The airline's day is part of its arrival terminal's record (`arrivalTerminalRecord`).
       answer('2', {
-        mine: { terminal: 'Terminal 2', arrivalTerminal: '5' },
-        provider: { terminal: '2', arrivalTerminal },
+        mine: { departureDate: '2026-12-13', terminal: 'Terminal 2', arrivalTerminal: '5' },
+        provider: { departureDate: '2026-12-13', terminal: '2', arrivalTerminal },
         ...over,
       });
     expect(check(arr('T5'))).toBe('confirmed');

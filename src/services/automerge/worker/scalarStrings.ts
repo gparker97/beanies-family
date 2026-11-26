@@ -268,6 +268,7 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'accountEmail',
   // hashes and tokens, machine-written and replaced whole
   'liveArrivalTerminal', // a live check's arrival-terminal record ("SQ318|2026-12-13|2")
+  'noticeRev', // a live check's change-notice id, frozen in `liveWas` ("<revision>#2")
   'fingerprint',
   'importFingerprint',
   'lastPushedHash',

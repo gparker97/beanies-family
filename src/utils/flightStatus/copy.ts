@@ -432,14 +432,23 @@ function schedulePhrase(
  * 6:30pm from Terminal 3." Each side names the fields that disagree; when a departure time or
  * terminal is in dispute, the family's side also names the departure day (unless the day is
  * itself in dispute), so the reader knows which flight. `airline` is a display name (`airlineName`).
+ * `contested` (the verification's `diff.contested`) limits the sentence to the values in
+ * dispute, so a value the airline only published (a pending quiet fill) is never named as one.
  */
 export function conflictSentence(
   t: TranslateFn,
-  input: { mine: ScheduleTuple; provider: ScheduleTuple; airline: string },
+  input: {
+    mine: ScheduleTuple;
+    provider: ScheduleTuple;
+    airline: string;
+    contested?: readonly (keyof ScheduleTuple)[];
+  },
   lang?: LanguageCode
 ): string {
   const d = diffTuple(input.mine, input.provider);
-  const fields = d.changed.length > 0 ? d.changed : d.filled;
+  const inDispute = (f: TupleField) => !input.contested || input.contested.includes(f);
+  const changed = d.changed.filter(inDispute);
+  const fields = changed.length > 0 ? changed : d.filled.filter(inDispute);
   // The day is context for a DEPARTURE dispute only ("5pm from Terminal 2 on 9 Nov"); on an
   // arrival dispute it would read as the landing day, which it is not.
   const departureInDispute = fields.includes('departureTime') || fields.includes('terminal');
@@ -534,23 +543,27 @@ export function confirmedLive(v: FlightVerification): boolean {
  * What the airline's latest answer says about ONE value of the plan. The pill beside the value
  * (`LivePill`) shows exactly this, so the card's values and the flight's chip tell one story:
  *  - `confirmed`: the airline states it and the plan matches;
- *  - `conflict`: the flight is in Conflict and this is a value the two disagree on;
+ *  - `conflict`: the two disagree on this value and the plan already took this answer (the
+ *    family's own edit, or "Put it back"), whatever the flight's overall state;
  *  - `changed`: the airline moved this value and the plan has not been updated on this device.
  */
 export type FieldCheck = 'confirmed' | 'conflict' | 'changed';
 
 /**
  * A provider answer the per-value marks can be read from: checked on this device, with the
- * airline's schedule in hand, the flight running (not `Canceled`: nothing about a cancelled
- * flight is "confirmed") and not an alert status (`isAlertStatus`).
+ * airline's schedule and its per-field `diff` in hand (`deriveVerification` sets both from a
+ * running leg), the flight running (not `Canceled`: nothing about a cancelled flight is
+ * "confirmed") and not an alert status (`isAlertStatus`).
  */
-function answered(
-  v: FlightVerification | undefined
-): v is FlightVerification & { provider: ScheduleTuple } {
+function answered(v: FlightVerification | undefined): v is FlightVerification & {
+  provider: ScheduleTuple;
+  diff: NonNullable<FlightVerification['diff']>;
+} {
   return (
     !!v &&
     v.checkedAt !== undefined &&
     !!v.provider &&
+    !!v.diff &&
     (v.state === 'verified' || v.state === 'changed' || v.state === 'conflict') &&
     v.live?.status !== 'Canceled' &&
     !isAlertStatus(v.live?.status)
@@ -563,17 +576,23 @@ function answered(
  * state every field (no published terminal; the unknown arrival half of a multi-stop number,
  * `tupleFromLeg`), because an unknown value is never shown as confirmed. Deliberately not gated
  * on `fresh` (the `confirmedLive` rule): the chip says how old the answer is.
+ *
+ * Read per field from the verification's `diff`, never from its overall state, so a
+ * hand-edited value under an unwritten airline change reads Conflict while the moved one reads
+ * Changed. Over a group, first match wins: any field the family edited away from a recorded
+ * answer (`contested`) is `conflict`; else any the airline moved and the plan has not taken
+ * (`changed`) is `changed`; else any the airline only published (`filled`, a pending quiet
+ * fill) has no mark; else `confirmed` when the airline states every field.
  */
 export function fieldCheck(
   v: FlightVerification | undefined,
   fields: readonly TupleField[]
 ): FieldCheck | undefined {
   if (!answered(v)) return undefined;
-  const { changed, filled } = diffTuple(v.mine ?? {}, v.provider);
-  if (fields.some((f) => changed.includes(f) || filled.includes(f))) {
-    // A value the plan lacks and the airline states under `verified` is a quiet fill: no mark.
-    return v.state === 'conflict' || v.state === 'changed' ? v.state : undefined;
-  }
+  const { changed, filled, contested } = v.diff;
+  if (fields.some((f) => contested.includes(f))) return 'conflict';
+  if (fields.some((f) => changed.includes(f))) return 'changed';
+  if (fields.some((f) => filled.includes(f))) return undefined;
   return fields.every((f) => v.provider[f] !== undefined) ? 'confirmed' : undefined;
 }
 

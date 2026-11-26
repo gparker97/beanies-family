@@ -13,9 +13,16 @@
  *   - `tick`: every 15 minutes while visible (the per-flight `minIntervalMs` decides whether
  *     anything is fetched; the tick also moves the clock the chips read);
  *   - `segment-changed`: a debounced watch on the candidates' ids, dates, airlines, numbers
- *     and airports, and on the gate. An apply moves `departureDate`, which fires it; freshness
- *     is by TIME over the USABLE check (`usableCheck`), and an apply writes the leg's own day,
- *     so the store's own write never refetches, while a hand edit to another day does.
+ *     and airports, their live record (`liveRecordOf`), on the gate, and on
+ *     `storesAuthoritative`. Every run is HELD while the stores still show a snapshot
+ *     (`run`), so on a cold start the first real check is this watch's run after authority,
+ *     not `open`. An apply moves
+ *     `departureDate` and the record, which fires it; freshness is by TIME over the USABLE
+ *     check (`usableCheck`), an apply writes the leg's own day, and the store's own writes
+ *     keep the check's remembered record current (`writeSegment`), so the store's own write
+ *     never refetches (that run skips), while a hand edit to another day does. A record
+ *     another device wrote starts a run promptly: a cached answer that would write over it
+ *     is superseded (`isSuperseded`) and asked again once, never written.
  *
  * Each run evaluates `pickFlightRefresh` per candidate (flight types with a date in an
  * upcoming trip), soonest departure first, and fetches at most `MAX_FETCHES_PER_RUN`; the rest
@@ -102,23 +109,25 @@ import {
   type AlertSpec,
 } from '@/utils/flightStatus/alerts';
 import { isFlightType } from '@/utils/travelCodes';
-import { changeNoticeRevision, noticeRevision } from '@/utils/flightStatus/occurrenceNotice';
+import { noticeRevision } from '@/utils/flightStatus/occurrenceNotice';
 import { normaliseFlightNumber } from '@/utils/flightStatus/flightNumber';
 import { flightTrackUrl } from '@/utils/flightStatus/flightAware';
 import { operatedAs, pickLeg } from '@/utils/flightStatus/match';
 import {
   TUPLE_FIELDS,
   arrivalTerminalRecord,
-  classifyDiff,
+  liveRecordOf,
   revisionOf,
 } from '@/utils/flightStatus/schedule';
 import {
   cancelRevisionOf,
   carriesNotice,
   deriveVerification,
+  isSuperseded,
+  matchingCheck as matchingCheckFor,
+  noticeRevAfterWrite,
   planChange,
   revertPlan,
-  revisionAfterWrite,
   shouldApply,
   takeAirlinePatch,
   unresolvedEntry,
@@ -288,15 +297,24 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   });
 
   /** This device's check for the segment, only while it still fits the segment's current
-   *  flight number and day (`usableCheck` in verify.ts); else none, and the next run fetches. */
+   *  flight number and day and is not superseded (`usableCheck` in verify.ts); else none, and
+   *  the next run fetches. */
   function usableCheck(seg: VacationTravelSegment): FlightCheck | undefined {
     return usableCheckFor(seg, checks.value[seg.id]);
   }
 
+  /** This device's check for the segment's flight and day, superseded or not
+   *  (`matchingCheck`): timing, the track link and alert registration only. */
+  function matchingCheck(seg: VacationTravelSegment): FlightCheck | undefined {
+    return matchingCheckFor(seg, checks.value[seg.id]);
+  }
+
   function verify(seg: VacationTravelSegment): FlightVerification {
-    const check = usableCheck(seg);
-    const timing = flightTiming(seg, check, homeZone.value, nowMs.value);
-    const v = deriveVerification(seg, check, failures.value[seg.id], {
+    // Timing from the plain match, so the card and the run agree on the window; the answer
+    // itself is read through `usableCheck` (inside `deriveVerification`).
+    const matching = matchingCheck(seg);
+    const timing = flightTiming(seg, matching, homeZone.value, nowMs.value);
+    const v = deriveVerification(seg, matching, failures.value[seg.id], {
       nowMs: nowMs.value,
       inWindow: timing.inWindow,
       ...(timing.opensAt !== undefined ? { opensAt: new Date(timing.opensAt).toISOString() } : {}),
@@ -321,10 +339,9 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    * The key "Got it" folds a segment's notice under on this device: its bell/OS id
    * (`liveNoticeId`, from the synced fields), except for an airline change or cancellation
    * NOT in the plan (`applied: false`: this member may not edit trips, or the write failed),
-   * which has no synced id, or only an older revision's. That one is keyed on the revision the
-   * write will leave (`revisionAfterWrite`, through `changeNoticeRevision` with the airline's
-   * arrival terminal record when it moved): the
-   * id `liveNoticeId` gives a change once it is written, and a new airline revision is a new
+   * which has no synced id, or only an older revision's. That one is keyed on the id the write
+   * will freeze into `liveWas.noticeRev` (`noticeRevAfterWrite`, the one builder): the id
+   * `liveNoticeId` gives a change once it is written, and a new airline change is a new
    * key. A cancellation is keyed on its revision alone on BOTH paths (never
    * the bell/OS id's `@liveCancelledAt`), so one dismissed before its write lands stays
    * dismissed once it is written. `liveNoticeId` itself stays the bell/OS id. Every notice
@@ -337,13 +354,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   ): string | null {
     if (v.applied === false && v.provider) {
       if (v.state === 'changed') {
-        // Named as the write will leave it (`revisionAfterWrite`), so one id before and after.
-        const revision = changeNoticeRevision(
-          revisionAfterWrite(seg, v.provider) ?? revisionOf(v.provider),
-          arrivalTerminalRecord(seg, v.provider),
-          v.was
-        );
-        return travelChangeId(segmentId, revision);
+        // Named as the write will freeze it, so one id before and after.
+        return travelChangeId(segmentId, noticeRevAfterWrite(seg, v.provider));
       }
       if (v.state === 'cancelled') return travelCancelId(segmentId, cancelRevisionOf(v.provider));
     }
@@ -385,7 +397,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   function trackUrlFor(segmentId: string): string | null {
     const c = segmentsById.value.get(segmentId);
     if (!c || !isFlightType(c.segment.type)) return null;
-    return flightTrackUrl(c.segment, usableCheck(c.segment), homeZone.value, nowMs.value);
+    return flightTrackUrl(c.segment, matchingCheck(c.segment), homeZone.value, nowMs.value);
   }
 
   /** Epoch ms of this device's most recent successful check, or null. */
@@ -447,8 +459,9 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     });
   }
 
-  /** Drop entries for deleted segments and flights that are over. Only once the doc is
-   *  loaded: before that, every segment looks deleted. A notice is live only while the
+  /** Drop entries for deleted segments and flights that are over. Only called from a run
+   *  that is not held (`run`), so the stores are authoritative; the `docReady` test below is
+   *  a second guard, because before the doc is loaded every segment looks deleted. A notice is live only while the
    *  segment's CURRENT verification carries one (`carriesNotice`; a finished flight is
    *  `unavailable`, so never), under both of its ids: the bell/OS one (`noticed`) and the
    *  dismiss key (`dismissed`), which differ for a cancellation. Only a flight with synced
@@ -603,7 +616,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
 
   /** Once per airline answer per session: the revision AND the arrival terminal record, so a
    *  Conflict over the arrival terminal on a revision already logged is still logged once.
-   *  `flight_fields` names the contested fields (field names, never values), or `status` for
+   *  `flight_fields` names the contested fields (the verification's `diff.contested`, field
+   *  names, never values), or `status` for
    *  a re-booked flight the airline still lists as cancelled (the `applied` event's rule). */
   function logConflict(seg: VacationTravelSegment, v: FlightVerification): void {
     if (v.state !== 'conflict' || !v.provider) return;
@@ -617,9 +631,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       context: {
         action: 'conflict',
         flight_fields:
-          v.live?.status === 'Canceled'
-            ? 'status'
-            : classifyDiff(seg, v.provider).contested.join(','),
+          v.live?.status === 'Canceled' ? 'status' : (v.diff?.contested ?? []).join(','),
       },
     });
   }
@@ -678,17 +690,37 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    * Otherwise `'refused'` and nothing is written (the airline's word still shows, as
    * `changed` / `cancelled` with `applied: false`); callers then answer `'failed'`. `what`
    * names the write in the skip event.
+   *
+   * Every write passes here, so this is where this device's own writes are kept from looking
+   * foreign: a saved write advances the held check's remembered record (`planRecord`) to the
+   * record it leaves, but ONLY when the check was current before the write. A check already
+   * superseded, or with no `planRecord`, is never advanced: "Put it back" and Undo are offered
+   * while a check is superseded, and advancing it would make the stale answer usable again.
+   * The record before the write is read from `current()`, not `c` (`undoTake` closes over the
+   * candidate as it was before the take).
    */
   async function writeSegment(
     c: Candidate,
     patch: SegmentPatch,
     what: WriteKind
   ): Promise<SegmentWriteResult | 'refused'> {
+    const id = c.segment.id;
     if (!mayEdit()) {
-      logNoPermission(c.segment.id, what);
+      logNoPermission(id, what);
       return 'refused';
     }
-    return vacationStore.updateSegment(c.vacationId, c.segment.id, patch);
+    const seg = current(id)?.segment ?? c.segment;
+    const before = liveRecordOf(seg);
+    const result = await vacationStore.updateSegment(c.vacationId, id, patch);
+    const held = checks.value[id];
+    if (result === 'saved' && held?.planRecord === before) {
+      const after = liveRecordOf({ ...seg, ...patch });
+      if (after !== before) {
+        checks.value = { ...checks.value, [id]: { ...held, planRecord: after } };
+        persist();
+      }
+    }
+    return result;
   }
 
   /** Write a patch; log the outcome. `missing`/`failed` keep the check: the next run retries. */
@@ -724,10 +756,27 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   }
 
   /** Write the check's change when it is due; null = nothing was due. The AUTOMATIC write
-   *  entry: not while the stores hold a projection snapshot (the segment it patches is a
-   *  snapshot copy). The answer stays cached, so the next run retries it as owed. */
+   *  entry: never a superseded answer (`isSuperseded`: it would write over a record this
+   *  device has not seen; enforced here, not left to the callers, since the check is a
+   *  parameter), and not while the stores hold a projection snapshot (the segment it patches
+   *  is a snapshot copy). The answer stays cached, so the next run retries it as owed.
+   *
+   *  A superseded refusal is logged (`apply_skipped`, `detail: 'superseded'`): an answer set
+   *  aside because a foreign write synced in while its request was in flight is otherwise
+   *  invisible until the next run's `superseded_check`. The snapshot guard comes first, so a
+   *  segment read from a snapshot (authority lost while a request was in flight) is never
+   *  judged superseded. */
   async function applyIfDue(c: Candidate, check: FlightCheck): Promise<SegmentWriteResult | null> {
     if (!storesAuthoritative.value) return null;
+    if (isSuperseded(c.segment, check)) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'flight change not written',
+        context: { action: 'apply_skipped', detail: 'superseded' },
+      });
+      return null;
+    }
     const leg = check.leg;
     if (!leg || !shouldApply(c.segment, leg, check.arrivalLeg)) return null;
     const patch = planChange(c.segment, leg, check.arrivalLeg, Date.now(), copy());
@@ -767,6 +816,10 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     controllers.add(controller);
     inFlight.value.add(id);
     const started = Date.now();
+    // The record this device had seen when it ASKED, not the one at answer time: a foreign
+    // write that syncs in while the request is in flight then leaves this answer superseded
+    // when it owes, so it is asked again rather than written over the newer record.
+    const planRecord = liveRecordOf(c.segment);
     try {
       const answer = await fetchFlightLegs({ flight: query, date, signal: controller.signal });
       const durationMs = Date.now() - started;
@@ -790,6 +843,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
         ...(matched && operatedAs(matched.leg, query)
           ? { operatedAs: operatedAs(matched.leg, query) }
           : {}),
+        planRecord,
       };
       checks.value = { ...checks.value, [id]: check };
       if (failures.value[id]) {
@@ -861,13 +915,26 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    *  outcome (see the cache record). A segment re-stamped for a NEW question loses its old
    *  answer in the same write: that answer was to the old question (`usableCheck` ignores
    *  airports), so a failed re-ask after an airport fix must not keep "Couldn't find this
-   *  flight" up for the corrected booking. One persist for the batch. */
+   *  flight" up for the corrected booking. One persist for the batch.
+   *
+   *  A superseded answer refetched OUT of the window is set aside here too, in the same
+   *  persist: the fetch then stores a fresh answer or fails leaving none, and the kept entry
+   *  stamp skips the flight as `out_of_window`, so it is asked once. In the window the stale
+   *  answer is kept: it is already no answer to everything that shows or writes, it still
+   *  feeds timing and alert registration (`matchingCheck`), and the failure backoff spaces a
+   *  failed refetch. */
   function stampEntryChecks(
-    batch: ReadonlyArray<{ c: Candidate; reason: FetchReason; question: string }>,
+    batch: ReadonlyArray<{
+      c: Candidate;
+      reason: FetchReason;
+      question: string;
+      outOfWindow: boolean;
+    }>,
     kind: FlightRefreshKind
   ): void {
     const entries = batch.filter((d) => d.reason === 'entry');
-    if (entries.length === 0) return;
+    const superseded = batch.filter((d) => d.reason === 'superseded');
+    if (entries.length === 0 && superseded.length === 0) return;
     const next = { ...entryChecked.value };
     const answers = { ...checks.value };
     for (const d of entries) {
@@ -875,15 +942,27 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       if (next[id] !== undefined && next[id] !== d.question) delete answers[id];
       next[id] = d.question;
     }
-    entryChecked.value = next;
-    if (Object.keys(answers).length !== Object.keys(checks.value).length) checks.value = answers;
-    persist();
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'flight entry check',
-      context: { action: 'entry_check', kind, count: entries.length },
-    });
+    for (const d of superseded) if (d.outOfWindow) delete answers[d.c.segment.id];
+    const dropped = Object.keys(answers).length !== Object.keys(checks.value).length;
+    if (entries.length > 0) entryChecked.value = next;
+    if (dropped) checks.value = answers;
+    if (entries.length > 0 || dropped) persist();
+    if (entries.length > 0) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'flight entry check',
+        context: { action: 'entry_check', kind, count: entries.length },
+      });
+    }
+    if (superseded.length > 0) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'flight superseded check',
+        context: { action: 'superseded_check', kind, count: superseded.length },
+      });
+    }
   }
 
   /** Everything a run needs to know about one flight right now, and whether to ask about it
@@ -892,8 +971,12 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   function decide(c: Candidate, now: number, configured: boolean, manual: boolean) {
     const seg = c.segment;
     const number = normaliseFlightNumber(seg.airline, seg.flightNumber);
-    const check = usableCheck(seg);
-    const timing = flightTiming(seg, check, homeZone.value, now);
+    // Timing from the plain match (the card reads the same); the answer, its age and any owed
+    // write from the usable one. A superseded answer is one explicit input, never inferred.
+    const matching = matchingCheck(seg);
+    const superseded = !!matching && isSuperseded(seg, matching);
+    const check = superseded ? undefined : matching;
+    const timing = flightTiming(seg, matching, homeZone.value, now);
     const date = seg.departureDate?.slice(0, 10) ?? '';
     const question = number
       ? entryQuestion(number.query, date, seg.departureAirport, seg.arrivalAirport)
@@ -912,22 +995,48 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       minIntervalMs: timing.minIntervalMs,
       backoffUntil: failures.value[seg.id]?.until ?? 0,
       entryDone: entryChecked.value[seg.id] === question,
+      superseded,
       manual,
     });
-    return { number, check, timing, date, question, decision };
+    return { number, matching, superseded, check, timing, date, question, decision };
   }
 
   /** One pass over the candidates: decide each, fetch the due ones (soonest first, capped). */
   async function run(kind: FlightRefreshKind): Promise<void> {
     const now = Date.now();
     nowMs.value = now;
-    // The flights a "Check now" tap asked for ride on the next run, whatever kind wins the
-    // trailing slot, and on that run only.
-    const manual = manualIds;
-    manualIds = null;
     const familyId = familyContextStore.activeFamilyId;
     if (familyId !== loadedFamilyId) hydrate(familyId);
     if (!familyId) return;
+    // Nothing is decided on a projection snapshot: its segments can lag the document, so a
+    // record this device has seen can read as unseen there, and a refetch would be stamped
+    // with the snapshot's record (`planRecord`), an entry check asked or its answer dropped
+    // for an old question, a cached answer pruned. So no decision, fetch, stamp, owed write,
+    // prune or alert reconcile until the stores are authoritative. The cache was hydrated
+    // above, so the card reads this family's cached answers meanwhile, judged against the
+    // snapshot's segment (display only: an answer the snapshot makes look superseded shows
+    // as not checked until the reload). The watch on `storesAuthoritative` (`setup`)
+    // requests the run that follows, tagged `segment-changed`. The hold lasts as long as
+    // authority takes, which on a slow boot includes the Drive read.
+    if (!storesAuthoritative.value) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'flight check run',
+        context: {
+          action: 'run',
+          kind,
+          count: candidateSegments.value.length,
+          detail: 'not_authoritative',
+        },
+      });
+      return;
+    }
+    // The flights a "Check now" tap asked for ride on the next run that is not held, whatever
+    // kind wins the trailing slot, and on that run only. A held run leaves them for the run
+    // that follows authority, so a tap made on a snapshot is still honoured.
+    const manual = manualIds;
+    manualIds = null;
     prune(now);
 
     const configured = isFlightStatusConfigured();
@@ -939,6 +1048,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       departureMs: number;
       reason: FetchReason;
       question: string;
+      outOfWindow: boolean;
     }> = [];
     /** Answers not due a fetch (fresh, or a far-out flight already asked) whose write is still
      *  owed (refused or failed earlier): retried from the cache, with no provider call. */
@@ -981,6 +1091,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
         departureMs: timing.departureMs ?? Number.MAX_SAFE_INTEGER,
         reason: decision.reason,
         question,
+        outOfWindow: !timing.inWindow,
       });
     }
 
@@ -1254,6 +1365,9 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    *  - `started`: at least one flight is being asked (or already was);
    *  - `fresh`: every flight that could be asked was checked inside the floor;
    *  - `not_due`: nothing can be asked right now (outside the window, offline, checks off).
+   * While the stores still hold a snapshot every run is held (see `run`), so nothing can be
+   * decided yet: the tap is remembered and rides on the run that follows authority, and the
+   * answer is `started`, never a refusal with a reason that is not true.
    */
   function checkNow(segmentIds: readonly string[]): ManualCheckResult {
     const now = Date.now();
@@ -1261,6 +1375,18 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     const reasons = new Set<string>();
     let due = 0;
     let busy = 0;
+    // The run a tap requests would be held, so no flight is decided here: the tap is kept
+    // for the run that follows authority (the watch in `setup` requests it).
+    if (!storesAuthoritative.value) {
+      manualIds = new Set(segmentIds);
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'flight manual check',
+        context: { action: 'manual_check', kind: 'manual', count: 0, detail: 'held' },
+      });
+      return 'started';
+    }
     for (const id of segmentIds) {
       const c = current(id);
       if (!c || !isFlightType(c.segment.type)) continue;
@@ -1402,7 +1528,13 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
         message: 'flight airline refused',
         context: {
           action: 'take_airline',
-          detail: !checks.value[segmentId] ? 'no_check' : check ? 'no_leg' : 'stale',
+          detail: !checks.value[segmentId]
+            ? 'no_check'
+            : check
+              ? 'no_leg'
+              : matchingCheck(c.segment)
+                ? 'superseded'
+                : 'stale',
         },
       });
       return { result: 'missing' };
@@ -1544,11 +1676,20 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     { immediate: true }
   );
 
-  /** What makes a candidate a different question: the watch's signature, a string. */
+  /** What makes a candidate a different question, or a different plan record (a write from
+   *  another device, `liveRecordOf`): the watch's signature, a string. */
   const candidateSignature = computed(() =>
     candidateSegments.value
       .map(({ segment: s }) =>
-        [s.id, s.departureDate, s.airline, s.flightNumber, s.departureAirport, s.arrivalAirport]
+        [
+          s.id,
+          s.departureDate,
+          s.airline,
+          s.flightNumber,
+          s.departureAirport,
+          s.arrivalAirport,
+          liveRecordOf(s),
+        ]
           .map((v) => v ?? '')
           .join('|')
       )
@@ -1572,7 +1713,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       // A rotated push token: re-subscribe every desired flight under it (a no-op on web).
       onTokenChanged(() => void request('push-token'));
       let timer: ReturnType<typeof setTimeout> | null = null;
-      // `storesAuthoritative`: a write held back on a snapshot is retried once it turns true.
+      // `storesAuthoritative`: every run is held on a snapshot (`run`); this is the one that
+      // follows once it turns true.
       watch([candidateSignature, isEnabled, storesAuthoritative], () => {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {

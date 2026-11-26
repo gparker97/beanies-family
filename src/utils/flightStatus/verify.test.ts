@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { FlightCheck, FlightLeg } from '@/types/flightStatus';
 import type { VacationTravelSegment } from '@/types/models';
-import { revisionOf, tupleFromLeg, tupleFromWas } from './schedule';
+import {
+  classifyDiff,
+  liveRecordOf,
+  revisionOf,
+  tupleFromLeg,
+  tupleFromSegment,
+  tupleFromWas,
+} from './schedule';
 import {
   CANCELLED_REVISION_SUFFIX,
   deriveVerification,
   delayMinutes,
   isCancelRevision,
+  isSuperseded,
+  matchingCheck,
+  noticeRevAfterWrite,
   planChange,
   providerTuple,
   revertPlan,
@@ -18,7 +28,7 @@ import {
   type VerifyContext,
 } from './verify';
 import { liveNoticeId } from '@/utils/notifications/travel';
-import { makeCheck, makeFlight, makeLeg, t } from './__tests__/fixtures';
+import { makeCheck, makeFlight, makeLeg, t, withArrival } from './__tests__/fixtures';
 
 const NOW = Date.parse('2026-12-12T09:00:00Z');
 const COPY = { t, lang: 'en' as const };
@@ -365,6 +375,7 @@ describe('shouldApply / planChange: idempotency', () => {
         terminal: 'Terminal 2',
         arrivalDate: '2026-12-13',
         arrivalTime: '23:10',
+        noticeRev: '2026-12-13|18:30|3|2026-12-14|00:40',
       },
       liveAppliedAt: new Date(NOW).toISOString(),
       notes: expect.stringMatching(/^Window seats\nChanged on .*: Was 5pm from Terminal 2$/),
@@ -495,29 +506,130 @@ describe('unresolvedEntry', () => {
   });
 });
 
-describe('usableCheck: the check answers this flight on this day', () => {
+describe('matchingCheck: the check answers this flight on this day', () => {
   it('needs the current flight number', () => {
-    expect(usableCheck(makeFlight(), makeCheck(makeLeg({})))).toBeDefined();
+    expect(matchingCheck(makeFlight(), makeCheck(makeLeg({})))).toBeDefined();
     expect(
-      usableCheck(makeFlight({ flightNumber: 'SQ322' }), makeCheck(makeLeg({})))
+      matchingCheck(makeFlight({ flightNumber: 'SQ322' }), makeCheck(makeLeg({})))
     ).toBeUndefined();
-    expect(usableCheck(makeFlight(), undefined)).toBeUndefined();
+    expect(matchingCheck(makeFlight(), undefined)).toBeUndefined();
   });
 
   it("the queried day or the leg's own day: an apply keeps it, a hand edit drops it", () => {
     const nextDay = makeLeg({ dep: { scheduledLocal: '2026-12-14 17:00+08:00' } });
     const check = makeCheck(nextDay); // queried 2026-12-13
-    expect(usableCheck(makeFlight(), check)).toBeDefined(); // not yet written
-    expect(usableCheck(makeFlight({ departureDate: '2026-12-14' }), check)).toBeDefined(); // applied
-    expect(usableCheck(makeFlight({ departureDate: '2026-12-15' }), check)).toBeUndefined();
-    expect(usableCheck(makeFlight({ departureDate: undefined }), check)).toBeUndefined();
+    expect(matchingCheck(makeFlight(), check)).toBeDefined(); // not yet written
+    expect(matchingCheck(makeFlight({ departureDate: '2026-12-14' }), check)).toBeDefined(); // applied
+    expect(matchingCheck(makeFlight({ departureDate: '2026-12-15' }), check)).toBeUndefined();
+    expect(matchingCheck(makeFlight({ departureDate: undefined }), check)).toBeUndefined();
   });
 
   it('a no-match check (leg null) fits only its queried day', () => {
-    expect(usableCheck(makeFlight(), makeCheck(null))).toBeDefined();
+    expect(matchingCheck(makeFlight(), makeCheck(null))).toBeDefined();
     expect(
-      usableCheck(makeFlight({ departureDate: '2026-12-14' }), makeCheck(null))
+      matchingCheck(makeFlight({ departureDate: '2026-12-14' }), makeCheck(null))
     ).toBeUndefined();
+  });
+
+  it('usableCheck is the same match for a check that is not superseded', () => {
+    const nextDay = makeLeg({ dep: { scheduledLocal: '2026-12-14 17:00+08:00' } });
+    for (const [seg, check] of [
+      [makeFlight(), makeCheck(makeLeg({}))],
+      [makeFlight({ flightNumber: 'SQ322' }), makeCheck(makeLeg({}))],
+      [makeFlight(), makeCheck(nextDay)],
+      [makeFlight({ departureDate: '2026-12-15' }), makeCheck(nextDay)],
+      [makeFlight(), makeCheck(null)],
+      [makeFlight({ departureDate: '2026-12-14' }), makeCheck(null)],
+    ] as const) {
+      expect(usableCheck(seg, check)).toBe(matchingCheck(seg, check));
+    }
+  });
+});
+
+describe('isSuperseded: a cached answer never writes over a record this device has not seen', () => {
+  const cancelledLeg = makeLeg({ status: 'Canceled' });
+  /** Another device applied the airline's move; the plan as it syncs in. */
+  const foreign = applyRun(makeFlight(), makeCheck(moved));
+  /** This device's older answer (the booked schedule), asked beside the untouched plan. */
+  const stale = makeCheck(makeLeg({}));
+
+  it('the truth table: a leg, a record not seen, and a write owed, all three', () => {
+    // Seen beside this plan, and owes: the normal apply.
+    expect(isSuperseded(makeFlight(), makeCheck(moved))).toBe(false);
+    // A record another device wrote, and owes: superseded.
+    expect(isSuperseded(foreign, stale)).toBe(true);
+    // No planRecord (a check cached before this build), or a wrong-typed one: not seen.
+    for (const planRecord of [undefined, 42, null, ['§§§']]) {
+      expect(
+        isSuperseded(makeFlight(), makeCheck(moved, { planRecord: planRecord as never }))
+      ).toBe(true);
+    }
+    // Owes nothing: never superseded, whatever the record (another device applied the same
+    // answer this device holds, or a pre-build check that matches the plan).
+    expect(isSuperseded(foreign, makeCheck(moved))).toBe(false);
+    expect(isSuperseded(makeFlight(), makeCheck(makeLeg({}), { planRecord: undefined }))).toBe(
+      false
+    );
+    // No leg: nothing to write.
+    expect(isSuperseded(foreign, makeCheck(null, { planRecord: undefined }))).toBe(false);
+  });
+
+  it('a stale cancelled answer against a reinstated plan, and a stale running one against a cancelled plan', () => {
+    const cancelled = applyRun(makeFlight(), makeCheck(cancelledLeg));
+    const staleCancel = makeCheck(cancelledLeg, { planRecord: liveRecordOf(cancelled) });
+    expect(isSuperseded(cancelled, staleCancel)).toBe(false); // this device's own record
+    const reinstated = applyRun(
+      cancelled,
+      makeCheck(makeLeg({}), { planRecord: liveRecordOf(cancelled) })
+    );
+    expect(isCancelRevision(reinstated.liveRevision)).toBe(false);
+    expect(isSuperseded(reinstated, staleCancel)).toBe(true);
+
+    const running = makeCheck(makeLeg({}));
+    expect(isSuperseded(cancelled, running)).toBe(true);
+  });
+
+  it('a record that goes away and comes back still supersedes an answer that owes', () => {
+    // This device saw the first cancellation and holds a running answer it did not write
+    // (view-only); another device reinstates, then the airline cancels again: the same cancel
+    // revision, a new liveCancelledAt.
+    const first = applyRun(makeFlight(), makeCheck(cancelledLeg));
+    const running = makeCheck(makeLeg({}), { planRecord: liveRecordOf(first) });
+    expect(isSuperseded(first, running)).toBe(false);
+    const reinstated = { ...first, ...planChange(first, makeLeg({}), undefined, NOW, COPY) };
+    const again = {
+      ...reinstated,
+      ...planChange(reinstated, cancelledLeg, undefined, NOW + 60_000, COPY),
+    };
+    expect(again.liveRevision).toBe(first.liveRevision);
+    expect(isSuperseded(again, running)).toBe(true);
+  });
+
+  it('usableCheck drops a superseded check; matchingCheck keeps it', () => {
+    expect(matchingCheck(foreign, stale)).toBe(stale);
+    expect(usableCheck(foreign, stale)).toBeUndefined();
+    expect(usableCheck(foreign, makeCheck(moved))).toBeDefined();
+  });
+
+  it("deriveVerification shows the plan's synced state while superseded: never the stale answer", () => {
+    const v = deriveVerification(foreign, stale, undefined, ctx());
+    expect(v).toMatchObject({ state: 'changed', was: tupleFromWas(foreign.liveWas) });
+    expect(v.provider).toBeUndefined();
+    expect(v.live).toBeUndefined();
+    const cancelled = applyRun(makeFlight(), makeCheck(cancelledLeg));
+    expect(deriveVerification(cancelled, makeCheck(makeLeg({})), undefined, ctx())).toEqual({
+      state: 'cancelled',
+      mine: tupleFromSegment(cancelled),
+    });
+    // No synced notice: "Checking..." in the window, "Checks from <date>" out of it.
+    const preBuild = makeCheck(moved, { planRecord: undefined });
+    expect(deriveVerification(makeFlight(), preBuild, undefined, ctx())).toEqual({
+      state: 'unavailable',
+      mine: tupleFromSegment(makeFlight()),
+    });
+    expect(
+      deriveVerification(makeFlight(), preBuild, undefined, ctx({ inWindow: false }))
+    ).toMatchObject({ state: 'unavailable', reason: 'before_window' });
   });
 });
 
@@ -638,17 +750,13 @@ describe('deriveVerification: fresh', () => {
 });
 
 describe('the arrival terminal: checked beside the frozen revision', () => {
-  /** `leg` with the arrival terminal the airline publishes. */
-  const withArrival = (leg: FlightLeg, terminal: string) => ({
-    ...leg,
-    arrival: { ...leg.arrival, terminal },
-  });
   const AT = new Date(NOW).toISOString();
   /** The `liveArrivalTerminal` record of SQ318's arrival terminal on the airline's day. */
   const REC = (terminal: string, day = '2026-12-13') => `SQ318|${day}|${terminal}`;
   const run = (seg: VacationTravelSegment, leg: FlightLeg) => applyRun(seg, makeCheck(leg));
+  /** The verification of an answer this device asked beside the plan as it is now. */
   const state = (seg: VacationTravelSegment, leg: FlightLeg) =>
-    deriveVerification(seg, makeCheck(leg), undefined, ctx());
+    deriveVerification(seg, makeCheck(leg, { planRecord: liveRecordOf(seg) }), undefined, ctx());
 
   it('a fill: written quietly with its record and a labelled notes line, then verified', () => {
     const leg = withArrival(makeLeg({}), '2');
@@ -696,7 +804,11 @@ describe('the arrival terminal: checked beside the frozen revision', () => {
       arrivalTerminal: '3',
       liveRevision: revisionOf(tupleFromLeg(leg)),
       liveArrivalTerminal: REC('3'),
-      liveWas: { at: AT, arrivalTerminal: '2' },
+      liveWas: {
+        at: AT,
+        arrivalTerminal: '2',
+        noticeRev: `${revisionOf(tupleFromLeg(leg))}~${REC('3')}`,
+      },
       liveAppliedAt: AT,
       notes: expect.stringMatching(/\nChanged on .*: Was arriving at Terminal 2$/),
     });
@@ -925,7 +1037,7 @@ describe('the arrival terminal: checked beside the frozen revision', () => {
     // A new flight number, same day, the arrival terminal cleared in the drawer.
     const renumbered = { ...filled, flightNumber: 'SQ322', arrivalTerminal: undefined };
     const sq322 = withArrival(makeLeg({ number: 'SQ 322' }), '2');
-    const c322 = makeCheck(sq322, { flight: 'SQ322' });
+    const c322 = makeCheck(sq322, { flight: 'SQ322', planRecord: liveRecordOf(renumbered) });
     expect(deriveVerification(renumbered, c322, undefined, ctx())).toMatchObject({
       state: 'verified',
       applied: false,
@@ -950,7 +1062,7 @@ describe('the arrival terminal: checked beside the frozen revision', () => {
       }),
       '2'
     );
-    const cDay = makeCheck(dayLeg, { date: '2026-12-14' });
+    const cDay = makeCheck(dayLeg, { date: '2026-12-14', planRecord: liveRecordOf(redated) });
     expect(deriveVerification(redated, cDay, undefined, ctx())).toMatchObject({
       state: 'verified',
       applied: false,
@@ -990,6 +1102,96 @@ describe('the arrival terminal: checked beside the frozen revision', () => {
     expect(providerTuple(makeCheck(sector1, { arrivalLeg: sector2 }))?.arrivalTerminal).toBe('4');
     expect(
       providerTuple(makeCheck(sector1, { arrivalLeg: null }))?.arrivalTerminal
+    ).toBeUndefined();
+  });
+});
+
+describe('noticeRevAfterWrite: one identity per change, read off the plan', () => {
+  const REV = revisionOf(tupleFromLeg(moved));
+  const provider = tupleFromLeg(moved);
+  const was = (noticeRev?: unknown) =>
+    makeFlight({ liveWas: { departureTime: '16:00', at: AT, noticeRev: noticeRev as string } });
+  const AT = '2026-12-10T08:00:00.000Z';
+
+  it("a first change (no liveWas) is today's format: the revision the write leaves", () => {
+    expect(noticeRevAfterWrite(makeFlight(), provider)).toBe(REV);
+  });
+
+  it('a later change is the next occurrence, from the previous one, never from a clock', () => {
+    expect(noticeRevAfterWrite(was(REV), provider)).toBe(`${REV}#2`);
+    expect(noticeRevAfterWrite(was(`${REV}#2`), provider)).toBe(`${REV}#3`);
+    expect(noticeRevAfterWrite(was('x|y#41'), provider)).toBe(`${REV}#42`);
+  });
+
+  it('a previous change with no usable ordinal counts as the first', () => {
+    for (const noticeRev of [undefined, '', 7, null, 'abc#', '#2x', 'a#2#b']) {
+      expect(noticeRevAfterWrite(was(noticeRev), provider), String(noticeRev)).toBe(`${REV}#2`);
+    }
+  });
+
+  it('a moved arrival terminal names the record, as the write leaves it', () => {
+    const leg = { ...moved, arrival: { ...moved.arrival, terminal: '3' } };
+    const seg = makeFlight({ arrivalTerminal: '2' });
+    expect(noticeRevAfterWrite(seg, tupleFromLeg(leg))).toBe(
+      `${revisionOf(tupleFromLeg(leg))}~SQ318|2026-12-13|3`
+    );
+    // Only filled (the plan held none): no record in the id.
+    expect(noticeRevAfterWrite(makeFlight(), tupleFromLeg(leg))).toBe(
+      revisionOf(tupleFromLeg(leg))
+    );
+  });
+});
+
+describe('planChange writes noticeRev on a change, and only on a change', () => {
+  it('a change freezes the id it is announced under', () => {
+    const seg = makeFlight();
+    const patch = planChange(seg, moved, undefined, NOW, COPY);
+    expect(patch.liveWas?.noticeRev).toBe(noticeRevAfterWrite(seg, tupleFromLeg(moved)));
+  });
+
+  it('a quiet fill, a cancellation and a reinstatement never write it', () => {
+    const fill = planChange(
+      makeFlight({ terminal: undefined }),
+      makeLeg({ dep: { terminal: '3' } }),
+      undefined,
+      NOW,
+      COPY
+    );
+    expect(fill).not.toHaveProperty('liveWas');
+    const cancelled = planChange(
+      makeFlight(),
+      makeLeg({ status: 'Canceled' }),
+      undefined,
+      NOW,
+      COPY
+    );
+    expect(cancelled).not.toHaveProperty('liveWas');
+    const marked = { ...makeFlight(), ...cancelled };
+    const reinstated = planChange(marked, makeLeg({}), undefined, NOW, COPY);
+    expect(reinstated).toEqual({ liveRevision: revisionOf(tupleFromLeg(makeLeg({}))) });
+  });
+});
+
+describe('deriveVerification carries the per-field diff', () => {
+  it('on every verification built from a running leg, and on none without one', () => {
+    const applied = applyRun(makeFlight(), makeCheck(moved));
+    const seen = (seg: VacationTravelSegment, leg: FlightLeg) =>
+      makeCheck(leg, { planRecord: liveRecordOf(seg) });
+    const cases: [VacationTravelSegment, FlightLeg][] = [
+      [makeFlight(), makeLeg({})], // verified
+      [makeFlight({ terminal: undefined }), makeLeg({})], // verified, a fill pending
+      [makeFlight(), moved], // changed, not written
+      [applied, moved], // changed, written
+      [{ ...applied, departureTime: '19:00' }, moved], // conflict
+    ];
+    for (const [seg, leg] of cases) {
+      const v = deriveVerification(seg, seen(seg, leg), undefined, ctx());
+      expect(v.diff, v.state).toEqual(classifyDiff(seg, tupleFromLeg(leg)));
+    }
+    expect(deriveVerification(makeFlight(), undefined, undefined, ctx()).diff).toBeUndefined();
+    expect(
+      deriveVerification(makeFlight(), makeCheck(makeLeg({ status: 'Canceled' })), undefined, ctx())
+        .diff
     ).toBeUndefined();
   });
 });
