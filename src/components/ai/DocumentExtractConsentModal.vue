@@ -184,8 +184,7 @@ function onConfirm(): void {
          ships (PRIVACY_ARTICLE_LIVE); until then it renders as plain emphasised
          text so the sentence still reads correctly. -->
     <p class="font-inter dark:text-ink text-sm text-[var(--color-text)]">
-      <span>{{ introParts.lead }}</span
-      ><button
+      <span>{{ introParts.lead }}</span><button
         v-if="introParts.accent && PRIVACY_ARTICLE_LIVE"
         type="button"
         class="dark:hover:text-accent-lift font-semibold underline underline-offset-2 hover:text-[#F15D22]"

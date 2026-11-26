@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - The Android and iOS apps now ask anyone on a version older than 1.7 to update (a prompt that can be dismissed).
+- Dependency updates, including Capacitor 8.6, chart.js 4.6 and the development tooling.
 
 ## 2026-11-23
 

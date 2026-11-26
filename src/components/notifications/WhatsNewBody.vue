@@ -105,8 +105,7 @@ function handleSeeAll() {
           <h4 class="wn-item-title">{{ txt(feature.title) }}</h4>
           <!-- description: plain text, or split around an inline external link -->
           <p v-if="blockParts[i] && blockParts[i]!.accent" class="wn-item-desc">
-            <span>{{ blockParts[i]!.lead }}</span
-            ><button
+            <span>{{ blockParts[i]!.lead }}</span><button
               type="button"
               class="wn-inline-link"
               @click="openExternal(feature.descriptionLink!.href)"

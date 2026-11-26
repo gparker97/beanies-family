@@ -47,8 +47,7 @@ const SLOT_ICON = SLOT_EMOJI;
     <!-- One row per slot. -->
     <template v-for="row in rows.rows" :key="row.slot">
       <div class="slot-head" :style="{ '--slot-band': SLOT_BAND[row.slot] }">
-        <span class="slot-ic" aria-hidden="true">{{ SLOT_ICON[row.slot] }}</span
-        >{{ row.slotLabel }}
+        <span class="slot-ic" aria-hidden="true">{{ SLOT_ICON[row.slot] }}</span>{{ row.slotLabel }}
       </div>
       <div
         v-for="(cell, i) in row.cells"

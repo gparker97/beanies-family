@@ -61,8 +61,7 @@ async function handleStart() {
     <!-- Title -->
     <h2 class="ob-title">
       {{ t('onboarding.welcomePrefix') }}
-      <span class="text-heritage-orange">{{ t('onboarding.welcomeBrand') }}</span
-      >.family
+      <span class="text-heritage-orange">{{ t('onboarding.welcomeBrand') }}</span>.family
     </h2>
 
     <!-- Tagline (Caveat italic, soft slate) — replaces the deleted description paragraph -->

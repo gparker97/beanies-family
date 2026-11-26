@@ -56,13 +56,15 @@ const { syncHighlightClass } = useSyncHighlight();
     >
       <span class="text-xs opacity-50">{{ collapsed ? '▼' : '▲' }}</span>
       <span class="nook-section-label" :class="labelClass">
-        <span v-if="emoji" class="mr-1" aria-hidden="true">{{ emoji }}</span
-        >{{ label }} ({{ todos.length }})
+        <span v-if="emoji" class="mr-1" aria-hidden="true">{{ emoji }}</span>{{ label }} ({{
+          todos.length
+        }})
       </span>
     </button>
     <p v-else class="nook-section-label mb-2" :class="labelClass">
-      <span v-if="emoji" class="mr-1" aria-hidden="true">{{ emoji }}</span
-      >{{ label }} ({{ todos.length }})
+      <span v-if="emoji" class="mr-1" aria-hidden="true">{{ emoji }}</span>{{ label }} ({{
+        todos.length
+      }})
     </p>
 
     <!-- Optional hint line under the header -->
