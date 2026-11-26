@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-26
+
+### Changed
+
+- The Android and iOS apps now ask anyone on a version older than 1.7 to update (a prompt that can be dismissed).
+
 ## 2026-11-23
 
 ### Added
