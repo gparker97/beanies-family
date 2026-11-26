@@ -19,6 +19,7 @@ relatedPosts:
   - a-widget-for-your-fidget
   - daddy-come-look-at-my-bed
   - choreboard
+  - flight-change-alerts
 tags:
   - family-organization
   - routines
