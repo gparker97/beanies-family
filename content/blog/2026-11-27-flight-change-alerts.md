@@ -6,12 +6,12 @@ category: feature announcement
 coverEmoji: 🛫
 coverImage: /blog/flight-change-alert-card.webp
 excerpt: "live flight checks are in beanies.family: your travel plan now tells you when a flight's time or terminal changes, or when it's cancelled. privately."
-subtitle: 'beanies has massively upgraded it’s personal travel assistant capabilities'
+subtitle: 'beanies has massively upgraded its personal travel assistant capabilities'
 featured: false
 author: greg
 longAndShort:
   built: "live flight checks that compare every flight in a travel plan with the airline's schedule, from 3 days before departure until it lands."
-  helps: 'you hear about a new time, a new terminal or a cancellation before you leave for the airport, without keeping a second travel app.'
+  helps: 'you hear about a new time, a new terminal or a cancellation before you leave for the airport, without keeping a second travel app, for both yourself and your family members (no more late pickups!)'
   where: '`The Treehouse › Travel Plans`, on each flight card, with the switches in `Settings › Reminders`'
 draft: false
 ---
@@ -20,7 +20,7 @@ Hello to all my traveling beans!
 
 I’ve been sitting here, [planning travel](https://beanies.family/blog/travel-plans-intro?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=travel-plans-post) in beanies, but when my travel day finally arrives, I’m still checking flight status and delays in another app. And I asked myself, _why_?
 
-Since [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=homepage-flight-alerts) takes in all my travel details with [a simple share](https://beanies.family/blog/sharing-with-beanies?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=sharing-post) to the app, displays everything for me to read, allows me to easily make any changes or updates manually or with AI, keeps lists of things I might want to do, and [shares everything seamlessly with my family](https://beanies.family/guides/family-organization?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=family-organization-guide), why are my other travel apps still doing, hanging around on my phone?
+Since [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=homepage-flight-alerts) takes in all my travel details with [a simple share](https://beanies.family/blog/sharing-with-beanies?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=sharing-post) to the app, displays everything for me to read, allows me to easily make any changes or updates manually or with AI, keeps lists of things I might want to do, and [shares everything seamlessly with my family](https://beanies.family/guides/family-organization?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=family-organization-guide), what are my other travel apps still doing, hanging around on my phone?
 
 Well, nothing anymore - because they’re gone! Introducing: [**_real-time travel alerts_**](https://beanies.family/help/features/live-flight-checks?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=help-live-flight-checks)**_!_**
 
@@ -42,7 +42,7 @@ _the feature we’ve all been waiting for. well, i have, at least._
 
 ## What about my family member’s flights?
 
-Ever miss an airport pickup because a flight came in early? Or arrived 2 hours earlier without realizing it was delayed? Or went to the wrong terminal to pick them up? Yeah, me too. On all counts.
+Ever miss an airport pickup because a flight came in early? Or arrived 2 hours early without realizing it was delayed? Or went to the wrong terminal to pick them up? Yeah, me too. On all counts.
 
 Along with real-time travel alerts for your own flights, [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=homepage-family-pickups) will also alert you when your family member’s flights are scheduled to arrive, along with all the key information you need to ensure that perfect airport pickup that’s as rare as a golden unicorn.
 
@@ -50,17 +50,17 @@ Along with real-time travel alerts for your own flights, [beanies.family](https:
 
 _a perfect airport pickup is a golden unicorn no more!_
 
-## Here’s how much privacy you give up to use this feature
+## And how much privacy do I need to give up to use these awesome features?
 
-- None. Only the flight number and date leave your device. No name, family or booking attached
+- None (naturally - what else would you expect?) - only the flight number and date leave your device. No name, family or booking attached
 
-beanies checks that flight number and date against an industry standard flight status database API - therefore while we are running checks against airlines and flight numbers, _nothing_ about your travel plans can be linked back to you. On the phone apps, a push address is also held until after the flight, so the alert can reach you.
+beanies checks your flight number and date against an industry standard flight status database API - therefore while we are running checks against airlines and flight numbers, _nothing_ about your travel plans can be linked back to you. On the phone apps, a push address is also held until after the flight, so the alert can reach you.
 
 Once the data comes back, anything you need to know about is alerted to your family without your personal data ever being shared.
 
 So it’s a helpful and fully private check of your travel plans to ensure you (or your family) are not caught at the wrong time, date, or terminal.
 
-I’ve already started using this for my own travel plans, and, while it’s not saved me yet (I’m quite obsessive about checking flight status when I have trips coming up), I’m feeling much more confident that when that day comes in the future, I’ll know far in advance if I need to start changing my plans (which always makes me cringe), or if I can chill at home a little longer with the kids before picking up my wife from the airport (always a good thing).
+I’ve already started using this for my own travel plans, and, while it’s not saved me yet (I’m a bit obsessive about checking flight status when I have trips coming up), I’m feeling much more confident that when that day comes in the future, I’ll know far in advance if I need to start changing my plans (which always makes me cringe), or if I can chill at home a little longer with the kids before picking up my wife from the airport (always a good thing).
 
 If this is useful (or not) for you, [let me know in our favorite discord room](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=flight-change-alerts&utm_content=discord).
 
