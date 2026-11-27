@@ -25,6 +25,7 @@ const PREFS: ReminderPrefs = {
   travelReminderLeads: DEFAULT_TRAVEL_LEADS,
   helpfulHintNotifyByType: {},
   flightChangeAlerts: true,
+  familyArrivalLead: 60,
 };
 
 function occ(over: Partial<TravelSegmentOccurrence> = {}): TravelSegmentOccurrence {

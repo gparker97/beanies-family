@@ -202,7 +202,7 @@ async function updateAskBeforePhotos(ask: boolean) {
           @update:model-value="onPickTier"
         />
         <p
-          class="dark:bg-surface-raised dark:text-ink-soft rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2.5 text-[0.8rem] leading-snug text-[var(--deep-slate)]/70"
+          class="dark:bg-surface-raised dark:text-ink-soft rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2.5 text-xs leading-snug text-[var(--deep-slate)]/70"
         >
           {{ privacyText }}
         </p>

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
+  buildArrivalReminders,
   buildReminderSchedule,
   MAX_SCHEDULED,
   type ReminderInput,
@@ -12,6 +13,9 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { allDayFireTime, DEFAULT_TRAVEL_LEADS } from '@/utils/reminderSchedule';
 import { todoDueId } from '@/utils/notifications';
 import { advanceRepeat } from '@/utils/todoRecurrence';
+import { travelArrivalId } from '@/utils/notifications/travel';
+import type { ArrivalAnnouncement } from '@/utils/flightStatus/arrivalAnnouncement';
+import { t as realT } from '@/utils/flightStatus/__tests__/fixtures';
 
 const NOW = new Date('2026-05-22T10:00:00'); // local 10am
 
@@ -102,6 +106,7 @@ const PREFS: ReminderPrefs = {
   activityReminderLead: 30,
   travelReminderLeads: DEFAULT_TRAVEL_LEADS,
   helpfulHintNotifyByType: {},
+  familyArrivalLead: 60,
 };
 
 describe('buildReminderSchedule — activities', () => {
@@ -1041,5 +1046,132 @@ describe('an untimed to-do dated after the morning anchor', () => {
       PREFS
     );
     expect(reminders[0].fireAt).toEqual(new Date('2026-05-24T09:00:00'));
+  });
+});
+
+describe('family flight arrivals (#143)', () => {
+  /** Jill lands at 14:00 local on the 22nd; NOW is 10:00, so the default hour fires at 13:00. */
+  const arrival = (over: Partial<ArrivalAnnouncement> = {}): ArrivalAnnouncement => ({
+    segmentId: 'seg-2',
+    vacationId: 'vac-1',
+    names: 'Jill',
+    count: 1,
+    date: '2026-05-22',
+    time: '14:00',
+    estimated: false,
+    over: false,
+    flight: 'SQ317',
+    airport: 'SIN',
+    terminal: '1',
+    ...over,
+  });
+  const arrivalInput = (...arrivals: ArrivalAnnouncement[]) => input({ arrivals, t: realT });
+
+  it('one reminder, lead minutes before landing, with its id, text, kind and deep link', () => {
+    const { reminders, skipped, gated } = buildArrivalReminders(
+      arrivalInput(arrival()),
+      NOW,
+      PREFS
+    );
+    expect(skipped).toBe(0);
+    expect(gated).toBe(0);
+    expect(reminders).toEqual([
+      {
+        id: travelArrivalId('seg-2', '2026-05-22'),
+        fireAt: new Date('2026-05-22T13:00:00'),
+        title: 'Jill is scheduled to land at 2pm',
+        body: 'SQ317 · SIN Terminal 1',
+        kind: 'travel-arrival',
+        deepLink: { path: '/travel', query: { vacation: 'vac-1', segment: 'seg-2' } },
+      },
+    ]);
+  });
+
+  it('"lands at" with a live estimate', () => {
+    const [r] = buildArrivalReminders(
+      arrivalInput(arrival({ estimated: true, time: '14:30' })),
+      NOW,
+      PREFS
+    ).reminders;
+    expect(r!.title).toBe('Jill lands at 2:30pm');
+  });
+
+  it('the device lead moves it; a "day before" lead names the landing day', () => {
+    const [r] = buildArrivalReminders(arrivalInput(arrival()), NOW, {
+      ...PREFS,
+      familyArrivalLead: 15,
+    }).reminders;
+    expect(r!.fireAt).toEqual(new Date('2026-05-22T13:45:00'));
+    const tomorrow = arrival({ date: '2026-05-23' });
+    const [dayBefore] = buildArrivalReminders(arrivalInput(tomorrow), NOW, {
+      ...PREFS,
+      familyArrivalLead: 1440,
+    }).reminders;
+    expect(dayBefore!.fireAt).toEqual(new Date('2026-05-22T14:00:00'));
+    expect(dayBefore!.body).toMatch(/ · SQ317 · SIN Terminal 1$/);
+    expect(dayBefore!.body).not.toBe('SQ317 · SIN Terminal 1');
+  });
+
+  it('a fire time already past is dropped uncounted', () => {
+    const res = buildArrivalReminders(arrivalInput(arrival({ time: '10:30' })), NOW, PREFS);
+    expect(res).toEqual({ reminders: [], skipped: 0, gated: 0 });
+  });
+
+  it('an earlier estimate that puts the fire time behind now drops it', () => {
+    // Planned 14:00 arms 13:00; an estimate of 10:45 would fire at 09:45, already past.
+    const planned = buildArrivalReminders(arrivalInput(arrival()), NOW, PREFS).reminders;
+    expect(planned).toHaveLength(1);
+    const early = arrival({ estimated: true, time: '10:45' });
+    expect(buildArrivalReminders(arrivalInput(early), NOW, PREFS).reminders).toEqual([]);
+  });
+
+  it('a later estimate re-arms the SAME id at the new time', () => {
+    const [before] = buildArrivalReminders(arrivalInput(arrival()), NOW, PREFS).reminders;
+    const late = arrival({ estimated: true, time: '15:20', scheduledTime: '14:00' });
+    const [after] = buildArrivalReminders(arrivalInput(late), NOW, PREFS).reminders;
+    expect(after!.id).toBe(before!.id);
+    expect(after!.fireAt).toEqual(new Date('2026-05-22T14:20:00'));
+    expect(after!.title).toBe('Jill lands at 3:20pm');
+  });
+
+  it('a flight that is over is never armed (it landed early with the app open)', () => {
+    expect(
+      buildArrivalReminders(arrivalInput(arrival({ over: true })), NOW, PREFS).reminders
+    ).toEqual([]);
+  });
+
+  it("a landing outside the scheduler's window is not armed", () => {
+    const far = arrival({ date: '2026-06-20' });
+    expect(buildArrivalReminders(arrivalInput(far), NOW, PREFS).reminders).toEqual([]);
+  });
+
+  it('off (no announcements): nothing', () => {
+    expect(buildArrivalReminders(input(), NOW, PREFS).reminders).toEqual([]);
+    expect(buildArrivalReminders(input({ arrivals: [] }), NOW, PREFS).reminders).toEqual([]);
+  });
+
+  it('one that throws is counted in skipped, never aborting the others', () => {
+    const bad = arrival({ segmentId: 'seg-bad' });
+    Object.defineProperty(bad, 'over', {
+      get() {
+        throw new Error('boom');
+      },
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const res = buildArrivalReminders(arrivalInput(bad, arrival()), NOW, PREFS);
+    expect(res.skipped).toBe(1);
+    expect(res.reminders.map((r) => r.id)).toEqual([travelArrivalId('seg-2', '2026-05-22')]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('seg-bad'), expect.any(Error));
+    warn.mockRestore();
+  });
+
+  it('joins the schedule, and the master switch off removes it', () => {
+    const on = buildReminderSchedule(arrivalInput(arrival()), NOW, PREFS);
+    expect(on.reminders.map((r) => r.kind)).toEqual(['travel-arrival']);
+    const off = buildReminderSchedule(arrivalInput(arrival()), NOW, {
+      ...PREFS,
+      remindersEnabled: false,
+    });
+    expect(off.reminders).toEqual([]);
   });
 });

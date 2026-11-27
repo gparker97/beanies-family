@@ -60,6 +60,7 @@ const PREFS = {
   activityReminderLead: 30,
   travelReminderLeads: {},
   helpfulHintNotifyByType: {},
+  familyArrivalLead: 60,
 };
 
 describe('stableNotificationId', () => {

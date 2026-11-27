@@ -41,17 +41,15 @@ function editProfile() {
 
     <!-- Info -->
     <div class="min-w-0 flex-1">
-      <p
-        class="font-outfit truncate text-[1.3rem] font-bold text-[var(--deep-slate)] dark:text-white"
-      >
+      <p class="font-outfit truncate text-xl font-bold text-[var(--deep-slate)] dark:text-white">
         {{ currentMember?.name ?? '' }}
       </p>
-      <p class="dark:text-ink-faint truncate text-[0.8rem] text-[var(--deep-slate)]/40">
+      <p class="dark:text-ink-faint truncate text-sm text-[var(--deep-slate)]/40">
         {{ currentMember?.email ?? '' }}
       </p>
       <span
         v-if="familyContextStore.activeFamilyName"
-        class="font-outfit mt-1.5 inline-block rounded-[10px] bg-[var(--tint-orange-8)] px-3 py-1 text-[0.6rem] font-bold tracking-[0.08em] text-[var(--heritage-orange)] uppercase"
+        class="font-outfit mt-1.5 inline-block rounded-[10px] bg-[var(--tint-orange-8)] px-3 py-1 text-xs font-bold tracking-[0.08em] text-[var(--heritage-orange)] uppercase"
       >
         {{ familyContextStore.activeFamilyName }}
       </span>
@@ -59,7 +57,7 @@ function editProfile() {
 
     <!-- Edit Profile -->
     <button
-      class="font-outfit flex-shrink-0 rounded-[20px] bg-[var(--tint-orange-8)] px-5 py-2.5 text-[0.8rem] font-semibold text-[var(--heritage-orange)] transition-colors hover:bg-[var(--tint-orange-12)]"
+      class="font-outfit flex-shrink-0 rounded-[20px] bg-[var(--tint-orange-8)] px-5 py-2.5 text-sm font-semibold text-[var(--heritage-orange)] transition-colors hover:bg-[var(--tint-orange-12)]"
       @click="editProfile"
     >
       {{ t('settings.editProfile') }}

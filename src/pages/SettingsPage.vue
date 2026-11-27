@@ -2057,7 +2057,7 @@ async function handleDeleteFamilyClick() {
     <!-- ── Quick Toggles ───────────────────────────────────────────────── -->
     <div>
       <p
-        class="font-outfit dark:text-ink-faint mb-4 text-[0.75rem] font-bold tracking-[0.1em] text-[var(--deep-slate)]/35 uppercase"
+        class="font-outfit dark:text-ink-faint mb-4 text-xs font-bold tracking-[0.1em] text-[var(--deep-slate)]/35 uppercase"
       >
         {{ t('settings.quickToggles') }}
       </p>
@@ -2082,7 +2082,7 @@ async function handleDeleteFamilyClick() {
         >
           <p
             v-if="!translationStore.isEnglish"
-            class="dark:text-terracotta-lift text-[0.65rem] text-amber-600"
+            class="dark:text-terracotta-lift text-xs text-amber-600"
           >
             {{ t('settings.beanieModeDisabled') }}
           </p>

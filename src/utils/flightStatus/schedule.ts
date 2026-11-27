@@ -149,23 +149,25 @@ export function departureSortKey(s: { departureDate?: string; departureTime?: st
  * an airport-local string read by `splitLocal`) when a live check carries one, else the plan's
  * `arrivalDate` / `arrivalTime`. Null without a date or without a real clock time (`hhmm`).
  * `scheduledTime` is set only when the estimate is used and its time differs from the plan's.
+ * `estimated` is true whenever the estimate supplied the time (also when it equals the plan),
+ * false when the plan did (no estimate, or one whose time is unusable).
  */
 export function resolveArrival(
   schedule: Pick<ScheduleTuple, 'arrivalDate' | 'arrivalTime'> | undefined,
   estimatedArrival: string | undefined
-): { date: string; time: string; scheduledTime?: string } | null {
+): { date: string; time: string; scheduledTime?: string; estimated: boolean } | null {
   const planned = hhmm(schedule?.arrivalTime);
   const estimate = splitLocal(estimatedArrival);
   // An estimate whose time is unusable ("24:00") falls back to the plan, never drops the row.
   const time = estimate ? hhmm(estimate.time) : undefined;
   if (estimate && time !== undefined) {
     return planned !== undefined && planned !== time
-      ? { date: estimate.date, time, scheduledTime: planned }
-      : { date: estimate.date, time };
+      ? { date: estimate.date, time, scheduledTime: planned, estimated: true }
+      : { date: estimate.date, time, estimated: true };
   }
   const date = datePart(schedule?.arrivalDate);
   if (!date || planned === undefined) return null;
-  return { date, time: planned };
+  return { date, time: planned, estimated: false };
 }
 
 /**

@@ -47,6 +47,7 @@ function ctx(viewer: FamilyMember, over: Partial<TravelRowsContext> = {}): Trave
     t,
     verificationFor: () => undefined,
     homecomingFor: () => [],
+    arrivals: true,
     ...over,
   };
 }
@@ -316,6 +317,18 @@ describe('arrival row: the flight home, for the people at home', () => {
     for (const viewer of members) {
       expect(buildTravelBriefingRows([all], at(viewer, { homecomingFor: everyone }))).toEqual([]);
     }
+  });
+
+  it('the device switch off: no arrival row, and the departure row is unchanged', () => {
+    expect(buildTravelBriefingRows([home()], at(dad, { arrivals: false }))).toEqual([]);
+    const solo = home({ date: '2026-12-13', time: '09:00', travellerIds: ['kid'] });
+    const rows = buildTravelBriefingRows(
+      [solo],
+      at(dad, { homecomingFor: () => ['kid'], arrivals: false })
+    );
+    expect(rows.map((r) => [r.id, r.message])).toEqual([
+      ['travel-departure:seg-2', 'Ansel flies at 9am today'],
+    ]);
   });
 
   it('a child flying alone: an adult at home sees both rows, each with its own id', () => {

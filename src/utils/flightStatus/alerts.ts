@@ -119,7 +119,8 @@ export function sameFlightDay(
 /**
  * The registrations this device should hold, by segment id. A candidate is desired only when
  * all six hold (plan requirement 15):
- *   (i)   now is inside its check window (72 h before departure to 2 h after arrival);
+ *   (i)   now is inside its check window (72 h before departure to 2 h after arrival, or after a
+ *         delayed flight's later estimate: `flightTiming`);
  *   (ii)  it has a normalised flight number and a date;
  *   (iii) alerts are on (`alertsEnabled`);
  *   (iv)  this device's member receives its change notice (`isChangeRecipient`);

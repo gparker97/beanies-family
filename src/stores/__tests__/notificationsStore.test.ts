@@ -57,6 +57,11 @@ vi.mock('@/stores/calendarSyncStore', () => ({
   useCalendarSyncStore: () => ({ connections: [] }),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: (i: unknown) => reportErrorSpy(i) }));
+// The family flights home (#143) come from their own composable, which reads the flight-status
+// and vacation stores; the familyStore mock above is partial, so it is stubbed to none here.
+vi.mock('@/composables/useArrivalAnnouncements', () => ({
+  useArrivalAnnouncements: () => ({ announcements: { value: [] } }),
+}));
 
 import { useNotificationsStore } from '@/stores/notificationsStore';
 

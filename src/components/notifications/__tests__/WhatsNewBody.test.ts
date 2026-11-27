@@ -10,7 +10,10 @@ const { push, close, openExternal, getReleaseNote } = vi.hoisted(() => ({
   getReleaseNote: vi.fn(),
 }));
 
-vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }));
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
+  useRouter: () => ({ push, currentRoute: { value: { fullPath: '/nook' } } }),
+}));
 vi.mock('@/stores/notificationsStore', () => ({ useNotificationsStore: () => ({ close }) }));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -104,7 +107,9 @@ describe('WhatsNewBody — headline + detail blocks', () => {
     expect(tryIt.exists()).toBe(true);
     await tryIt.trigger('click');
     expect(close).toHaveBeenCalled();
-    expect(push).toHaveBeenCalledWith('/activities');
+    // The push follows the drawer's history pop (`pushFromDrawer`).
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/activities'));
   });
 
   it('the primary Done button closes the panel', async () => {

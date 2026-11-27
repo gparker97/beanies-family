@@ -11218,6 +11218,16 @@ const STRING_DEFS = {
   'reminders.trains': { en: 'Trains', beanie: 'trains' },
   'reminders.ferries': { en: 'Ferries', beanie: 'ferries' },
   'reminders.timedTodos': { en: 'Timed to-dos', beanie: 'timed to-dos' },
+  'reminders.familyArrivals': { en: 'Family Flight Arrivals', beanie: 'family flight arrivals' },
+  'reminders.familyArrivalsHint': {
+    en: 'Tells you before someone lands on their flight home, and shows it in your daily briefing. Never for a flight you are on.',
+    beanie:
+      'tells you before someone lands on their flight home, and shows it in your daily briefing. never for a flight you are on.',
+  },
+  'reminders.familyArrivalsNotice': {
+    en: 'How much notice before landing',
+    beanie: 'how much notice before landing',
+  },
   'reminders.timedTodosHint': {
     en: 'To-dos that have a time set.',
     beanie: 'to-dos that have a time set.',
@@ -11309,6 +11319,10 @@ const STRING_DEFS = {
   'notifications.kindTravelChange': {
     en: 'Travel Change',
     beanie: 'travel change',
+  },
+  'notifications.kindTravelArrival': {
+    en: 'Arrival',
+    beanie: 'arrival',
   },
   'reminders.liveChecks.title': {
     en: 'Live Flight Checks',
@@ -16144,6 +16158,14 @@ const STRING_DEFS = {
   'flightChecks.row.landsTonight.other': {
     en: '{names} land tonight at {time}',
     beanie: '{names} land tonight at {time}',
+  },
+  'flightChecks.row.scheduledToLand.one': {
+    en: '{names} is scheduled to land at {time}',
+    beanie: '{names} is scheduled to land at {time}',
+  },
+  'flightChecks.row.scheduledToLand.other': {
+    en: '{names} are scheduled to land at {time}',
+    beanie: '{names} are scheduled to land at {time}',
   },
   'flightChecks.row.scheduled': { en: 'Scheduled {time}', beanie: 'scheduled {time}' },
   'flightChecks.chip.checksFrom': { en: 'Checks from {date}', beanie: 'checks from {date}' },

@@ -7,6 +7,7 @@
  * quiet `Mark unread` link beneath (read/unread is primarily a row-level toggle).
  */
 import { useRouter } from 'vue-router';
+import { pushFromDrawer } from '@/components/notifications/drawerNavigation';
 import { useTranslation } from '@/composables/useTranslation';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useNotificationPresentation } from '@/composables/useNotificationPresentation';
@@ -22,8 +23,12 @@ const { presentation, tintClass, labelKey, hasRichBody, title, summary, when, ro
 
 function handleOpen() {
   if (!props.notification.route) return;
-  router.push({ path: props.notification.route, query: props.notification.query });
   store.close();
+  void pushFromDrawer(
+    router,
+    { path: props.notification.route, query: props.notification.query },
+    'open'
+  );
 }
 
 function handleMarkUnread() {

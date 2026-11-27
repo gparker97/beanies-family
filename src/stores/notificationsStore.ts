@@ -24,6 +24,7 @@ import { useTranslationStore } from '@/stores/translationStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { useCommunityNudge } from '@/composables/useCommunityNudge';
 import { useInstallNudge } from '@/composables/useInstallNudge';
+import { useArrivalAnnouncements } from '@/composables/useArrivalAnnouncements';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
 import { getById as projectionGetById } from '@/services/automerge/projection';
 import { mutate } from '@/services/automerge/worker/docClient';
@@ -43,16 +44,14 @@ import {
   markReadIn,
   markUnreadIn,
   pruneReadState,
+  WINDOW_DAYS,
   type DeriveInput,
 } from '@/utils/notifications';
+import { bellTravelRange } from '@/utils/notifications/travel';
 import type { AppNotification } from '@/types/notifications';
 import { assembleOccurrencesByDate } from '@/utils/occurrenceAssembly';
-import { localYmd } from '@/utils/flightStatus/copy';
 
-const WINDOW_DAYS = 30;
 const MS_PER_DAY = 86_400_000;
-/** How far ahead the bell looks for departures (a departure entry fires one lead before it). */
-const TRAVEL_LOOKAHEAD_DAYS = 30;
 
 export const useNotificationsStore = defineStore('notifications', () => {
   const todoStore = useTodoStore();
@@ -68,6 +67,9 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const beanTips = useBeanTips();
   const communityNudge = useCommunityNudge();
   const installNudge = useInstallNudge();
+  // The family flights home (#143), shared with the OS arrival reminder: one decision, so the
+  // bell and the lock screen cannot disagree, and the snapshot never reads the flight clock.
+  const arrivalAnnouncements = useArrivalAnnouncements();
 
   // ── Derive-clock — advanced ONLY by tick() (the poll). Nothing else writes it.
   const now = ref<Date>(new Date());
@@ -105,6 +107,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     // Shared assembly with the OS forward scheduler (occurrenceAssembly.ts).
     const end = now.value;
     const start = new Date(end.getTime() - WINDOW_DAYS * MS_PER_DAY);
+    const travelRange = bellTravelRange(end.getTime(), WINDOW_DAYS);
     const occurrencesByDate = assembleOccurrencesByDate(
       activityStore.activeActivitiesForMonth,
       start,
@@ -149,10 +152,13 @@ export const useNotificationsStore = defineStore('notifications', () => {
       // Live flight checks (#143): departures and airline changes for the bell. A change stays
       // in the bell for the rolling window, so look back as far as it does.
       travelOccurrences: vacationStore.travelSegmentOccurrencesInRange(
-        localYmd(start.getTime()),
-        localYmd(end.getTime() + TRAVEL_LOOKAHEAD_DAYS * MS_PER_DAY)
+        travelRange.from,
+        travelRange.to
       ),
       travelReminderLeads: settingsStore.travelReminderLeads,
+      // The family flights home this member is told about (empty with the switch off).
+      arrivals: arrivalAnnouncements.announcements.value,
+      arrivalLead: settingsStore.familyArrivalLead,
       // The occasion milestone in an activity reminder's title ("... (turns 60)").
       t: translationStore.t,
     };

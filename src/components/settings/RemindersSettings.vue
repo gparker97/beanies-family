@@ -8,7 +8,9 @@
  * rather than sitting loose on the settings page.
  *
  * A master on/off toggle plus adjustable lead-times: per travel type (flights,
- * cruise, train, ferry) and one for timed to-dos. Activities keep their own
+ * cruise, train, ferry) and one for timed to-dos. Family Flight Arrivals (#143)
+ * is a switch with its own lead: it also governs the briefing row and the bell
+ * entry, so it is live on every platform. Activities keep their own
  * per-item reminder time (this row just links to the activity editor). Mirrors
  * the BeanieLabSection toggle-handler contract (persist via the store, which
  * toasts + re-throws; the control reads the persisted value so a failed write
@@ -26,6 +28,7 @@
  */
 import { computed } from 'vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
+import SettingSubRow from '@/components/settings/SettingSubRow.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieBellIcon from '@/components/ui/BeanieBellIcon.vue';
@@ -130,6 +133,26 @@ async function onToggleLiveAlerts(enabled: boolean): Promise<void> {
     await settingsStore.setLiveFlightChangeAlerts(enabled);
   } catch {
     // Setter toasts + re-throws; the toggle reads the persisted value and reverts.
+  }
+}
+
+// ── Family flight arrivals (#143): one device switch for the briefing row, the bell entry and
+// the reminder before a traveller lands on the flight home, plus how much notice it gives ──
+const familyArrivalsOn = computed(() => settingsStore.familyArrivalAlerts);
+
+async function onToggleFamilyArrivals(enabled: boolean): Promise<void> {
+  try {
+    await settingsStore.setFamilyArrivalAlerts(enabled);
+  } catch {
+    // Setter toasts + re-throws; the toggle reads the persisted value and reverts.
+  }
+}
+
+async function onFamilyArrivalLead(value: string | number): Promise<void> {
+  try {
+    await settingsStore.setFamilyArrivalLead(Number(value));
+  } catch {
+    // Surfaced + re-thrown by the store; the select re-reads the persisted value.
   }
 }
 
@@ -335,6 +358,31 @@ async function onOpenExactAlarmSettings(): Promise<void> {
       />
     </div>
 
+    <!-- #143: family flights home: the switch, then (when on) how much notice before landing -->
+    <div class="dark:border-line border-b border-[var(--tint-slate-05)]">
+      <SettingToggleRow
+        testid="family-arrivals"
+        :title="t('reminders.familyArrivals')"
+        :hint="t('reminders.familyArrivalsHint')"
+        :model-value="familyArrivalsOn"
+        @update:model-value="onToggleFamilyArrivals"
+      />
+      <SettingSubRow
+        v-if="familyArrivalsOn"
+        class="-mt-1 pb-3"
+        :label="t('reminders.familyArrivalsNotice')"
+      >
+        <BaseSelect
+          class="w-40 flex-none"
+          data-testid="family-arrivals-lead"
+          :model-value="settingsStore.familyArrivalLead"
+          :options="leadOptions"
+          :aria-label="t('reminders.familyArrivalsNotice')"
+          @update:model-value="onFamilyArrivalLead"
+        />
+      </SettingSubRow>
+    </div>
+
     <!-- Timed to-dos -->
     <div class="flex items-center justify-between gap-4 py-3">
       <div class="flex items-center gap-2.5">
@@ -435,10 +483,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
             </div>
           </div>
           <!-- How far ahead (family-synced) -->
-          <div class="mt-2.5 flex items-center justify-between gap-4 pl-[2.1rem]">
-            <span class="dark:text-ink-soft text-secondary-400 text-xs font-medium">
-              {{ t('settings.helpfulHints.howFarAhead') }}
-            </span>
+          <SettingSubRow class="mt-2.5 pl-[2.1rem]" :label="t('settings.helpfulHints.howFarAhead')">
             <BaseSelect
               class="w-40 flex-none"
               :model-value="row.lead"
@@ -446,17 +491,17 @@ async function onOpenExactAlarmSettings(): Promise<void> {
               :aria-label="t('settings.helpfulHints.howFarAhead')"
               @update:model-value="(v: string | number) => onHintLead(row.type, v)"
             />
-          </div>
+          </SettingSubRow>
           <!-- Notify me on this device (per-device) -->
-          <div class="mt-2 flex items-center justify-between gap-4 pl-[2.1rem]">
-            <span class="dark:text-ink-soft text-secondary-400 text-xs font-medium">
-              {{ t('settings.helpfulHints.notifyOnDevice') }}
-            </span>
+          <SettingSubRow
+            class="mt-2 pl-[2.1rem]"
+            :label="t('settings.helpfulHints.notifyOnDevice')"
+          >
             <ToggleSwitch
               :model-value="row.enabled"
               @update:model-value="(v: boolean) => onToggleHintType(row.type, v)"
             />
-          </div>
+          </SettingSubRow>
         </div>
       </template>
     </template>

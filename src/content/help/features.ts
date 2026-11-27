@@ -423,7 +423,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       "The bell in your header keeps track of what's coming due, assigned, and coming up — and the app can give you a timely heads-up before activities, travel and timed to-dos start.",
     icon: '\u{1F514}',
     readTime: 4,
-    updatedDate: '2026-07-23',
+    updatedDate: '2026-11-27',
     sections: [
       {
         type: 'paragraph',
@@ -490,6 +490,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '<strong>Activities</strong> use the reminder time set on each activity, so you can give an important one more notice.',
           '<strong>Travel</strong> reminds you before each departure — flights and cruises two hours ahead by default, trains and ferries one hour, all adjustable.',
           '<strong>Timed to-dos</strong> (ones with a time) remind you a set amount before they’re due.',
+          '<strong>Family Flight Arrivals</strong> tells you before someone lands on their flight home, so you can leave for the airport on time: one hour ahead by default, adjustable under <strong>How much notice before landing</strong>. Everyone at home gets it, children included; the people on the flight do not. The same switch also shows the landing in your daily briefing and in the bell, so turning it off removes all three on this device. The notification uses the planned landing time, unless the app has been open to see a newer estimate from the airline.',
         ],
       },
       {
@@ -4543,6 +4544,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'On the day, the people flying see their departure in the <strong>daily briefing</strong> on the Family Nook, for example <strong>Jill flies at 5pm today</strong>. Everyone else in the family sees when a traveller lands on the <strong>flight home</strong>, for example <strong>Jill lands at 12:40am</strong>, with the flight number, the arrival airport and its terminal, and, while the flight is being checked, the airline’s estimated time and the baggage belt. A flight that lands before 6am also shows the evening before, as <strong>Jill lands tonight at 12:40am</strong>. Tap either row to open the trip in Travel Plans with that flight open. Like every briefing row, each can be dismissed on its own.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The landing row, and a notification before the flight home lands (an hour ahead by default), are switched on or off together in <strong>Settings → Reminders → Family Flight Arrivals</strong>, where you can also choose how much notice the notification gives; it uses the planned time unless the app has been open to see a newer estimate.',
       },
       {
         type: 'paragraph',

@@ -47,6 +47,7 @@ import type {
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
   DEFAULT_ACTIVITY_LEAD,
+  DEFAULT_ARRIVAL_LEAD,
   DEFAULT_TODO_LEAD,
   DEFAULT_TRAVEL_LEADS,
   toActivityLeadOption,
@@ -144,6 +145,13 @@ export const useSettingsStore = defineStore('settings', () => {
   /** #143: "Tell Me When a Flight Changes" on this device; on by default. */
   const liveFlightChangeAlerts = computed(
     () => globalSettings.value.liveFlightChangeAlerts ?? true
+  );
+  /** #143: "Family Flight Arrivals" on this device (the briefing row, the bell entry and the
+   *  reminder before a traveller lands on the flight home); on by default. */
+  const familyArrivalAlerts = computed(() => globalSettings.value.familyArrivalAlerts ?? true);
+  /** #143: minutes before a family flight home lands that its reminder fires. */
+  const familyArrivalLead = computed(
+    () => globalSettings.value.familyArrivalLead ?? DEFAULT_ARRIVAL_LEAD
   );
   /** When the beanie wall sleeps on this device; always complete (see `resolveWallSleep`). */
   const wallSleep = computed(() => resolveWallSleep(globalSettings.value.wall?.sleep));
@@ -909,6 +917,10 @@ export const useSettingsStore = defineStore('settings', () => {
     persistGlobalSetting('reminders.title', 'liveFlightChecksEnabled', enabled);
   const setLiveFlightChangeAlerts = (enabled: boolean) =>
     persistGlobalSetting('reminders.title', 'liveFlightChangeAlerts', enabled);
+  const setFamilyArrivalAlerts = (enabled: boolean) =>
+    persistGlobalSetting('reminders.title', 'familyArrivalAlerts', enabled);
+  const setFamilyArrivalLead = (minutes: number) =>
+    persistGlobalSetting('reminders.title', 'familyArrivalLead', minutes);
   const setTodoReminderLead = (minutes: number) =>
     persistGlobalSetting('reminders.title', 'todoReminderLead', minutes);
   const setActivityReminderLead = (minutes: number) =>
@@ -1442,6 +1454,8 @@ export const useSettingsStore = defineStore('settings', () => {
     widgetLockScreenTitles,
     liveFlightChecksEnabled,
     liveFlightChangeAlerts,
+    familyArrivalAlerts,
+    familyArrivalLead,
     wallSleep,
     wallWeatherStyle,
     wallMemories,
@@ -1505,6 +1519,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setWidgetLockScreenTitles,
     setLiveFlightChecksEnabled,
     setLiveFlightChangeAlerts,
+    setFamilyArrivalAlerts,
+    setFamilyArrivalLead,
     setWallSleep,
     setWallWeather,
     setWallMemories,

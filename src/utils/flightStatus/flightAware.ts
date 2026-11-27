@@ -25,7 +25,7 @@ import type { FlightCheck } from '@/types/flightStatus';
 import type { VacationTravelSegment } from '@/types/models';
 import { isFlightType } from '../travelCodes';
 import { normaliseFlightNumber } from './flightNumber';
-import { arrivalInstant, departureInstant } from './window';
+import { arrivalInstant, departureInstant, estimatedArrivalInstant, windowArrival } from './window';
 
 const HOUR_MS = 3_600_000;
 
@@ -124,6 +124,8 @@ export function flightTrackUrl(
   const departs = departureInstant(seg, check, homeZone);
   // Without its stored arrival time, `arrivalInstant` answers only from a fitting cached check
   // (exact UTC), else null: the "trust the arrival only when confirmed" rule in the header.
-  const lands = arrivalInstant({ ...seg, arrivalTime: undefined }, check, homeZone);
+  const confirmed = arrivalInstant({ ...seg, arrivalTime: undefined }, check, homeZone);
+  // A delayed flight is tracked to its estimate, as its checks are (`windowArrival`).
+  const lands = windowArrival(confirmed, estimatedArrivalInstant(seg, check));
   return trackWindowOpen(departs, lands, nowMs) ? url : null;
 }

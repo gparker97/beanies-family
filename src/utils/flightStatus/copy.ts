@@ -17,6 +17,7 @@ import type { TranslateFn } from '@/utils/format';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort, formatTime12 } from '@/utils/date';
 import { carriedCode } from '@/utils/travelCodes';
+import type { ArrivalAnnouncement } from './arrivalAnnouncement';
 import {
   FIELD_KIND,
   REVISION_FIELDS,
@@ -490,24 +491,73 @@ export function departureRowMessage(
   return fillTemplate(t(key), { names: input.names, time: clockTime(input.time) });
 }
 
+/** How an arrival sentence words its time: today's ("lands at"), early tomorrow's ("lands
+ *  tonight at"), or one no live estimate stands behind ("is scheduled to land at"). */
+export type ArrivalWording = 'today' | 'tonight' | 'scheduled';
+
+/** Total, so a new wording fails to compile until it has both numbers. */
+const ARRIVAL_WORDING_KEYS: Record<ArrivalWording, { one: UIStringKey; other: UIStringKey }> = {
+  today: { one: 'flightChecks.row.lands.one', other: 'flightChecks.row.lands.other' },
+  tonight: {
+    one: 'flightChecks.row.landsTonight.one',
+    other: 'flightChecks.row.landsTonight.other',
+  },
+  scheduled: {
+    one: 'flightChecks.row.scheduledToLand.one',
+    other: 'flightChecks.row.scheduledToLand.other',
+  },
+};
+
 /**
- * The briefing row's message for a flight home, to the people at home: "Jill lands at
- * 12:40am", "Jill and Sam land at 12:40am"; "Jill lands tonight at 12:40am" when it lands
- * early tomorrow. `names` is the caller's joined list, `count` how many people it names.
+ * The message for a flight home, to the people at home: "Jill lands at 12:40am", "Jill and
+ * Sam land at 12:40am"; "Jill lands tonight at 12:40am" when it lands early tomorrow; "Jill is
+ * scheduled to land at 12:40am" for a notice no live estimate stands behind. `names` is the
+ * caller's joined list, `count` how many people it names.
  */
 export function arrivalRowMessage(
   t: TranslateFn,
-  input: { names: string; count: number; time: string; tonight: boolean }
+  input: { names: string; count: number; time: string; wording: ArrivalWording }
 ): string {
-  const one = input.count === 1;
-  const key = input.tonight
-    ? one
-      ? 'flightChecks.row.landsTonight.one'
-      : 'flightChecks.row.landsTonight.other'
-    : one
-      ? 'flightChecks.row.lands.one'
-      : 'flightChecks.row.lands.other';
-  return fillTemplate(t(key), { names: input.names, time: clockTime(input.time) });
+  const keys = ARRIVAL_WORDING_KEYS[input.wording];
+  return fillTemplate(t(input.count === 1 ? keys.one : keys.other), {
+    names: input.names,
+    time: clockTime(input.time),
+  });
+}
+
+/** "SIN Terminal 1", or the bare airport when no terminal is known ('' for neither): where a
+ *  flight home lands, for the briefing row's caption, the reminder and the bell. */
+export function arrivalPlace(
+  t: TranslateFn,
+  a: Pick<ArrivalAnnouncement, 'airport' | 'terminal'>
+): string {
+  return placeTerminal(t, a.airport, a.terminal) || a.airport;
+}
+
+/**
+ * The reminder's and the bell entry's text for a flight home: title "Jill lands at 12:40am"
+ * with a live estimate, else "Jill is scheduled to land at 12:40am"; body
+ * "SQ317 · SIN Terminal 1". `fireAt` is when it is shown (`arrivalFireAt`): when that falls on
+ * another calendar day than the landing (a "day before" lead, a just-after-midnight arrival),
+ * the body leads with the landing day ("14 Dec · SQ317 · SIN Terminal 1"), so the sentence
+ * never reads as that day's.
+ */
+export function arrivalNoticeText(
+  t: TranslateFn,
+  a: ArrivalAnnouncement,
+  fireAt: Date,
+  lang?: LanguageCode
+): { title: string; body: string } {
+  const day = localYmd(fireAt.getTime()) !== a.date ? shortDate(a.date, lang) : '';
+  return {
+    title: arrivalRowMessage(t, {
+      names: a.names,
+      count: a.count,
+      time: a.time,
+      wording: a.estimated ? 'today' : 'scheduled',
+    }),
+    body: [day, a.flight, arrivalPlace(t, a)].filter(Boolean).join(' · '),
+  };
 }
 
 /** "just now", "12 min ago", "3 h ago", "2 d ago": the age of a check, by the caller's clock. */

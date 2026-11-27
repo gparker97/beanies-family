@@ -20,6 +20,8 @@ import {
   hasFlightChip,
   isAlertStatus,
   conflictSentence,
+  arrivalNoticeText,
+  arrivalPlace,
   arrivalRowMessage,
   departureRowMessage,
   fillNoteLine,
@@ -32,7 +34,9 @@ import {
   terminalLabel,
   terminalRoute,
   wasLine,
+  type ArrivalWording,
 } from './copy';
+import type { ArrivalAnnouncement } from './arrivalAnnouncement';
 import { t, withDiff, type Recorded } from './__tests__/fixtures';
 
 const zh = (k: UIStringKey): string => ZH_STRINGS[k];
@@ -172,18 +176,71 @@ describe('departureRowMessage', () => {
 });
 
 describe('arrivalRowMessage', () => {
-  it('one person and several, today and tonight', () => {
-    const row = (names: string, count: number, tonight: boolean) =>
-      arrivalRowMessage(t, { names, count, time: '00:40', tonight });
-    expect(row('Jill', 1, false)).toBe('Jill lands at 12:40am');
-    expect(row('Jill and Sam', 2, false)).toBe('Jill and Sam land at 12:40am');
-    expect(row('Jill', 1, true)).toBe('Jill lands tonight at 12:40am');
-    expect(row('Jill and Sam', 2, true)).toBe('Jill and Sam land tonight at 12:40am');
+  it('one person and several, today, tonight and scheduled', () => {
+    const row = (names: string, count: number, wording: ArrivalWording) =>
+      arrivalRowMessage(t, { names, count, time: '00:40', wording });
+    expect(row('Jill', 1, 'today')).toBe('Jill lands at 12:40am');
+    expect(row('Jill and Sam', 2, 'today')).toBe('Jill and Sam land at 12:40am');
+    expect(row('Jill', 1, 'tonight')).toBe('Jill lands tonight at 12:40am');
+    expect(row('Jill and Sam', 2, 'tonight')).toBe('Jill and Sam land tonight at 12:40am');
+    expect(row('Jill', 1, 'scheduled')).toBe('Jill is scheduled to land at 12:40am');
+    expect(row('Jill and Sam', 2, 'scheduled')).toBe(
+      'Jill and Sam are scheduled to land at 12:40am'
+    );
   });
 
   it('in Chinese', () => {
-    expect(arrivalRowMessage(zh, { names: 'Jill', count: 1, time: '17:00', tonight: false })).toBe(
-      'Jill 5pm 降落'
+    expect(
+      arrivalRowMessage(zh, { names: 'Jill', count: 1, time: '17:00', wording: 'today' })
+    ).toBe('Jill 5pm 降落');
+  });
+});
+
+describe('arrivalPlace and arrivalNoticeText', () => {
+  const a: ArrivalAnnouncement = {
+    segmentId: 'seg-2',
+    vacationId: 'vac-1',
+    names: 'Jill',
+    count: 1,
+    date: '2026-12-13',
+    time: '17:05',
+    estimated: false,
+    over: false,
+    flight: 'SQ317',
+    airport: 'SIN',
+    terminal: '1',
+  };
+  const local = (ymd: string, hhmm: string) => new Date(`${ymd}T${hhmm}:00`);
+
+  it('the airport with its terminal, or the bare airport', () => {
+    expect(arrivalPlace(t, a)).toBe('SIN Terminal 1');
+    expect(arrivalPlace(t, { airport: 'SIN' })).toBe('SIN');
+    expect(arrivalPlace(t, { airport: '', terminal: '1' })).toBe('');
+  });
+
+  it('"is scheduled to land" without an estimate, "lands" with one; body is flight and place', () => {
+    const fireAt = local('2026-12-13', '16:05');
+    expect(arrivalNoticeText(t, a, fireAt)).toEqual({
+      title: 'Jill is scheduled to land at 5:05pm',
+      body: 'SQ317 · SIN Terminal 1',
+    });
+    expect(arrivalNoticeText(t, { ...a, estimated: true, time: '17:45' }, fireAt)).toEqual({
+      title: 'Jill lands at 5:45pm',
+      body: 'SQ317 · SIN Terminal 1',
+    });
+    expect(arrivalNoticeText(t, { ...a, count: 2, names: 'Jill & Sam' }, fireAt).title).toBe(
+      'Jill & Sam are scheduled to land at 5:05pm'
+    );
+  });
+
+  it('names the landing day when the notice fires on another calendar day', () => {
+    // A "day before" lead, and a just-after-midnight arrival with a one-hour lead.
+    expect(arrivalNoticeText(t, a, local('2026-12-12', '17:05')).body).toBe(
+      `${shortDate('2026-12-13')} · SQ317 · SIN Terminal 1`
+    );
+    const early = { ...a, date: '2026-12-14', time: '00:40' };
+    expect(arrivalNoticeText(t, early, local('2026-12-13', '23:40')).body).toBe(
+      `${shortDate('2026-12-14')} · SQ317 · SIN Terminal 1`
     );
   });
 });

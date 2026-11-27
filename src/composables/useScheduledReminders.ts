@@ -35,6 +35,7 @@ import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { useListStore } from '@/stores/listStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useToday } from '@/composables/useToday';
+import { useArrivalAnnouncements } from '@/composables/useArrivalAnnouncements';
 import { assembleOccurrencesByDate } from '@/utils/occurrenceAssembly';
 import { addDaysYmd, formatTime12 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -52,10 +53,17 @@ import {
 import { activityReminderId, listDueId, todoDueId, travelReminderId } from '@/utils/notifications';
 import {
   CHANGE_NOTICE_DELAY_MS,
+  travelArrivalId,
   travelCancelId,
   travelChangeId,
 } from '@/utils/notifications/travel';
 import { isChangeRecipient } from '@/utils/flightStatus/audience';
+import {
+  arrivalFireAt,
+  arrivalLink,
+  type ArrivalAnnouncement,
+} from '@/utils/flightStatus/arrivalAnnouncement';
+import { arrivalNoticeText } from '@/utils/flightStatus/copy';
 import { occurrenceNotice } from '@/utils/flightStatus/occurrenceNotice';
 import { dedupeHintsByKey } from '@/utils/helpfulHints';
 import { entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
@@ -89,7 +97,8 @@ export const REMINDER_WINDOW_DAYS = 14;
  */
 export const MAX_SCHEDULED = 60;
 
-export type ReminderKind = 'activity' | 'travel' | 'travel-change' | 'todo' | 'list';
+export type ReminderKind =
+  'activity' | 'travel' | 'travel-change' | 'travel-arrival' | 'todo' | 'list';
 
 export interface ScheduledReminder {
   /** Stable id (shared scheme with the in-app system → future unification). */
@@ -119,6 +128,9 @@ export interface ReminderPrefs {
   /** #143: tell this device when an airline changes or cancels a flight. This device's switch
    *  AND the plan (`flightStatusStore.alertsEnabled`). Absent ⟹ off. */
   flightChangeAlerts?: boolean;
+  /** #143: minutes before a family flight home lands that its reminder fires
+   *  (`settingsStore.familyArrivalLead`). The switch needs no field: off, `arrivals` is empty. */
+  familyArrivalLead: number;
 }
 
 export interface ReminderInput {
@@ -142,6 +154,10 @@ export interface ReminderInput {
    *  flight-status store stamps and persists it, pre-dated when a push was the notice).
    *  Absent ⟹ no change notices. */
   noticeFirstSeen?: (id: string, segmentId: string) => number;
+  /** #143: the family flights home this member is told about (`useArrivalAnnouncements`, shared
+   *  with the bell; empty with the device's switch off). Absent ⟹ none. The list keeps its
+   *  identity until an announcement changes, so a clock tick reschedules nothing. */
+  arrivals?: readonly ArrivalAnnouncement[];
   /** Translation fn (injected → the builder stays pure). */
   t: (key: UIStringKey) => string;
 }
@@ -467,6 +483,53 @@ export function buildTravelReminders(
 }
 
 /**
+ * Family flight arrivals (#143): one reminder per flight home, `prefs.familyArrivalLead` minutes
+ * before it lands, to the people at home. Who and which flights is `arrivalAnnouncement`'s
+ * decision (already applied to `input.arrivals`, which is empty with the switch off); this
+ * builder only times them.
+ *
+ * Skipped: a flight that is over (it landed early with the app open: falling back to its
+ * planned time would announce "is scheduled to land" after it had landed), and a landing
+ * outside the scheduler's window (the list reaches as far as the bell's; every builder arms
+ * `REMINDER_WINDOW_DAYS`). A fire time already behind `now` is dropped uncounted, as a departure
+ * reminder's is: every landed flight would otherwise inflate `gated`.
+ *
+ * The id carries the landing date and no time, so a new estimate on the same day moves the
+ * pending reminder (`reconcileScheduled` re-arms the whole set) and a slip to another day is a
+ * new reminder. An estimate earlier than now plus the lead drops it (the bell and the
+ * briefing row still show); one that slips after it fired re-arms the same id, and fires again
+ * only while the new fire time is ahead.
+ */
+export function buildArrivalReminders(
+  input: ReminderInput,
+  now: Date,
+  prefs: ReminderPrefs
+): ReminderBuildResult {
+  const out: ScheduledReminder[] = [];
+  let skipped = 0;
+  const nowMs = now.getTime();
+  for (const a of input.arrivals ?? []) {
+    try {
+      if (a.over) continue;
+      if (!withinWindow(a.date, input.windowStartISO, input.windowEndISO)) continue;
+      const fireAt = arrivalFireAt(a, prefs.familyArrivalLead);
+      if (!fireAt || fireAt.getTime() <= nowMs) continue;
+      out.push({
+        id: travelArrivalId(a.segmentId, a.date),
+        fireAt,
+        ...arrivalNoticeText(input.t, a, fireAt),
+        kind: 'travel-arrival',
+        deepLink: arrivalLink(a),
+      });
+    } catch (err) {
+      skipped++;
+      console.warn(`[buildReminderSchedule] skipped arrival ${a?.segmentId ?? '?'}:`, err);
+    }
+  }
+  return { reminders: out, skipped, gated: 0 };
+}
+
+/**
  * Due-date reminders for one-off Beanie Lists: morning-of, assignees only (each of a
  * list's assignees, and a child assignee's adults). The list's show rule does not move them.
  *
@@ -501,8 +564,8 @@ export function buildTravelReminders(
 export function buildListReminders(
   input: ReminderInput,
   now: Date,
-  /** Unused: a list has no time and so no lead to configure. Kept so all four
-   *  builders share one `(input, now, prefs)` signature. */
+  /** Unused: a list has no time and so no lead to configure. Kept so every
+   *  builder shares one `(input, now, prefs)` signature. */
   _prefs: ReminderPrefs
 ): ReminderBuildResult {
   const out: ScheduledReminder[] = [];
@@ -594,6 +657,7 @@ export function buildReminderSchedule(
     buildTravelReminders(input, now, prefs),
     buildTodoReminders(input, now, prefs),
     buildListReminders(input, now, prefs),
+    buildArrivalReminders(input, now, prefs),
   ];
   const all = parts.flatMap((p) => p.reminders);
   // Surfaced as `notif_skipped`: a non-zero count against a healthy
@@ -640,6 +704,7 @@ function createScheduledReminderSources(): ScheduledReminderSources {
   const listStore = useListStore();
   const { t } = useTranslation();
   const { today } = useToday();
+  const arrivalAnnouncements = useArrivalAnnouncements();
 
   const prefs = computed<ReminderPrefs>(() => ({
     remindersEnabled: settingsStore.remindersEnabled,
@@ -648,6 +713,7 @@ function createScheduledReminderSources(): ScheduledReminderSources {
     travelReminderLeads: settingsStore.travelReminderLeads,
     helpfulHintNotifyByType: settingsStore.helpfulHintNotifyByType,
     flightChangeAlerts: flightStatusStore.alertsEnabled,
+    familyArrivalLead: settingsStore.familyArrivalLead,
   }));
 
   // Reactive to activity/todo/travel data + the day clock. Bounded to the local
@@ -682,6 +748,7 @@ function createScheduledReminderSources(): ScheduledReminderSources {
       windowStartISO,
       windowEndISO,
       noticeFirstSeen: flightStatusStore.noticeFirstSeen,
+      arrivals: arrivalAnnouncements.announcements.value,
       t,
     };
   });

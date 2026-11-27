@@ -131,6 +131,8 @@ export interface GlobalSettings {
   helpfulHintNotifyByType?: Partial<Record<HelpfulHintType, boolean>>; // #40: per-device per-hint-type notification mute; absent key ⟹ enabled. Never family-synced.
   liveFlightChecksEnabled?: boolean; // #143: this device checks flights live (a magic beans feature; the plan gate is applied on read, never written here). Absent ⟹ on. Never family-synced
   liveFlightChangeAlerts?: boolean; // #143: this device is told when an airline changes or cancels a flight. Absent ⟹ on. Never family-synced
+  familyArrivalAlerts?: boolean; // #143: the family's flight arrivals on this device (the briefing row, the bell entry and the OS reminder before a traveller lands on the flight home). Absent ⟹ on. Never family-synced
+  familyArrivalLead?: number; // #143: minutes before a family flight home lands that its reminder and bell entry fire (default DEFAULT_ARRIVAL_LEAD). Never family-synced
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
   cachedFamilyKeys?: Record<string, string>;

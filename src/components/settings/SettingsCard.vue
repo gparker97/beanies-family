@@ -25,12 +25,12 @@ defineEmits<{ click: [] }>();
       <slot name="icon">{{ icon }}</slot>
     </div>
     <div class="flex items-center gap-2">
-      <p class="font-outfit dark:text-ink text-[0.9rem] font-bold text-[var(--deep-slate)]">
+      <p class="font-outfit dark:text-ink text-sm font-bold text-[var(--deep-slate)]">
         {{ title }}
       </p>
       <slot name="badge" />
     </div>
-    <p class="dark:text-ink-faint mt-1 text-[0.72rem] leading-relaxed text-[var(--deep-slate)]/40">
+    <p class="dark:text-ink-faint mt-1 text-xs leading-relaxed text-[var(--deep-slate)]/40">
       {{ description }}
     </p>
   </div>

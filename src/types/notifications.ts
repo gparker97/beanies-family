@@ -23,6 +23,7 @@ export type NotificationKind =
   | 'calendar-reconnect'
   | 'travel-departure'
   | 'travel-change'
+  | 'travel-arrival'
   | 'whats-new'
   | 'announcement'
   | 'tip'

@@ -17,6 +17,7 @@
  *   - "don't show tips" → muteAllTips() + success toast + close drawer.
  */
 import { useRouter } from 'vue-router';
+import { pushFromDrawer } from '@/components/notifications/drawerNavigation';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useNotificationPresentation } from '@/composables/useNotificationPresentation';
 import { useBeanTips } from '@/composables/useBeanTips';
@@ -38,7 +39,11 @@ const beanTips = useBeanTips();
 function handleTryIt() {
   if (!props.notification.route) return;
   store.close();
-  router.push({ path: props.notification.route, query: props.notification.query });
+  void pushFromDrawer(
+    router,
+    { path: props.notification.route, query: props.notification.query },
+    'tip'
+  );
 }
 
 function handleGotIt() {

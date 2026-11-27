@@ -5021,6 +5021,10 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'reminders.trains': '火车',
   'reminders.ferries': '渡轮',
   'reminders.timedTodos': '定时待办',
+  'reminders.familyArrivals': '家人航班抵达',
+  'reminders.familyArrivalsHint':
+    '有人乘航班回家时，在降落前提醒你，并显示在每日简报中。你自己乘坐的航班不会提醒。',
+  'reminders.familyArrivalsNotice': '降落前多久提醒',
   'reminders.timedTodosHint': '设置了时间的待办。',
   'reminders.permissionNudge':
     '在设备设置中开启通知，才能收到这些提醒。无论是否开启，应用内的简报都会显示全部内容。',
@@ -5052,6 +5056,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'nook.criticalTravelBelt': '行李转盘 {belt}',
   'notifications.kindTravelDeparture': '出发',
   'notifications.kindTravelChange': '行程变更',
+  'notifications.kindTravelArrival': '抵达',
   'reminders.liveChecks.title': '实时航班查询',
   'reminders.liveChecks.checks': '实时航班查询',
   'reminders.liveChecks.checksHint': '从起飞前三天开始，向航空公司核对你的航班。',
@@ -7265,6 +7270,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'flightChecks.row.lands.other': '{names} {time} 降落',
   'flightChecks.row.landsTonight.one': '{names}今晚 {time} 降落',
   'flightChecks.row.landsTonight.other': '{names}今晚 {time} 降落',
+  'flightChecks.row.scheduledToLand.one': '{names}按计划 {time} 降落',
+  'flightChecks.row.scheduledToLand.other': '{names}按计划 {time} 降落',
   'flightChecks.row.scheduled': '原定 {time}',
   'flightChecks.chip.checksFrom': '{date} 起核对',
   'flightChecks.chip.checking': '正在核对…',

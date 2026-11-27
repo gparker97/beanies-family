@@ -621,6 +621,13 @@ describe('read-state reducers', () => {
     });
   });
 
+  it('pruneReadState keeps a travel-arrival read this device does not derive, while it is young', () => {
+    const now = '2026-09-26T12:00:00.000Z';
+    const daysAgo = (d: number) => new Date(Date.parse(now) - d * 86_400_000).toISOString();
+    const m = { 'travel-arrival:seg-1': daysAgo(1), 'travel-arrival:seg-old': daysAgo(31) };
+    expect(pruneReadState(m, [], now)).toEqual({ 'travel-arrival:seg-1': daysAgo(1) });
+  });
+
   it('pruneReadState still keeps a card-move read that is in keepIds, whatever its age', () => {
     const now = '2026-09-26T12:00:00.000Z';
     const m = { 'card-move:c1': '2020-01-01T00:00:00.000Z' };

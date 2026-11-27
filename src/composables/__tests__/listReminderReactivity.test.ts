@@ -95,6 +95,7 @@ const PREFS = {
   activityReminderLead: 30,
   travelReminderLeads: {},
   helpfulHintNotifyByType: {},
+  familyArrivalLead: 60,
 };
 
 /** A list as it exists BEFORE the user edits it: no owner change, no due date. */

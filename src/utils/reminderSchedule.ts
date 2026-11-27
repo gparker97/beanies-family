@@ -245,6 +245,10 @@ export const DEFAULT_TRAVEL_LEADS: Record<SupportedTravelType, number> = {
   ferry: 60,
 };
 
+/** Family flight arrivals (#143): how long before a traveller lands on the flight home its
+ *  reminder and bell entry fire, when the device has not overridden it. */
+export const DEFAULT_ARRIVAL_LEAD = 60;
+
 /**
  * Lead-time options for the TRAVEL and TO-DO selects (minutes). `0` = "at the
  * event time"; `1440` = "the day before".

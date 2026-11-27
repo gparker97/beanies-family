@@ -21,7 +21,7 @@ import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import { getReleaseNote } from '@/content/release-notes';
 import CelebrationDetail from '@/components/notifications/CelebrationDetail.vue';
 import type { AppNotification } from '@/types/notifications';
-import { logEvent } from '@/services/telemetry/logEvent';
+import { pushFromDrawer } from '@/components/notifications/drawerNavigation';
 
 const props = defineProps<{ notification: AppNotification }>();
 
@@ -60,22 +60,9 @@ const summaryText = computed(() => (release.value?.summary ? txt(release.value.s
 
 async function handleTryIt(route: string) {
   store.close();
-  // `router.push` reports guard cancellations as a RESOLVED NavigationFailure —
-  // swallowed, this read as "tapping the button does nothing" (0.13R2 field bug:
-  // the first post-login tap can land while a guard, e.g. the critical-write
-  // block, rejects navigation). Await it, retry once after a beat, and log the
-  // failure so the real guard is identifiable from CloudWatch if it recurs.
-  const failure = await Promise.resolve(router.push(route)).catch((e) => e);
-  if (failure) {
-    logEvent({
-      level: 'warn',
-      surface: 'notifications',
-      message: 'whats-new CTA navigation was cancelled — retrying once',
-      context: { action: 'tryit_nav_cancelled', detail: String(failure).slice(0, 120) },
-    });
-    await new Promise((r) => setTimeout(r, 400));
-    await Promise.resolve(router.push(route)).catch(() => {});
-  }
+  // A cancelled push used to read as "tapping the button does nothing" (0.13R2 field bug);
+  // `pushFromDrawer` awaits it, retries once and logs.
+  await pushFromDrawer(router, route, 'tryit');
 }
 
 function handleSeeAll() {

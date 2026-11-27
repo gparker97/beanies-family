@@ -14,6 +14,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - The daily briefing now tells the family at home when someone lands on their flight home, with the airport, terminal and the airline's latest time.
 - Tapping a travel row in the daily briefing now opens that flight in Travel Plans.
+- Family Flight Arrivals in Settings › Reminders: a notification before someone lands on their flight home (an hour ahead by default), and one switch for it, its bell entry and the briefing row.
+
+### Changed
+
+- A delayed flight keeps being checked until it lands, so its latest time, baggage belt and arrival reminder stay current through a long delay.
+
+### Fixed
+
+- Fixed opening an item from the notification bell sometimes doing nothing on the first tap.
+- Fixed explanation text in Settings that was smaller than the rest of the app.
 
 ## 2026-11-26
 

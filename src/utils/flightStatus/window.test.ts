@@ -3,12 +3,15 @@ import {
   INTERVAL_DAY_MS,
   INTERVAL_FAR_MS,
   INTERVAL_NEAR_MS,
+  INTERVAL_OVERDUE_FAR_MS,
+  INTERVAL_OVERDUE_MS,
   WINDOW_CLOSES_AFTER_MS,
   WINDOW_OPENS_BEFORE_MS,
   arrivalInstant,
   checkWindow,
   departureInstant,
   flightTiming,
+  windowArrival,
   minIntervalMs,
   MANUAL_CHECK_FLOOR_MS,
   pickFlightRefresh,
@@ -127,6 +130,129 @@ describe('flightTiming', () => {
     const now = Date.parse('2026-12-13T12:00:00Z');
     const timing = flightTiming(makeFlight(), makeCheck(makeLeg({ status: 'Arrived' })), SG, now);
     expect(timing).toMatchObject({ past: true, inWindow: false, departed: true });
+  });
+
+  describe('a delayed flight (the estimate is later than the schedule)', () => {
+    // makeLeg: departs 09:00Z, scheduled to arrive 2026-12-13 23:10Z (so the plain window
+    // closes at 01:10Z on the 14th).
+    const delayed = (revisedLocal: string, status = 'Delayed') =>
+      makeCheck(makeLeg({ status, arr: { revisedLocal } }));
+    const at = (iso: string) => Date.parse(iso);
+
+    it('stays in the window until 2 h after the estimate, checking faster as it nears', () => {
+      const check = delayed('2026-12-14 06:00+00:00');
+      const timing = flightTiming(makeFlight(), check, SG, at('2026-12-14T04:00:00Z'));
+      expect(timing).toMatchObject({
+        inWindow: true,
+        past: false,
+        minIntervalMs: INTERVAL_OVERDUE_MS,
+      });
+      // More than 3 h from the estimate: hourly. From 1 h before it: the near floor.
+      const far = delayed('2026-12-14 12:00+00:00');
+      expect(flightTiming(makeFlight(), far, SG, at('2026-12-14T02:00:00Z')).minIntervalMs).toBe(
+        INTERVAL_OVERDUE_FAR_MS
+      );
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T05:30:00Z')).minIntervalMs).toBe(
+        INTERVAL_NEAR_MS
+      );
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T07:30:00Z')).minIntervalMs).toBe(
+        INTERVAL_NEAR_MS
+      );
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T07:59:00Z')).inWindow).toBe(true);
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T08:01:00Z'))).toMatchObject({
+        inWindow: false,
+        past: true,
+      });
+    });
+
+    it('keeps the near floor while the scheduled window is still open', () => {
+      const check = delayed('2026-12-14 06:00+00:00');
+      const timing = flightTiming(makeFlight(), check, SG, at('2026-12-13T23:30:00Z'));
+      expect(timing).toMatchObject({ inWindow: true, minIntervalMs: INTERVAL_NEAR_MS });
+    });
+
+    it('an estimate reads its own offset, never the device zone', () => {
+      // 14:00 at +08:00 is 06:00Z.
+      const check = delayed('2026-12-14 14:00+08:00');
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T07:59:00Z')).inWindow).toBe(true);
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T08:01:00Z')).past).toBe(true);
+    });
+
+    it('an Arrived leg still ends it at once', () => {
+      const check = delayed('2026-12-14 06:00+00:00', 'Arrived');
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T04:00:00Z'))).toMatchObject({
+        inWindow: false,
+        past: true,
+      });
+    });
+
+    it('an estimate earlier than the schedule, or with no zone, changes nothing', () => {
+      const plain = flightTiming(
+        makeFlight(),
+        makeCheck(makeLeg({})),
+        SG,
+        at('2026-12-14T00:30:00Z')
+      );
+      for (const revisedLocal of ['2026-12-13 22:00+00:00', '2026-12-14 06:00']) {
+        expect(
+          flightTiming(makeFlight(), delayed(revisedLocal), SG, at('2026-12-14T00:30:00Z'))
+        ).toEqual(plain);
+        expect(
+          flightTiming(makeFlight(), delayed(revisedLocal), SG, at('2026-12-14T01:30:00Z')).past
+        ).toBe(true);
+      }
+    });
+
+    it('a departure delayed on the ground moves the arrival by the same delay', () => {
+      // Departure revised from 09:00Z to 15:00Z (+6 h), no arrival estimate yet: lands 05:10Z.
+      const check = makeCheck(
+        makeLeg({ status: 'Delayed', dep: { revisedLocal: '2026-12-13 15:00+00:00' } })
+      );
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T07:00:00Z')).inWindow).toBe(true);
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T07:20:00Z')).past).toBe(true);
+    });
+
+    it('a cancelled flight lends no estimate', () => {
+      for (const status of ['Canceled', 'CanceledUncertain']) {
+        const check = delayed('2026-12-14 06:00+00:00', status);
+        expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T01:30:00Z')).past).toBe(true);
+      }
+    });
+
+    it('an estimate with no scheduled instant on its own leg is not compared with the plan', () => {
+      const check = makeCheck(
+        makeLeg({ arr: { scheduledUtc: undefined, revisedLocal: '2026-12-14 06:00+00:00' } })
+      );
+      expect(
+        flightTiming(makeFlight(), check, SG, at('2026-12-14T04:00:00Z')).minIntervalMs
+      ).not.toBe(INTERVAL_OVERDUE_MS);
+    });
+
+    it('an absurd estimate holds the window at most 24 h past the schedule', () => {
+      const check = delayed('2026-12-20 06:00+00:00');
+      // Scheduled 23:10Z on the 13th: capped at 23:10Z on the 14th, plus the 2 h close.
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-15T01:00:00Z')).inWindow).toBe(true);
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-15T01:20:00Z')).past).toBe(true);
+    });
+
+    it('a check for another day\u2019s flight lends no estimate', () => {
+      const moved = makeFlight({ departureDate: '2026-12-20', arrivalDate: '2026-12-20' });
+      const timing = flightTiming(
+        moved,
+        delayed('2026-12-25 06:00+00:00'),
+        SG,
+        at('2026-12-21T12:00:00Z')
+      );
+      expect(timing.past).toBe(true);
+    });
+  });
+
+  it('windowArrival: the later of the schedule and the estimate, capped', () => {
+    expect(windowArrival(null, 5)).toBeNull();
+    expect(windowArrival(100, null)).toBe(100);
+    expect(windowArrival(100, 50)).toBe(100);
+    expect(windowArrival(100, 200)).toBe(200);
+    expect(windowArrival(100, 100 + 25 * 3_600_000)).toBe(100 + 24 * 3_600_000);
   });
 
   it('no departure date: not in window, not past, the far interval', () => {

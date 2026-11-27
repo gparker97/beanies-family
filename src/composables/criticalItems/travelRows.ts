@@ -14,7 +14,9 @@
  *     on the flight and is not a pet; an arrival before `EARLY_ARRIVAL_BEFORE` also shows the
  *     day before ("Jill lands tonight at 12:40am"). Built from the DEPARTURE occurrence, which
  *     carries the schedule, whatever day it departed (`travelRowsRange` fetches far enough
- *     back).
+ *     back). Who and when is `arrivalAnnouncement`'s decision, shared with the arrival reminder
+ *     and bell entry; the device's "Family Flight Arrivals" switch (`ctx.arrivals`) gates all
+ *     three.
  * Every row opens the trip on that flight (`flightRoute`).
  *
  * Pure (the `buildCardBriefingRows` precedent): `useCriticalItems` calls it once and stamps the
@@ -28,11 +30,11 @@ import { transportEmoji } from '@/utils/vacation';
 import { airportCode, isFlightType } from '@/utils/travelCodes';
 import { classifyAudience } from '@/utils/audience';
 import { formatNameList } from '@/utils/assignees';
-import { entityDeepLink } from '@/utils/entityDeepLink';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
-import { addDaysYmd, resolveArrival } from '@/utils/flightStatus/schedule';
+import { addDaysYmd } from '@/utils/flightStatus/schedule';
 import {
+  arrivalPlace,
   arrivalRowMessage,
   checkedAgo,
   clockTime,
@@ -45,10 +47,15 @@ import { isChangeRecipient } from '@/utils/flightStatus/audience';
 import {
   CHANGE_NEWS_MS,
   flightLabel,
-  noticeRevision,
   occurrenceNotice,
   type OccurrenceNotice,
 } from '@/utils/flightStatus/occurrenceNotice';
+import {
+  arrivalAnnouncement,
+  arrivalLink,
+  travellerNames,
+} from '@/utils/flightStatus/arrivalAnnouncement';
+import { travelArrivalId } from '@/utils/notifications/travel';
 import type { CriticalItem } from '@/composables/useCriticalItems';
 
 /** How many days before today a departure is fetched: a flight across the date line can land
@@ -86,28 +93,17 @@ export interface TravelRowsContext {
   verificationFor: (segmentId: string) => FlightVerification | undefined;
   /** The travellers for whom this flight is the one home (`vacationStore.homecomingFor`). */
   homecomingFor: (segmentId: string) => readonly string[];
+  /** This device's "Family Flight Arrivals" switch (`settingsStore.familyArrivalAlerts`):
+   *  off, no arrival row. */
+  arrivals: boolean;
   /** Told about each row the builder had to skip (it threw). The caller reports it. */
   onSkipped?: (o: TravelSegmentOccurrence, err: unknown, row: TravelRowKind) => void;
 }
 
-/** The trip in Travel Plans, opened on this flight's card. */
+/** The trip in Travel Plans, opened on this flight's card (`arrivalLink`, so the arrival
+ *  reminder and bell entry open the same place). */
 function flightRoute(o: TravelSegmentOccurrence): CriticalItem['route'] {
-  return entityDeepLink('vacation', o.vacationId, { segment: o.segmentId });
-}
-
-/** "Jill and Sam" for the people on the flight, or null when it is the whole family. */
-function travellerNames(
-  ids: readonly string[],
-  ctx: TravelRowsContext
-): { names: string | null; count: number } {
-  const people = ids
-    .map((id) => ctx.resolveMember(id))
-    .filter((m): m is FamilyMember => !!m && !m.isPet);
-  const everyone = ctx.members.filter((m) => !m.isPet);
-  if (people.length === 0 || everyone.every((m) => people.some((p) => p.id === m.id))) {
-    return { names: null, count: everyone.length };
-  }
-  return { names: formatNameList(people.map((m) => m.name)), count: people.length };
+  return arrivalLink(o);
 }
 
 /**
@@ -212,23 +208,16 @@ function departureRow(o: TravelSegmentOccurrence, ctx: TravelRowsContext): Criti
 /**
  * The arrival row of a flight home, to the people at home: "Jill lands at 12:40am" on the
  * arrival day, "Jill lands tonight at 12:40am" the day before an arrival before
- * `EARLY_ARRIVAL_BEFORE`. The airline's estimate wins over the plan while a live check carries
- * one. None for anyone on the flight, a pet, a flight that is nobody's way home, or a
- * cancelled flight (on the plan, or known on this device only).
+ * `EARLY_ARRIVAL_BEFORE`. Who and when: `arrivalAnnouncement` (the airline's estimate wins over
+ * the plan while a live check carries one; none for anyone on the flight, a pet, a flight that
+ * is nobody's way home, or a cancelled flight). None at all with the device's switch off.
  * Caption: "SQ318 · SIN Terminal 1 · Checked 12 min ago · Belt 7 · Scheduled 12:40am".
  */
 function arrivalRow(o: TravelSegmentOccurrence, ctx: TravelRowsContext): CriticalItem | null {
-  if (!isFlightType(o.transportType)) return null;
-  if (ctx.viewer.isPet) return null;
-  if (resolveSegmentTravellers(o.travellerIds, o.tripAssigneeIds).includes(ctx.viewer.id)) {
-    return null;
-  }
-  const who = travellerNames(ctx.homecomingFor(o.segmentId), ctx);
-  if (who.names === null) return null;
-  const v = ctx.verificationFor(o.segmentId);
-  if (noticeRevision(o.live)?.kind === 'cancelled' || v?.state === 'cancelled') return null;
-  const arrival = resolveArrival(o.schedule, v?.live?.estimatedArrival);
+  if (!ctx.arrivals) return null;
+  const arrival = arrivalAnnouncement(o, ctx);
   if (!arrival) return null;
+  const v = ctx.verificationFor(o.segmentId);
   const tomorrow = addDaysYmd(ctx.today, 1);
   const when =
     arrival.date === ctx.today
@@ -240,15 +229,10 @@ function arrivalRow(o: TravelSegmentOccurrence, ctx: TravelRowsContext): Critica
   const belt = v?.live?.belt
     ? fillTemplate(ctx.t('nook.criticalTravelBelt'), { belt: v.live.belt })
     : undefined;
-  const arrivalCode = airportCode(o.arrivalAirport);
-  // Like the time: the airline's terminal wins while a live check carries one (a change this
-  // device has seen may not be written to the plan yet, e.g. on a view-only device).
-  const arrivalTerminal =
-    (v?.live ? v.provider?.arrivalTerminal : undefined) ?? o.schedule?.arrivalTerminal;
   const parts = [
-    flightLabel(o),
+    arrival.flight,
     // The airport always shows, with its terminal when one is known.
-    placeTerminal(ctx.t, arrivalCode, arrivalTerminal) || arrivalCode,
+    arrivalPlace(ctx.t, arrival),
     ...liveCaptionParts(v, ctx, belt),
     arrival.scheduledTime !== undefined
       ? fillTemplate(ctx.t('flightChecks.row.scheduled'), {
@@ -257,13 +241,13 @@ function arrivalRow(o: TravelSegmentOccurrence, ctx: TravelRowsContext): Critica
       : '',
   ];
   return {
-    id: `travel-arrival:${o.segmentId}`,
+    id: travelArrivalId(o.segmentId),
     type: 'travel',
     message: arrivalRowMessage(ctx.t, {
-      names: who.names,
-      count: who.count,
+      names: arrival.names,
+      count: arrival.count,
       time: arrival.time,
-      tonight: when === 'tonight',
+      wording: when,
     }),
     caption: parts.filter(Boolean).join(' · '),
     icon: transportEmoji(o.transportType, 'arrival'),

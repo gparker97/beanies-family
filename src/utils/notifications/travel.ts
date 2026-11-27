@@ -8,7 +8,11 @@
  *                     written without one: `<liveRevision>`, plus `~<liveArrivalTerminal>` when
  *                     the arrival terminal moved; `noticeRevision`);
  *   travel-change     (cancellation) `travel-cancel:<segmentId>:<liveRevision>@<liveCancelledAt>`
- *                     (`occurrenceNotice`'s cancel identity), same kind.
+ *                     (`occurrenceNotice`'s cancel identity), same kind;
+ *   travel-arrival    `travel-arrival:<segmentId>:<landing date>`, a family flight home, to the
+ *                     people at home, at landing minus the device's arrival lead (the same
+ *                     moment, and the same id, as the OS reminder). Dated, so a slip to
+ *                     another day is a new, unread entry. From `arrivalAnnouncement`'s list, not from the occurrences.
  *
  * Exactly one change entry per airline change: every id is built from the plan (the revision
  * and an occurrence ordinal), never from `liveAppliedAt`, so two devices that applied the same
@@ -30,8 +34,19 @@ import { isFlightType } from '@/utils/travelCodes';
 import { classifyAudience } from '@/utils/audience';
 import { formatNameList } from '@/utils/assignees';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
-import { DEFAULT_TRAVEL_LEADS, localDateTime, minusMinutes } from '@/utils/reminderSchedule';
+import {
+  DEFAULT_ARRIVAL_LEAD,
+  DEFAULT_TRAVEL_LEADS,
+  localDateTime,
+  minusMinutes,
+} from '@/utils/reminderSchedule';
 import { isChangeRecipient } from '@/utils/flightStatus/audience';
+import {
+  arrivalFireAt,
+  arrivalLink,
+  type ArrivalAnnouncement,
+} from '@/utils/flightStatus/arrivalAnnouncement';
+import { arrivalNoticeText, localYmd } from '@/utils/flightStatus/copy';
 import {
   flightLabel,
   noticeRevision,
@@ -46,6 +61,34 @@ export const travelChangeId = (segmentId: string, revision: string): string =>
   `travel-change:${segmentId}:${revision}`;
 export const travelCancelId = (segmentId: string, revision: string): string =>
   `travel-cancel:${segmentId}:${revision}`;
+// A family flight home: the OS arrival reminder, the bell's arrival entry and the briefing row.
+export const TRAVEL_ARRIVAL_PREFIX = 'travel-arrival:';
+/**
+ * `landingDate` is given by the bell and the OS reminder: a flight that slips to another day is
+ * a new entry (unread, and a new reminder), never the old one's read mark carried over. The
+ * briefing row omits it (its hide key is already per day).
+ */
+export const travelArrivalId = (segmentId: string, landingDate?: string): string =>
+  landingDate
+    ? `${TRAVEL_ARRIVAL_PREFIX}${segmentId}:${landingDate}`
+    : `${TRAVEL_ARRIVAL_PREFIX}${segmentId}`;
+
+const MS_PER_DAY = 86_400_000;
+/** How far ahead the bell looks for departures (a departure entry fires one lead before it). */
+export const TRAVEL_LOOKAHEAD_DAYS = 30;
+
+/**
+ * The departure days the bell's travel entries come from, `YYYY-MM-DD`: back as far as the
+ * bell's rolling window (`windowDays`; a change stays in the bell that long) and ahead
+ * `TRAVEL_LOOKAHEAD_DAYS`. The ONE range: `notificationsStore` and `useArrivalAnnouncements`
+ * both read it, so a change to the bell's window cannot silently drop arrival entries.
+ */
+export function bellTravelRange(nowMs: number, windowDays: number): { from: string; to: string } {
+  return {
+    from: localYmd(nowMs - windowDays * MS_PER_DAY),
+    to: localYmd(nowMs + TRAVEL_LOOKAHEAD_DAYS * MS_PER_DAY),
+  };
+}
 
 /**
  * How long after this device first saw a change/cancel notice its OS notice fires (the OS
@@ -75,6 +118,11 @@ export interface TravelNotificationContext {
   /** The deriver's own gate: the trigger has passed and is inside the rolling window. */
   inWindow: (triggerMs: number) => boolean;
   isRead: (id: string) => boolean;
+  /** The family flights home this viewer is told about (`useArrivalAnnouncements`; empty with
+   *  the device's switch off). Absent ⟹ none. */
+  arrivals?: readonly ArrivalAnnouncement[];
+  /** Device arrival lead (`settingsStore.familyArrivalLead`). Absent ⟹ `DEFAULT_ARRIVAL_LEAD`. */
+  arrivalLead?: number;
 }
 
 function departureEntry(
@@ -141,7 +189,38 @@ function noticeEntry(
   };
 }
 
-/** Departure reminders and airline-change notices for `occurrences` (departure sides only). */
+/**
+ * A family flight home, at the moment its OS reminder is due (`arrivalFireAt`), with the
+ * reminder's text. None once the flight is over: a flight that landed early would otherwise
+ * fall back to its planned time and still say "is scheduled to land".
+ */
+function arrivalEntry(
+  a: ArrivalAnnouncement,
+  ctx: TravelNotificationContext
+): AppNotification | null {
+  if (a.over) return null;
+  const trigger = arrivalFireAt(a, ctx.arrivalLead ?? DEFAULT_ARRIVAL_LEAD);
+  if (!trigger || !ctx.inWindow(trigger.getTime())) return null;
+  const id = travelArrivalId(a.segmentId, a.date);
+  const text = arrivalNoticeText(ctx.t, a, trigger, ctx.lang);
+  const link = arrivalLink(a);
+  return {
+    id,
+    kind: 'travel-arrival',
+    title: text.title,
+    subtitle: text.body || undefined,
+    occurredAt: trigger.toISOString(),
+    eventDate: a.date,
+    eventTime: a.time,
+    route: link.path,
+    query: link.query,
+    sourceId: a.segmentId,
+    read: ctx.isRead(id),
+  };
+}
+
+/** Departure reminders and airline-change notices for `occurrences` (departure sides only),
+ *  and the arrival entries of `ctx.arrivals`. */
 export function deriveTravelNotifications(
   occurrences: readonly TravelSegmentOccurrence[],
   ctx: TravelNotificationContext
@@ -156,6 +235,14 @@ export function deriveTravelNotifications(
       if (change) out.push(change);
     } catch (err) {
       console.warn(`[deriveTravelNotifications] skipped occurrence ${o?.segmentId ?? '?'}:`, err);
+    }
+  }
+  for (const a of ctx.arrivals ?? []) {
+    try {
+      const arrival = arrivalEntry(a, ctx);
+      if (arrival) out.push(arrival);
+    } catch (err) {
+      console.warn(`[deriveTravelNotifications] skipped arrival ${a?.segmentId ?? '?'}:`, err);
     }
   }
   return out;

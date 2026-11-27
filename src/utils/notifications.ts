@@ -19,7 +19,8 @@ import type { BeanTip } from '@/content/tips';
 import type { AppNotification } from '@/types/notifications';
 import type { TranslateFn } from '@/utils/format';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
-import { deriveTravelNotifications } from '@/utils/notifications/travel';
+import type { ArrivalAnnouncement } from '@/utils/flightStatus/arrivalAnnouncement';
+import { deriveTravelNotifications, TRAVEL_ARRIVAL_PREFIX } from '@/utils/notifications/travel';
 import { activityDisplayTitle } from '@/utils/occasions';
 import { normalizeAssignees } from '@/utils/assignees';
 import {
@@ -76,8 +77,24 @@ export const CARD_CHECKIN_PREFIX = 'card-checkin:';
 /** A daily-briefing row the member dismissed: `briefing-hide:<type>:<id>:<date>`. Only
  *  that day's (or that occurrence's) key matters, so 30 days is far more than enough. */
 export const BRIEFING_HIDE_PREFIX = 'briefing-hide:';
-const AGED_EXEMPT_PREFIXES = [CARD_MOVE_PREFIX, CARD_CHECKIN_PREFIX, BRIEFING_HIDE_PREFIX] as const;
+/**
+ * A family flight arrival's bell entry (`travel-arrival:<segmentId>:<landing date>`). It IS a bell notification,
+ * but whether a device derives it depends on that device's own switch, lead and live estimate,
+ * while read state is synced per member. Without this, a device that does not derive the entry
+ * would prune the read mark another device just wrote, and the entry would come back unread
+ * there. One per flight home, so it is kept by age like the keys above.
+ */
+const AGED_EXEMPT_PREFIXES = [
+  CARD_MOVE_PREFIX,
+  CARD_CHECKIN_PREFIX,
+  BRIEFING_HIDE_PREFIX,
+  TRAVEL_ARRIVAL_PREFIX,
+] as const;
 export const AGED_EXEMPT_MAX_DAYS = 30;
+/** The bell's rolling history window (days) for time-based kinds (`DeriveInput.windowDays`).
+ *  Its travel range is `bellTravelRange(now, WINDOW_DAYS)`, read by the store and by
+ *  `useArrivalAnnouncements` alike. */
+export const WINDOW_DAYS = 30;
 
 /** The shared occurrence shape (`calendar/occurrence.ts`). */
 export type NotificationOccurrence = ActivityOccurrence;
@@ -125,6 +142,11 @@ export interface DeriveInput {
   travelOccurrences?: readonly TravelSegmentOccurrence[];
   /** Device travel lead per type (`settingsStore.travelReminderLeads`), injected for purity. */
   travelReminderLeads?: Partial<Record<SupportedTravelType, number>>;
+  /** The family flights home this viewer is told about (`useArrivalAnnouncements`, shared with
+   *  the OS reminder; empty with the device's switch off). Absent ⟹ no arrival entries. */
+  arrivals?: readonly ArrivalAnnouncement[];
+  /** Device arrival lead (`settingsStore.familyArrivalLead`), injected for purity. */
+  arrivalLead?: number;
   /** The app's translator (`notificationsStore` supplies `useTranslationStore().t`), for
    *  the occasion milestone in an activity reminder's title. Injected to stay pure. */
   t: TranslateFn;
@@ -410,7 +432,7 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     }
   }
 
-  // ── travel-departure + travel-change (#143), one pure deriver ────────────────
+  // ── travel-departure + travel-change + travel-arrival (#143), one pure deriver ──
   out.push(
     ...deriveTravelNotifications(input.travelOccurrences ?? [], {
       viewer: currentMember,
@@ -419,6 +441,8 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       leads: input.travelReminderLeads ?? {},
       inWindow,
       isRead,
+      arrivals: input.arrivals,
+      arrivalLead: input.arrivalLead,
     })
   );
 

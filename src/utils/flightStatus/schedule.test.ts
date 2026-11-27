@@ -698,10 +698,15 @@ describe('resolveArrival: when the briefing says a flight lands', () => {
   const plan = { arrivalDate: '2026-12-14', arrivalTime: '00:40' };
 
   it('the plan, without an estimate', () => {
-    expect(resolveArrival(plan, undefined)).toEqual({ date: '2026-12-14', time: '00:40' });
+    expect(resolveArrival(plan, undefined)).toEqual({
+      date: '2026-12-14',
+      time: '00:40',
+      estimated: false,
+    });
     expect(resolveArrival({ arrivalDate: '2026-12-14', arrivalTime: '0:40' }, undefined)).toEqual({
       date: '2026-12-14',
       time: '00:40',
+      estimated: false,
     });
   });
 
@@ -710,9 +715,14 @@ describe('resolveArrival: when the briefing says a flight lands', () => {
       date: '2026-12-14',
       time: '01:15',
       scheduledTime: '00:40',
+      estimated: true,
     });
-    // An estimate on time adds nothing.
-    expect(resolveArrival(plan, '2026-12-14T00:40')).toEqual({ date: '2026-12-14', time: '00:40' });
+    // An estimate on time adds no scheduled time, but it is still the estimate.
+    expect(resolveArrival(plan, '2026-12-14T00:40')).toEqual({
+      date: '2026-12-14',
+      time: '00:40',
+      estimated: true,
+    });
   });
 
   it('an estimate can move the day', () => {
@@ -721,6 +731,7 @@ describe('resolveArrival: when the briefing says a flight lands', () => {
       date: '2026-12-14',
       time: '00:20',
       scheduledTime: '23:30',
+      estimated: true,
     });
   });
 
@@ -728,17 +739,22 @@ describe('resolveArrival: when the briefing says a flight lands', () => {
     expect(resolveArrival({ arrivalDate: '2026-12-14' }, '2026-12-14 01:15')).toEqual({
       date: '2026-12-14',
       time: '01:15',
+      estimated: true,
     });
   });
 
   it('a malformed estimate falls back to the plan', () => {
-    expect(resolveArrival(plan, 'soon')).toEqual({ date: '2026-12-14', time: '00:40' });
+    expect(resolveArrival(plan, 'soon')).toEqual({
+      date: '2026-12-14',
+      time: '00:40',
+      estimated: false,
+    });
   });
 
   it('an estimate with an unusable time falls back to the plan', () => {
     expect(
       resolveArrival({ arrivalDate: '2026-12-14', arrivalTime: '00:40' }, '2026-12-14T24:00')
-    ).toEqual({ date: '2026-12-14', time: '00:40' });
+    ).toEqual({ date: '2026-12-14', time: '00:40', estimated: false });
   });
 
   it('null without a date, without a time, or with an invalid time', () => {

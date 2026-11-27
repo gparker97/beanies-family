@@ -28,9 +28,11 @@ export const NOTIFICATION_KIND_PRESENTATION: Record<NotificationKind, KindPresen
   'list-due': { accent: 'list', icon: '🧾' },
   'list-completed': { accent: 'list', icon: '🧾' },
   'calendar-reconnect': { accent: 'calendar-reconnect', icon: '📅' },
-  // Live flight checks (#143): one departure, and the airline's change or cancellation of it.
+  // Live flight checks (#143): one departure, the airline's change or cancellation of it, and a
+  // family flight home landing.
   'travel-departure': { accent: 'travel', icon: '✈️' },
   'travel-change': { accent: 'travel', icon: '🔄' },
+  'travel-arrival': { accent: 'travel', icon: '🛬' },
   'whats-new': { accent: 'whats-new', icon: '✨', detailBody: WhatsNewBody },
   announcement: { accent: 'announcement', icon: '📣', detailBody: AnnouncementBody },
   tip: { accent: 'tip', icon: '💡', detailBody: TipBody },
@@ -73,6 +75,8 @@ export function kindLabelKey(kind: NotificationKind, overdue?: boolean): UIStrin
       return 'notifications.kindTravelDeparture';
     case 'travel-change':
       return 'notifications.kindTravelChange';
+    case 'travel-arrival':
+      return 'notifications.kindTravelArrival';
     case 'whats-new':
       return 'notifications.kindWhatsNew';
     case 'announcement':
@@ -121,9 +125,11 @@ export function notificationSummary(n: AppNotification, t: T): string {
       });
     case 'calendar-reconnect':
       return t('notifications.calendarReconnectSummary');
-    // The deriver puts the flight (departure) or the prior values (change) in `subtitle`.
+    // The deriver puts the flight (departure), the prior values (change) or the flight and
+    // where it lands (arrival) in `subtitle`.
     case 'travel-departure':
     case 'travel-change':
+    case 'travel-arrival':
       return n.subtitle ?? '';
     case 'whats-new':
       return n.title; // the release month (e.g. "may 2026")

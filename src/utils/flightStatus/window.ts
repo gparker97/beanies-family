@@ -24,8 +24,14 @@ const HOUR_MS = 60 * MINUTE_MS;
 
 /** The window opens this long before scheduled departure (Requirement 3). */
 export const WINDOW_OPENS_BEFORE_MS = 72 * HOUR_MS;
-/** ...and closes this long after scheduled arrival. */
+/** ...and closes this long after arrival: the scheduled one, or the airline's later estimate. */
 export const WINDOW_CLOSES_AFTER_MS = 2 * HOUR_MS;
+/**
+ * How far past its scheduled arrival a delayed flight's estimate may hold the window open. A
+ * flight delayed for hours is exactly when the people meeting it need the checks, but an
+ * estimate is vendor data: one absurd value must not keep a flight being checked for days.
+ */
+export const MAX_DELAY_EXTENSION_MS = 24 * HOUR_MS;
 /** The store's visible-tab poll. Each tick only asks; `minIntervalMs` decides. */
 export const FLIGHT_POLL_MS = 15 * MINUTE_MS;
 
@@ -33,6 +39,15 @@ export const FLIGHT_POLL_MS = 15 * MINUTE_MS;
 export const INTERVAL_FAR_MS = 6 * HOUR_MS;
 export const INTERVAL_DAY_MS = 30 * MINUTE_MS;
 export const INTERVAL_NEAR_MS = 10 * MINUTE_MS;
+/**
+ * The floors while a flight is only still in its window because the airline's estimate is later
+ * than the schedule (a long delay), from the time left before the estimate: hourly when it is
+ * more than 3 h off, every 30 min inside 3 h, and the near floor from 1 h before it (the
+ * approach, the landing and the belt). The wait can last many hours and each check may be a
+ * provider call against the daily cap, so it is only as fast as the landing is near.
+ */
+export const INTERVAL_OVERDUE_FAR_MS = HOUR_MS;
+export const INTERVAL_OVERDUE_MS = 30 * MINUTE_MS;
 /**
  * The floor for a check the person asked for ("Check now"): a flight inside its window is
  * asked again once its last answer is this old, whatever the automatic floor says. Only ever
@@ -134,6 +149,49 @@ export function arrivalInstant(
   return zonedInstant(date, time, homeZone);
 }
 
+/** A flight that will not land: its last estimate must not hold the window open. */
+const isCancelled = (status: string | undefined): boolean =>
+  status === 'Canceled' || status === 'CanceledUncertain';
+
+/**
+ * When the airline now expects the flight to land, from a fitting cached check: the arrival
+ * sector's `revisedLocal` (a wall clock WITH its offset, so it is an instant); or, when only
+ * the departure has been revised (the usual state of a flight delayed on the ground), the
+ * scheduled arrival moved by the departure's delay.
+ *
+ * Null without a fitting check, for a cancelled flight, without any estimate, for a value that
+ * names no zone, or when the arrival sector carries no `scheduledUtc`: the estimate is then
+ * compared with nothing from the same leg (the segment's own arrival time is read in the home
+ * zone, and that gap would look like a delay).
+ */
+export function estimatedArrivalInstant(
+  seg: TimedSegment,
+  check: FlightCheck | undefined
+): number | null {
+  if (!cachedLegFits(seg, check)) return null;
+  const leg = check!.leg!;
+  const arrivalLeg = check!.arrivalLeg === undefined ? leg : check!.arrivalLeg;
+  if (!arrivalLeg || isCancelled(leg.status) || isCancelled(arrivalLeg.status)) return null;
+  const scheduled = parseUtcMs(arrivalLeg.arrival.scheduledUtc);
+  if (scheduled === null) return null;
+  const revised = parseUtcMs(arrivalLeg.arrival.revisedLocal);
+  if (revised !== null) return revised;
+  const departs = parseUtcMs(leg.departure.scheduledUtc);
+  const departsRevised = parseUtcMs(leg.departure.revisedLocal);
+  if (departs === null || departsRevised === null || departsRevised <= departs) return null;
+  return scheduled + (departsRevised - departs);
+}
+
+/**
+ * The arrival the window closes on: the scheduled one, or the airline's estimate when that is
+ * later, held to `MAX_DELAY_EXTENSION_MS` past the schedule. An estimate EARLIER than the
+ * schedule never closes the window sooner (the leg reading Arrived does that).
+ */
+export function windowArrival(arrivalMs: number | null, estimateMs: number | null): number | null {
+  if (arrivalMs === null || estimateMs === null || estimateMs <= arrivalMs) return arrivalMs;
+  return Math.min(estimateMs, arrivalMs + MAX_DELAY_EXTENSION_MS);
+}
+
 export interface CheckWindow {
   /** Now is inside [departure - 72 h, arrival + 2 h]. */
   inWindow: boolean;
@@ -146,7 +204,8 @@ export interface CheckWindow {
 }
 
 /**
- * The check window: 72 h before scheduled departure to 2 h after scheduled arrival. An
+ * The check window: 72 h before scheduled departure to 2 h after arrival (`flightTiming` passes
+ * `windowArrival`: the schedule, or a later estimate). An
  * unknown arrival (or one before departure, a data error) closes on the departure instant.
  */
 export function checkWindow(
@@ -161,6 +220,14 @@ export function checkWindow(
   return { inWindow: true, past: false, closesAt };
 }
 
+/** The floor while a delayed flight is held in its window by its estimate (see the constants). */
+export function overdueIntervalMs(estimateMs: number, nowMs: number): number {
+  const left = estimateMs - nowMs;
+  if (left > 3 * HOUR_MS) return INTERVAL_OVERDUE_FAR_MS;
+  if (left > HOUR_MS) return INTERVAL_OVERDUE_MS;
+  return INTERVAL_NEAR_MS;
+}
+
 /** The per-flight floor between two checks, from the time left before departure. */
 export function minIntervalMs(departureMs: number, nowMs: number): number {
   const left = departureMs - nowMs;
@@ -173,7 +240,8 @@ export interface FlightTiming {
   departureMs: number | null;
   arrivalMs: number | null;
   inWindow: boolean;
-  /** Window closed, or the cached leg reports `Arrived`. */
+  /** Window closed (2 h after the scheduled arrival, or after a later estimate), or the cached
+   *  leg reports `Arrived`. */
   past: boolean;
   /** Scheduled departure has passed (drives the end of the `changed` notice). */
   departed: boolean;
@@ -204,9 +272,15 @@ export function flightTiming(
       minIntervalMs: INTERVAL_FAR_MS,
     };
   }
-  const w = checkWindow(departureMs, arrivalMs, nowMs);
+  // A delayed flight stays in its window until 2 h after the airline's estimate: the people
+  // meeting it need the estimate, the belt and "Arrived" most when the wait is long.
+  const landsMs = windowArrival(arrivalMs, estimatedArrivalInstant(seg, check));
+  const w = checkWindow(departureMs, landsMs, nowMs);
   const arrived = cachedLegFits(seg, check) && check?.leg?.status === 'Arrived';
   const past = w.past || arrived;
+  // In the window only thanks to the estimate: the scheduled window would have closed by now.
+  const overdue =
+    !past && nowMs > Math.max(departureMs, arrivalMs ?? departureMs) + WINDOW_CLOSES_AFTER_MS;
   return {
     departureMs,
     arrivalMs,
@@ -214,7 +288,10 @@ export function flightTiming(
     past,
     departed: nowMs >= departureMs,
     ...(w.opensAt !== undefined ? { opensAt: w.opensAt } : {}),
-    minIntervalMs: minIntervalMs(departureMs, nowMs),
+    minIntervalMs:
+      overdue && landsMs !== null
+        ? overdueIntervalMs(landsMs, nowMs)
+        : minIntervalMs(departureMs, nowMs),
   };
 }
 
