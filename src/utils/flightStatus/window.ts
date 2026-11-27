@@ -14,7 +14,7 @@
  * write over a plan record another device wrote) is its own input, `superseded`, never
  * inferred from a missing check: it is fetched once, in the window or out of it.
  */
-import type { FlightCheck } from '@/types/flightStatus';
+import type { FlightCheck, FlightLeg } from '@/types/flightStatus';
 import type { VacationTravelSegment } from '@/types/models';
 import { wallClockInZone } from '@/utils/timeZone';
 import { datePart, hhmm, parseUtcMs, splitLocal } from './schedule';
@@ -174,12 +174,21 @@ export function estimatedArrivalInstant(
   if (!arrivalLeg || isCancelled(leg.status) || isCancelled(arrivalLeg.status)) return null;
   const scheduled = parseUtcMs(arrivalLeg.arrival.scheduledUtc);
   if (scheduled === null) return null;
+  // The later of the two answers: an arrival estimate that only echoes the schedule must not
+  // hide a ground delay the departure side already shows.
   const revised = parseUtcMs(arrivalLeg.arrival.revisedLocal);
-  if (revised !== null) return revised;
+  // The sector that lands is the one whose delay counts; the first sector's is the fallback.
+  const delay = groundDelayMs(arrivalLeg) ?? (arrivalLeg === leg ? null : groundDelayMs(leg));
+  const shifted = delay === null ? null : scheduled + delay;
+  if (revised === null) return shifted;
+  return shifted === null ? revised : Math.max(revised, shifted);
+}
+
+/** How late a sector's departure is revised to be, in ms; null when it is not revised later. */
+function groundDelayMs(leg: FlightLeg): number | null {
   const departs = parseUtcMs(leg.departure.scheduledUtc);
-  const departsRevised = parseUtcMs(leg.departure.revisedLocal);
-  if (departs === null || departsRevised === null || departsRevised <= departs) return null;
-  return scheduled + (departsRevised - departs);
+  const revised = parseUtcMs(leg.departure.revisedLocal);
+  return departs === null || revised === null || revised <= departs ? null : revised - departs;
 }
 
 /**
@@ -274,9 +283,12 @@ export function flightTiming(
   }
   // A delayed flight stays in its window until 2 h after the airline's estimate: the people
   // meeting it need the estimate, the belt and "Arrived" most when the wait is long.
-  const landsMs = windowArrival(arrivalMs, estimatedArrivalInstant(seg, check));
-  const w = checkWindow(departureMs, landsMs, nowMs);
-  const arrived = cachedLegFits(seg, check) && check?.leg?.status === 'Arrived';
+  const estimateMs = estimatedArrivalInstant(seg, check);
+  const w = checkWindow(departureMs, windowArrival(arrivalMs, estimateMs), nowMs);
+  // The sector that lands decides: on a one-number multi-stop flight the first sector reading
+  // Arrived at the stopover is not the booking's arrival.
+  const lastLeg = check?.arrivalLeg ?? check?.leg;
+  const arrived = cachedLegFits(seg, check) && lastLeg?.status === 'Arrived';
   const past = w.past || arrived;
   // In the window only thanks to the estimate: the scheduled window would have closed by now.
   const overdue =
@@ -288,9 +300,11 @@ export function flightTiming(
     past,
     departed: nowMs >= departureMs,
     ...(w.opensAt !== undefined ? { opensAt: w.opensAt } : {}),
+    // The floor follows the airline's own estimate, not the capped one the window closes on:
+    // a flight said to be 30 h late is not "about to land" at hour 23.
     minIntervalMs:
-      overdue && landsMs !== null
-        ? overdueIntervalMs(landsMs, nowMs)
+      overdue && estimateMs !== null
+        ? overdueIntervalMs(estimateMs, nowMs)
         : minIntervalMs(departureMs, nowMs),
   };
 }

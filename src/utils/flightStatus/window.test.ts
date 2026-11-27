@@ -212,6 +212,43 @@ describe('flightTiming', () => {
       expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T07:20:00Z')).past).toBe(true);
     });
 
+    it('an arrival estimate that only echoes the schedule does not hide a ground delay', () => {
+      const check = makeCheck(
+        makeLeg({
+          status: 'Delayed',
+          dep: { revisedLocal: '2026-12-13 15:00+00:00' },
+          arr: { revisedLocal: '2026-12-13 23:10+00:00' },
+        })
+      );
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T07:00:00Z')).inWindow).toBe(true);
+    });
+
+    it('a multi-stop flight: the sector that lands gives the delay and the Arrived', () => {
+      // First sector on time and Arrived at the stopover; the last sector leaves 5 h late.
+      const first = makeLeg({ status: 'Arrived' });
+      const last = makeLeg({
+        status: 'Delayed',
+        dep: { scheduledUtc: '2026-12-13 14:00Z', revisedLocal: '2026-12-13 19:00+00:00' },
+      });
+      const check = { ...makeCheck(first), arrivalLeg: last };
+      // Scheduled 23:10Z + 5 h = 04:10Z, window to 06:10Z; not past although sector one landed.
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T05:00:00Z'))).toMatchObject({
+        inWindow: true,
+        past: false,
+      });
+      const landed = { ...check, arrivalLeg: { ...last, status: 'Arrived' } };
+      expect(flightTiming(makeFlight(), landed, SG, at('2026-12-14T05:00:00Z')).past).toBe(true);
+    });
+
+    it('the floor follows the airline\u2019s estimate, not the capped window', () => {
+      // Estimate 30 h late; the window is capped at 24 h + 2 h. At hour 23 the landing is still
+      // 7 h away by the airline's own estimate: hourly, not every 10 minutes.
+      const check = delayed('2026-12-15 05:10+00:00');
+      expect(flightTiming(makeFlight(), check, SG, at('2026-12-14T22:10:00Z')).minIntervalMs).toBe(
+        INTERVAL_OVERDUE_FAR_MS
+      );
+    });
+
     it('a cancelled flight lends no estimate', () => {
       for (const status of ['Canceled', 'CanceledUncertain']) {
         const check = delayed('2026-12-14 06:00+00:00', status);

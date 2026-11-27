@@ -80,6 +80,10 @@ const activityLeadOptions = computed(() =>
   }))
 );
 
+// Every notice picker on this page: wide enough for its longest option ("30 minutes before")
+// beside the chevron, so the chosen value is never cut off, and one width so the pickers line up.
+const LEAD_SELECT_CLASS = 'w-48 flex-none';
+
 // One row per travel type the app can fire on. "Flights" drives all three
 // flight legs (outbound, return, other: they share a lead).
 const TRAVEL_ROWS: {
@@ -329,7 +333,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
         </div>
       </div>
       <BaseSelect
-        class="w-40 flex-none"
+        :class="LEAD_SELECT_CLASS"
         :model-value="settingsStore.activityReminderLead"
         :options="activityLeadOptions"
         :aria-label="t('reminders.activities')"
@@ -350,7 +354,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
         </p>
       </div>
       <BaseSelect
-        class="w-40 flex-none"
+        :class="LEAD_SELECT_CLASS"
         :model-value="travelLeadFor(row.types)"
         :options="leadOptions"
         :aria-label="t(row.labelKey)"
@@ -373,7 +377,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
         :label="t('reminders.familyArrivalsNotice')"
       >
         <BaseSelect
-          class="w-40 flex-none"
+          :class="LEAD_SELECT_CLASS"
           data-testid="family-arrivals-lead"
           :model-value="settingsStore.familyArrivalLead"
           :options="leadOptions"
@@ -397,7 +401,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
         </div>
       </div>
       <BaseSelect
-        class="w-40 flex-none"
+        :class="LEAD_SELECT_CLASS"
         :model-value="settingsStore.todoReminderLead"
         :options="leadOptions"
         :aria-label="t('reminders.timedTodos')"
@@ -485,7 +489,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
           <!-- How far ahead (family-synced) -->
           <SettingSubRow class="mt-2.5 pl-[2.1rem]" :label="t('settings.helpfulHints.howFarAhead')">
             <BaseSelect
-              class="w-40 flex-none"
+              :class="LEAD_SELECT_CLASS"
               :model-value="row.lead"
               :options="hintLeadOptions"
               :aria-label="t('settings.helpfulHints.howFarAhead')"

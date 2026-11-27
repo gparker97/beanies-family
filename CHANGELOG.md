@@ -24,6 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Fixed opening an item from the notification bell sometimes doing nothing on the first tap.
 - Fixed explanation text in Settings that was smaller than the rest of the app.
+- Fixed the notice pickers in Settings › Reminders cutting off the chosen time.
 
 ## 2026-11-26
 
