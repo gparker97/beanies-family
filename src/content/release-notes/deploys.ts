@@ -17,6 +17,46 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.27',
+    date: '2026-11-27',
+    month: '27 november 2026',
+    summary: {
+      en: 'Travel plans now tell the family at home when someone is landing.',
+      beanie: 'travel plans now tell the family at home when someone is landing.',
+    },
+    features: [
+      {
+        icon: '🛬',
+        title: { en: 'Family flight arrivals', beanie: 'family flight arrivals' },
+        description: {
+          en: 'When someone is flying home, everyone else sees when they land in the daily briefing, with the airport and terminal, and gets a reminder before landing. The switch and timing are in Settings > Reminders.',
+          beanie:
+            'when someone is flying home, everyone else sees when they land in the daily briefing, with the airport and terminal, and gets a reminder before landing. the switch and timing are in settings > reminders.',
+        },
+        tryItRoute: '/settings',
+      },
+      {
+        icon: '🛫',
+        title: { en: 'Both terminals on a flight', beanie: 'both terminals on a flight' },
+        description: {
+          en: 'A flight now shows its departure terminal and its arrival terminal, each under its own airport.',
+          beanie:
+            'a flight now shows its departure terminal and its arrival terminal, each under its own airport.',
+        },
+        tryItRoute: '/travel',
+      },
+      {
+        icon: '🛠️',
+        title: { en: 'Fixes', beanie: 'fixes' },
+        description: {
+          en: 'A delayed flight is now checked until it lands. Fixed a notification bell item not opening on the first tap, and small text in Settings.',
+          beanie:
+            'a delayed flight is now checked until it lands. fixed a notification bell item not opening on the first tap, and small text in settings.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.23',
     date: '2026-11-23',
     month: '23 november 2026',
